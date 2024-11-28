@@ -19,8 +19,8 @@ verbose = ctypes.c_int(0)
 seed = ctypes.c_int(-1)
 
 idx = 0
-example_len=512
-dataset_path = '../data/perfect_signal'
+example_len=100
+dataset_path = '../data/default'
 
 rrc = ctypes.CDLL(os.path.abspath('../cmodules/rrc_rx'))
 linear = ctypes.CDLL(os.path.abspath('../cmodules/linear_demodulate'))
