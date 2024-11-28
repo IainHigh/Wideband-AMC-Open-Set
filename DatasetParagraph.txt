@@ -1,0 +1,19 @@
+This following paragraph is from "Convolutional Radio Modulation Recognition Networks" by O'Shea. A similar paragraph could be used in our final paper.
+
+Evaluation Dataset:
+
+While simulation and the use of synthetic data sets for learning is sometimes frowned upon in machine learning, radio communications presents a special case. Training with real data is important and valuable - and will be addressed in future work - but certain properties of the domain allow us to say our simulation is quite meaningful. Radio communications signals are in reality synthetically generated, and we do so deterministically in a way identical to a real system, introducing modulation, pulse shaping, carried data, and other well characterized transmit parameters identical to a real world signal. We modulate real voice and text data sets onto the signal. In the case of digital modulation we whiten the data using a block randomizer to ensure bits are equiprobable. Radio channel effects are relatively well characterized. We employ robust models for time varying multi-path fading of the channel impulse response, random walk drifting of carrier frequency oscillator and sample time clocks, and additive Gaussian white noise. We pass our synthetic signal sets through harsh channel models which introduce unknown scale, translation, dilation, and impulsive noise onto our signal. We model the generation of this dataset in GNU Radio [3]usingtheGNU Radio channel model [14] blocks and then slice each time series signal up into a test and traning set using a 128 samples rectangular windowing process. The total dataset is roughly 500 MBytes stored as a python pickle file with complex 32 bit floating point samples. 
+
+Dataset Availability This data will hopefully be of great use to others in the field and may serve as a benchmark for this domain. This dataset is available in pickled python format at http://radioml.com, consisting of time-windowed examples and corresponding modulation class and SNR labels. We hope to grow scope of modulations addressed and the channel realism as interest in this area.
+
+Dataset Parameters:
+
+We focus on a dataset consisting of 11 modulations: 8 digital and 3 analog modulation, all are widely used in wireless communications systems all around us. These consist of BPSK, QPSK, 8PSK, 16QAM, 64QAM, BFSK, CPFSK, and PAM4 for digital modulations, and WB-FM, AM-SSB, and AM-DSB for analog modulations. Data is modulated at a rate of roughly 8 samples per symbol with a normalized average transmit power of 0 dB. 3.3 
+
+Dataset Visualization:
+
+Fig. 1. Time domain of high-SNR example classes Fig. 2. Power spectrum of high-SNR example classes
+
+Inspecting a single example from each class of modulation in the time (Fig. 1) and frequency domain (Fig. 2), we see a number of similarities and difference between modulations visually, but due to pulse shaping, distortion and other channel effects they are not all readily discernible by a human expert visually. In the frequency domain, each of the signals follows a similar band-limited power envelope by design whose shape provides some clues as to the modulation, but against poses a difficult noisy task for a human expert to judge visually.
+
+
