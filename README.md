@@ -6,11 +6,8 @@ TO RUN THIS PROJECT:
 3) To run code:
     $ python3 generator.py ./configs/defaults.json
 4) Output will be found in the data directory.
-
 5) To run plotting python scripts:
-    $ cd tests; python3 plot_constellation_diagram.py; cd ..
-    $ cd tests; python3 plot_time_domain_diagram.py; cd ..
-    $ cd tests; python3 plot_frequency_domain_diagram.py; cd ..
+    $ cd tests; python3 plot_dataset.py; cd ..
 
 To close:
 1) close the virtual environment
