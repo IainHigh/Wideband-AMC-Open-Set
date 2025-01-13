@@ -65,5 +65,5 @@ for i in range(len(files)):
     plt.grid(True, linestyle='--', alpha=0.5)
     cbar = plt.colorbar()  # Add colorbar to explain density
     cbar.set_label('Density')
-    plt.savefig(f'../tests/figures/constellation_{modscheme}.png')
+    plt.savefig(f'../tests/figures/Constellation-Diagrams/constellation_{modscheme}.png')
     plt.close()

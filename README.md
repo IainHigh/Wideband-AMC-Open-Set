@@ -4,8 +4,13 @@ TO RUN THIS PROJECT:
 2) Activate virtual python environment
     $ source venv/bin/activate
 3) To run code:
-    $ python generator.py ./configs/example.json
+    $ python3 generator.py ./configs/defaults.json
 4) Output will be found in the data directory.
+
+5) To run plotting python scripts:
+    $ cd tests; python3 plot_constellation_diagram.py; cd ..
+    $ cd tests; python3 plot_time_domain_diagram.py; cd ..
+    $ cd tests; python3 plot_frequency_domain_diagram.py; cd ..
 
 To close:
 1) close the virtual environment

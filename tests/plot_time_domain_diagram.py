@@ -14,12 +14,15 @@ import matplotlib.pyplot as plt
 np.Inf = np.inf # Fix for a bug in the numpy library 
 from utils import mod_str2int as mod_map
 
-save_plots = True
+# Empty out the Time-Domain diagram directory
+for file in os.listdir('../tests/figures/Time-Domain'):
+    os.remove(f'../tests/figures/Time-Domain/{file}')
+
 verbose = ctypes.c_int(0)
 seed = ctypes.c_int(-1)
 
 idx = 0
-example_len=100
+example_len=300
 dataset_path = '../data/default'
 
 rrc = ctypes.CDLL(os.path.abspath('../cmodules/rrc_rx'))
@@ -57,5 +60,5 @@ for i in range(len(files)):
     plt.plot(Q, label='Q')
     plt.xlabel('t')
     plt.legend()
-    plt.savefig('../tests/figures/'+modscheme+str(i)+'.png')
+    plt.savefig('../tests/figures/Time-Domain/'+modscheme+'.png')
     plt.close()

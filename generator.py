@@ -23,27 +23,40 @@ cfsk = ctypes.CDLL(os.path.abspath("./cmodules/fsk_modulate"))
 ctx = ctypes.CDLL(os.path.abspath("./cmodules/rrc_tx"))
 cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
 
+def append_capture_data(I_total, Q_total, I, Q):
+    """Helper function to append captures to the total data."""
+    return np.concatenate((I_total, I)), np.concatenate((Q_total, Q))
 
 def generate_linear(idx_start, mod, config):
     verbose = ctypes.c_int(config["verbose"])
     modtype = ctypes.c_int(mod[0])
-    n_samps = ctypes.c_int(config["n_samps"]+buf)
+    n_samps = ctypes.c_int(config["n_samps"] + buf)
     
-    sig_params = [(_sps, _beta, _delay, _dt) for _sps in config["symbol_rate"] for _beta in config["rrc_filter"]["beta"] for _delay in config["rrc_filter"]["delay"] for _dt in config["rrc_filter"]["dt"]]
+    sig_params = [
+        (_sps, _beta, _delay, _dt)
+        for _sps in config["symbol_rate"]
+        for _beta in config["rrc_filter"]["beta"]
+        for _delay in config["rrc_filter"]["delay"]
+        for _dt in config["rrc_filter"]["dt"]
+    ]
     idx = np.random.choice(len(sig_params), config["n_captures"])
     sig_params = [sig_params[_idx] for _idx in idx]
     idx = np.random.choice(len(config["channel_params"]), config["n_captures"])
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
+    # Initialize total IQ data for concatenation
+    I_total = np.array([], dtype=np.float32)
+    Q_total = np.array([], dtype=np.float32)
+
     for i in range(0, config["n_captures"]):
         seed = ctypes.c_int(np.random.randint(1e9))
         snr = ctypes.c_float(channel_params[i][0])
-        fo = ctypes.c_float(2.*channel_params[i][1]*np.pi)
-        po = ctypes.c_float(channel_params[i][2]) 
+        fo = ctypes.c_float(2. * channel_params[i][1] * np.pi)
+        po = ctypes.c_float(channel_params[i][2])
 
         order = ctypes.c_int(mod[1])
         sps = ctypes.c_int(sig_params[i][0])
-        n_sym = n_sym = ctypes.c_int(int(np.ceil(n_samps.value/sps.value)))
+        n_sym = ctypes.c_int(int(np.ceil(n_samps.value / sps.value)))
         beta = ctypes.c_float(sig_params[i][1])
         delay = ctypes.c_uint(int(sig_params[i][2]))
         dt = ctypes.c_float(sig_params[i][3])
@@ -60,32 +73,36 @@ def generate_linear(idx_start, mod, config):
         ctx.rrc_tx(n_sym, sps, delay, beta, dt, smI, smQ, xI, xQ, verbose)
         cchan.channel(snr, n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
 
-        metadata = {"modname":mod[-1],
-                    "modclass":modtype.value,
-                    "order":order.value,
-                    "n_samps":n_samps.value-buf,
-                    "channel_type":config["channel_type"],
-                    "snr":snr.value,
-                    "filter_type":"rrc",
-                    "sps":sps.value,
-                    "delay":delay.value,
-                    "beta":beta.value,
-                    "dt":dt.value,
-                    "fo":fo.value,
-                    "po":po.value,
-                    "savepath":config["savepath"],
-                    "savename":config["savename"]}
-        
         ## convert to numpy arrays
         I = np.array([_i for _i in yI])
         I = I[halfbuf:-halfbuf]
         Q = np.array([_q for _q in yQ])
         Q = Q[halfbuf:-halfbuf]
 
-        ## save record in sigmf format
-        save_sigmf(I, Q, metadata, idx_start+i)
+        # Append data to the total I and Q arrays
+        I_total, Q_total = append_capture_data(I_total, Q_total, I, Q)
 
-    return idx_start+i+1
+    # Save the concatenated captures for the modulation scheme
+    metadata = {
+        "modname": mod[-1],
+        "modclass": modtype.value,
+        "order": order.value,
+        "n_samps": I_total.size,  # Total samples across all captures
+        "channel_type": config["channel_type"],
+        "snr": snr.value,
+        "filter_type": "rrc",
+        "sps": sps.value,
+        "delay": delay.value,
+        "beta": beta.value,
+        "dt": dt.value,
+        "fo": fo.value,
+        "po": po.value,
+        "savepath": config["savepath"],
+        "savename": config["savename"],
+    }
+
+    save_sigmf(I_total, Q_total, metadata, idx_start)
+    return idx_start + 1  # Single output file per modulation scheme
 
 def generate_am(idx_start, mod, config):
     verbose = ctypes.c_int(config["verbose"])
