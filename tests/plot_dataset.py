@@ -11,9 +11,6 @@ np.Inf = np.inf  # Fix for a bug in the numpy library
 # Results can be compared to the IQEngine Signal Generator:
 # https://iqengine.org/siggen
 
-# TODO:
-# - Add frequency as a parameter into the defaults.json file (can then calculate time from frequency, sample rate + total samples). Frequency should also be able to be a range - can then be used for wideband generation of signals.
-
 #####################################################################
 ####################### MODIFIABLE VARIABLES ########################
 #####################################################################
