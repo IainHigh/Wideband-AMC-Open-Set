@@ -39,10 +39,10 @@ A JSON configuration file must be provided on the command line which contains th
 Basic error checking is performed in `./utils/config_utils.py`, and defaults parameters (set in `./configs/defaults.json`) are provided for any missing values.
 Configuration files should contain the following parameters:
 
- - `n_captures`: the number of captures to generate per modulation scheme
- - `n_samps`: the number of raw IQ samples per capture
+ - `n_captures`: the number of captures to generate per modulation scheme. e.g. 10 will create 10 different files for each modulation type.
+ - `n_samps`: the number of raw IQ samples per capture. This will be the length the IQ list after taking samples.
  - `modulations`: the modulation schemes to include in the dataset (may include "bpsk", "qpsk", "8psk", "16psk", "4dpsk", "16qam", "32qam", "64qam", "16apsk", "32apsk", "fsk5k", "fsk75k", "gfsk5k", "gfsk75k", "msk", "gmsk", "fmnb", "fmwb", "dsb", "dsbsc", "lsb", "usb", and "awgn")
- - `symbol_rate`: number of samples per signal, list of desired symbol rates accepted
+ - `symbol_rate`: number of samples per signal, list of desired symbol rates accepted. Lower value means less samples per signal = more signals over total sample space.
  - `am_defaults`: default analog modulation parameters, including modulation index in the form [start, stop, step]
  - `fmnb_defaults`: default narrowband frequency modulation parameters, including modulation factor in the form [start, stop, step]
  - `fmwb_defaults`: default wideband frequency modulation parameters, including modulation factor in the form [start, stop, step]

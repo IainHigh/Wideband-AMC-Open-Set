@@ -1,8 +1,8 @@
 {
-    "n_captures": 1,
-    "n_samps": 65536,
+    "n_captures": 10,
+    "n_samps": 1048576, 
     "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
-    "symbol_rate": 20,
+    "symbol_rate": 5,
     "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},
     "fmnb_defaults": {"modulation_factor": [0.03, 0.08, 0.01]},
     "fmwb_defaults": {"modulation_factor": [0.5, 0.8, 0.1]},

@@ -12,6 +12,7 @@ np.Inf = np.inf  # Fix for a bug in the numpy library
 # https://iqengine.org/siggen
 
 # TODO:
+# - Add frequency as a parameter into the defaults.json file (can then calculate time from frequency, sample rate + total samples). Frequency should also be able to be a range - can then be used for wideband generation of signals.
 # - Generate signals on IQEngine Signal Generator and compare results
 # - Test generating with different signal parameters (defaults.json)
 
@@ -28,8 +29,11 @@ constellation_diagram_output_path = "../tests/figures/Constellation-Diagrams"
 spectrogram_output_path = "../tests/figures/Spectrograms"
 
 # Time domain plotting parameters - time domain is too large to plot all at once
-time_domain_length = 300
+time_domain_length = 600
 time_domain_start_index = 0
+
+# Constellation diagram plotting parameters:
+samples = 10000  # Number of samples to plot in the constellation diagram
 
 # Spectrogram plotting parameters:
 spectrogram_fft_size = 1024  # Size of the FFT
@@ -122,6 +126,13 @@ def plot_frequency_domain_diagram(f_data, modscheme):
 def plot_constellation_diagram(f_data, modscheme):
     I = f_data[0::2]
     Q = f_data[1::2]
+
+    print(len(I), len(Q))
+
+    # Choose a subset of samples to plot
+    if len(I) > samples:
+        I = I[:samples]
+        Q = Q[:samples]
 
     # Density-based coloring
     xy = np.vstack([I, Q])
