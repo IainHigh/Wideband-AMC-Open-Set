@@ -28,7 +28,7 @@ time_domain_length = 600
 time_domain_start_index = 0
 
 # Constellation diagram plotting parameters:
-samples = 10000  # Number of samples to plot in the constellation diagram
+samples = 40000  # Number of samples to plot in the constellation diagram
 
 # Spectrogram plotting parameters:
 spectrogram_fft_size = 1024  # Size of the FFT
@@ -121,8 +121,6 @@ def plot_frequency_domain_diagram(f_data, modscheme):
 def plot_constellation_diagram(f_data, modscheme):
     I = f_data[0::2]
     Q = f_data[1::2]
-
-    print(len(I), len(Q))
 
     # Choose a subset of samples to plot
     if len(I) > samples:
