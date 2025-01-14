@@ -5,9 +5,8 @@ import argparse
 import json
 import numpy as np
 import os
-from datetime import datetime
 import ctypes
-import sys
+from tqdm import tqdm
 
 ## internal imports
 from utils import *
@@ -42,7 +41,9 @@ def generate_linear(idx_start, mod, config):
     idx = np.random.choice(len(config["channel_params"]), config["n_captures"])
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
-    for i in range(0, config["n_captures"]):
+    for i in tqdm(
+        range(0, config["n_captures"]), desc=f"Generating Data for: {mod[-1]}"
+    ):
         seed = ctypes.c_int(np.random.randint(1e9))
         snr = ctypes.c_float(channel_params[i][0])
         fo = ctypes.c_float(2.0 * channel_params[i][1] * np.pi)

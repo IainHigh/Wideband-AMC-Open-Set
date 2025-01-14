@@ -1,6 +1,6 @@
 {
-    "n_captures": 10,
-    "n_samps": 1048576, 
+    "n_captures": 1,
+    "n_samps": 65536, 
     "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
     "symbol_rate": 5,
     "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},
@@ -22,5 +22,5 @@
     },
     "savepath": "./data/default",
     "verbose": 0,
-    "archive": true
+    "archive": false
 }

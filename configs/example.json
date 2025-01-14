@@ -20,6 +20,6 @@
                "po":0.0},
     "savepath":"./data/example",
     "verbose":0,
-    "archive": true
+    "archive": false
 }
 
