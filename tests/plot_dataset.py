@@ -24,7 +24,7 @@ constellation_diagram_output_path = "../tests/figures/Constellation-Diagrams"
 spectrogram_output_path = "../tests/figures/Spectrograms"
 
 # Time domain plotting parameters - time domain is too large to plot all at once
-time_domain_length = 600
+time_domain_length = 200
 time_domain_start_index = 0
 
 # Constellation diagram plotting parameters:
@@ -89,7 +89,7 @@ def plot_time_domain_diagram(f_data, modscheme):
     plt.plot(Q, label="Q")
     plt.grid()
     plt.title(f"Time Domain Diagram ({modscheme})")
-    plt.xlabel("Time [s]")
+    plt.xlabel("Time [samples]")
     plt.ylabel("Amplitude [V]")
     plt.legend()
     plt.savefig(f"{time_domain_output_path}/{modscheme}.png")
@@ -183,7 +183,7 @@ def plot_spectrogram(f_data, modscheme):
     )
     plt.title(f"Spectrogram ({modscheme})")
     plt.xlabel("Frequency [Hz]")
-    plt.ylabel("Time [s]")
+    plt.ylabel("Time [samples]")
     plt.savefig(f"{spectrogram_output_path}/{modscheme}.png")
     plt.close()
 
