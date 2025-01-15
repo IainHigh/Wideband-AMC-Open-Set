@@ -15,7 +15,16 @@ from ModulationClassifier import ModulationClassifier
 # 1) Get it functional on the GPU cluster.
 # 2) Improve the model.
 
+
+##############################################
+########### MODIFIABLE PARAMETERS ############
+##############################################
 create_new_dataset = True
+data_dir = "../data"
+batch_size = 1024
+epochs = 50
+learning_rate = 0.001
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def create_dataset():
@@ -72,33 +81,25 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
     return model
 
 
-# Parameters
-data_dir = "../data"
-batch_size = 1024
-epochs = 50
-learning_rate = 0.001
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# Datasets
-train_dataset = ModulationDataset(os.path.join(data_dir, "training"))
-val_dataset = ModulationDataset(os.path.join(data_dir, "validation"))
-
-# Dataloaders
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-# Model, Loss, Optimizer
-num_classes = len(train_dataset.label_to_idx)
-model = ModulationClassifier(num_classes)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-
 def main():
 
     # Create new dataset
     if create_new_dataset:
         create_dataset()
+
+    # Datasets
+    train_dataset = ModulationDataset(os.path.join(data_dir, "training"))
+    val_dataset = ModulationDataset(os.path.join(data_dir, "validation"))
+
+    # Dataloaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    # Model, Loss, Optimizer
+    num_classes = len(train_dataset.label_to_idx)
+    model = ModulationClassifier(num_classes)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Train the model
     trained_model = train_model(
