@@ -5,6 +5,7 @@ import torch.nn as nn
 import os
 from tqdm import tqdm
 import glob
+import time
 
 from ModulationDataset import ModulationDataset
 from ModulationClassifier import ModulationClassifier
@@ -28,6 +29,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def create_dataset():
+    print(
+        "You are about to create a new dataset. This will delete the previous dataset."
+    )
+    print("Do you want to continue? (y/n)")
+    choice = input()
+    if choice != "y":
+        print("Exiting...")
+        return
+
     # Wipe out the previous data.
     for f in glob.glob("../data/training/*") + glob.glob("../data/validation/*"):
         os.remove(f)
@@ -114,4 +124,15 @@ def main():
 
 
 if __name__ == "__main__":
+    start_time = time.time()
+    print("STARTING TRAINING. TIMESTAMP: ", start_time)
     main()
+    end_time = time.time()
+    print("TRAINING FINISHED. TIMESTAMP: ", end_time)
+    time_diff = end_time - start_time
+    hours = time_diff // 3600
+    minutes = (time_diff % 3600) // 60
+    seconds = time_diff % 60
+    print(
+        f"Training took {hours:.0f} hours, {minutes:.0f} minutes, {seconds:.0f} seconds."
+    )
