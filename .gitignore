@@ -18,3 +18,9 @@ cmodules/utils
 data/
 *.pyc
 venv/
+
+# Pycache directories
+__pycache__/
+
+# Saved models (.pth)
+*.pth

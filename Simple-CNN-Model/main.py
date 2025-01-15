@@ -1,12 +1,34 @@
 import torch
-from torch.utils.data import random_split
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import os
+from tqdm import tqdm
+import glob
 
 from ModulationDataset import ModulationDataset
 from ModulationClassifier import ModulationClassifier
+
+##############################################
+#################### TODO ####################
+##############################################
+# 1) Get it functional on the GPU cluster.
+# 2) Improve the model.
+
+create_new_dataset = True
+
+
+def create_dataset():
+    # Wipe out the "/data" directory - this may contain sub-directories
+    for f in glob.glob("../data/training/*") + glob.glob("../data/validation/*"):
+        os.remove(f)
+
+    os.removedirs("../data/training")
+    os.removedirs("../data/validation")
+
+    # Generate the dataset
+    os.system("cd ..; python3 generator.py ./configs/training_set.json")
+    os.system("cd ..; python3 generator.py ./configs/validation_set.json")
 
 
 def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, device):
@@ -16,7 +38,9 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
         model.train()
         running_loss = 0.0
 
-        for inputs, labels in train_loader:
+        for inputs, labels in tqdm(
+            train_loader, desc=f"Training Epoch {epoch + 1}/{epochs}"
+        ):
             inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -50,8 +74,8 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
 
 # Parameters
 data_dir = "../data"
-batch_size = 64
-epochs = 10
+batch_size = 1024
+epochs = 50
 learning_rate = 0.001
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -71,6 +95,11 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 def main():
+
+    # Create new dataset
+    if create_new_dataset:
+        create_dataset()
+
     # Train the model
     trained_model = train_model(
         train_loader, val_loader, model, criterion, optimizer, epochs, device
