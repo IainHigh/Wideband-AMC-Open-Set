@@ -28,14 +28,17 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def create_dataset():
-    # Wipe out the "/data" directory - this may contain sub-directories
+    # Wipe out the previous data.
     for f in glob.glob("../data/training/*") + glob.glob("../data/validation/*"):
         os.remove(f)
 
-    os.removedirs("../data/training")
-    os.removedirs("../data/validation")
+    # If the dirs exist remove them
+    if os.path.exists("../data/training"):
+        os.removedirs("../data/training")
+    if os.path.exists("../data/validation"):
+        os.removedirs("../data/validation")
 
-    # Generate the dataset
+    # Generate the new dataset using the generator.py script.
     os.system("cd ..; python3 generator.py ./configs/training_set.json")
     os.system("cd ..; python3 generator.py ./configs/validation_set.json")
 
