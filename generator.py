@@ -6,8 +6,7 @@ import json
 import numpy as np
 import os
 import ctypes
-from tqdm import tqdm
-
+from tqdm import tqdm # TQDM is good.
 ## internal imports
 from utils import *
 
