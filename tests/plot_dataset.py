@@ -16,12 +16,12 @@ np.Inf = np.inf  # Fix for a bug in the numpy library
 #####################################################################
 
 # Directories:
-dataset_path = "../data/default"
+dataset_path = "/exports/eddie/scratch/s2062378/data/default"
 
-time_domain_output_path = "../tests/figures/Time-Domain"
-frequency_domain_output_path = "../tests/figures/Frequency-Domain"
-constellation_diagram_output_path = "../tests/figures/Constellation-Diagrams"
-spectrogram_output_path = "../tests/figures/Spectrograms"
+time_domain_output_path = "./tests/figures/Time-Domain"
+frequency_domain_output_path = "./tests/figures/Frequency-Domain"
+constellation_diagram_output_path = "./tests/figures/Constellation-Diagrams"
+spectrogram_output_path = "./tests/figures/Spectrograms"
 
 # Time domain plotting parameters - time domain is too large to plot all at once
 time_domain_length = 200

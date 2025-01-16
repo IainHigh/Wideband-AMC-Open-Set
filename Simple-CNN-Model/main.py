@@ -21,33 +21,25 @@ from ModulationClassifier import ModulationClassifier
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
 ##############################################
-create_new_dataset = False
-data_dir = "../data"
+create_new_dataset = True
+data_dir = "/exports/eddie/scratch/s2062378/data"
 batch_size = 64
 epochs = 10
 learning_rate = 0.001
+print("Cuda is available: ", torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def create_dataset():
-    print(
-        "You are about to create a new dataset. This will delete the previous dataset."
-    )
-    print("Do you want to continue? (y/n)")
-    choice = input()
-    if choice != "y":
-        print("Exiting...")
-        return
-
     # Wipe out the previous data.
-    for f in glob.glob("../data/training/*") + glob.glob("../data/validation/*"):
+    for f in glob.glob(f"{data_dir}/training/*") + glob.glob(f"{data_dir}/validation/*"):
         os.remove(f)
 
     # If the dirs exist remove them
-    if os.path.exists("../data/training"):
-        os.removedirs("../data/training")
-    if os.path.exists("../data/validation"):
-        os.removedirs("../data/validation")
+    if os.path.exists(f"{data_dir}/training"):
+        os.removedirs(f"{data_dir}/training")
+    if os.path.exists(f"{data_dir}/validation"):
+        os.removedirs(f"{data_dir}/validation")
 
     # Generate the new dataset using the generator.py script.
     os.system("cd ..; python3 generator.py ./configs/training_set.json")

@@ -18,7 +18,7 @@
                "snr":[0,20,1],
                "fo":[-0.1,0.1,0.025],
                "po":0.0},
-    "savepath":"./data/example",
+    "savepath":"/exports/eddie/scratch/s2062378/data/example",
     "verbose":0,
     "archive": false
 }

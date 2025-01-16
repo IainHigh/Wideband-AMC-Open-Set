@@ -20,7 +20,7 @@
         "fo": 0.0,
         "po": 0.0
     },
-    "savepath": "./data/default",
+    "savepath": "/exports/eddie/scratch/s2062378/data/default",
     "verbose": 0,
     "archive": false
 }

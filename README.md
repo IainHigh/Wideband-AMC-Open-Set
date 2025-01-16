@@ -1,4 +1,24 @@
-TO RUN THIS PROJECT:
+# NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
+### The conda environment set up will need to be run monthly (reminder in outlook calendar)
+1)  $ cd /home/s2062378
+2)  $ rm -rf /exports/eddie/scratch/s2062378/anaconda
+3)  $ mkdir /exports/eddie/scratch/s2062378/anaconda
+4)  $ mkdir /exports/eddie/scratch/s2062378/anaconda/envs
+5)  $ mkdir /exports/eddie/scratch/s2062378/anaconda/pkgs
+6)  $ module load anaconda
+7)  $ conda create -n mypython python=3.7 matplotlib numpy tqdm scipy
+8)  $ conda activate mypython
+9)  $ conda install pytorch torchvision torchaudio cudatoolkit=11.0 -c pytorch -y
+10) $ conda install pip
+11) $ pip install SigMF==1.1.1
+12) $ conda clean --all
+13) $ rm -rf .cache
+
+This can then be verified by running:
+14) $ qsub JobScripts/testCuda.sh
+
+
+# NOTES TO RUN LOCALLY:
 1) Activate WSL
     $ wsl
 2) Activate virtual python environment
