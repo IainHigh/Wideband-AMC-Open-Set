@@ -14,16 +14,17 @@ from ModulationClassifier import ModulationClassifier
 #################### TODO ####################
 ##############################################
 # 1) Get it functional on the GPU cluster.
-# 2) Improve the model.
-
+# 2) Run the full model on dataset with 0 SNR in the dataset.
+# 3) Improve the model.
+# 4) All randomness should be seeded (for data generation too) - for reproducibility.
 
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
 ##############################################
-create_new_dataset = True
+create_new_dataset = False
 data_dir = "../data"
-batch_size = 1024
-epochs = 50
+batch_size = 64
+epochs = 10
 learning_rate = 0.001
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

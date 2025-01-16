@@ -27,6 +27,13 @@ Python tool to generate synthetic radio frequency (RF) datasets.
 
 This repo contains code to synthetically generate 22 types of raw RF signals (psk, qam, fsk, analog modulation variants) in an Additive White Gaussian Noise (AWGN) channel via Python wrappers around [liquid-dsp](https://github.com/jgaeddert/liquid-dsp).
 
+# Requirements:
+matplotlib==3.5.3
+numpy==1.23.2
+SigMF==1.1.1
+tqdm==4.67.1
+Pytorch (depends on CUDA) - https://pytorch.org/get-started/locally/
+
 ## Usage
 Datasets are generated using the `generator.py` script.
 For example, the following command will generate an example dataset, `./datasets/example.sigmf`.
