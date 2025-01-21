@@ -9,7 +9,7 @@ class ModulationClassifier(nn.Module):
         self.conv1 = nn.Conv1d(2, 16, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv1d(16, 32, kernel_size=3, stride=1, padding=1)
         self.conv3 = nn.Conv1d(32, 64, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(3932160, 64)  # Adjust based on IQ input length
+        self.fc1 = nn.Linear(65536, 64)  # Adjust based on IQ input length
         self.fc2 = nn.Linear(
             64, num_classes
         )  # Adjust based on second parameter of fc1.

@@ -10,11 +10,14 @@ import time
 from ModulationDataset import ModulationDataset
 from ModulationClassifier import ModulationClassifier
 
+##############################################
+########### MODIFIABLE PARAMETERS ############
+##############################################
 create_new_dataset = True
 data_dir = "/exports/eddie/scratch/s2062378/data"
 batch_size = 64
-epochs = 10
-learning_rate = 0.001
+epochs = 100
+learning_rate = 0.0001
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 print(f"\n\nCUDA available: {torch.cuda.is_available()}")
@@ -98,7 +101,7 @@ def main():
 
     # Model, Loss, Optimizer
     num_classes = len(train_dataset.label_to_idx)
-    model = ModulationClassifier(num_classes)
+    model = ModulationClassifier(num_classes, input_len=1024) # Number of classes and length of each IQ sample.
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 

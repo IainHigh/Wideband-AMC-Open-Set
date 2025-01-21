@@ -1,0 +1,52 @@
+SNR = 5
+
+bpsk: 1000
+qpsk: 1000
+8psk: 1000
+16psk: 1000
+16qam: 1000
+32qam: 1000
+64qam: 1000
+16apsk: 1000
+32apsk: 1000
+bpsk: 400
+qpsk: 400
+8psk: 400
+16psk: 400
+16qam: 400
+32qam: 400
+64qam: 400
+16apsk: 400
+32apsk: 400
+
+
+CUDA available: True
+CUDA version: 11.7
+Available devices: 1
+Current device: 0
+Device name: NVIDIA A100 80GB PCIe
+
+
+Epoch 1/10, Loss: 1.6447324947262487
+Validation Accuracy: 50.11%
+Epoch 2/10, Loss: 0.9668046802493697
+Validation Accuracy: 63.89%
+Epoch 3/10, Loss: 0.5998921256961552
+Validation Accuracy: 67.47%
+Epoch 4/10, Loss: 0.40572985869350164
+Validation Accuracy: 68.56%
+Epoch 5/10, Loss: 0.2667386659705047
+Validation Accuracy: 68.86%
+Epoch 6/10, Loss: 0.13735006057412913
+Validation Accuracy: 68.56%
+Epoch 7/10, Loss: 0.05893018256529426
+Validation Accuracy: 68.08%
+Epoch 8/10, Loss: 0.01484462054419919
+Validation Accuracy: 68.36%
+Epoch 9/10, Loss: 0.004783143769084403
+Validation Accuracy: 67.67%
+Epoch 10/10, Loss: 0.002375113330319101
+Validation Accuracy: 67.64%
+
+
+Training took 0 hours, 9 minutes, 18 seconds.
