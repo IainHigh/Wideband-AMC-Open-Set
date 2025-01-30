@@ -238,6 +238,143 @@ def map_config(config, defaults):
 
             mapped["channel_params"] = [(snr, fo, po) for snr in snr_list for fo in fo_list for po in po_list]
 
+        elif config["channel"]["type"] == "rayleigh":
+            mapped["channel_type"] = "rayleigh"
+
+            # AWGN parameter
+            awgn_enabled = config["channel"].get("awgn", defaults["channel"].get("awgn", True))
+            awgn_flag = 1 if awgn_enabled else 0
+
+            # Number of taps
+            if "num_taps" in config["channel"].keys():
+                num_taps = config["channel"]["num_taps"]
+            else:
+                num_taps = defaults["channel"]["num_taps"]
+            if not isinstance(num_taps, int) or num_taps <= 0:
+                raise ValueError("Invalid number of taps.")
+
+            # SNR range
+            if "snr" in config["channel"].keys():
+                tmp = config["channel"]["snr"]
+            else:
+                print("No channel SNR parameters provided. Using defaults.")
+                tmp = defaults["channel"]["snr"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                snr_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, int):
+                snr_list = [tmp]
+            else:
+                raise ValueError("Invalid SNR range.")
+            
+            # FO and PO ranges
+            if "fo" in config["channel"].keys():
+                tmp = config["channel"]["fo"]
+            else:
+                tmp = defaults["channel"]["fo"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                fo_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, float) and tmp >= 0.0:
+                fo_list = [tmp]
+            else:
+                raise ValueError("Invalid FO range.")
+            fo_list = [_fo * np.pi for _fo in fo_list]
+
+            if "po" in config["channel"].keys():
+                tmp = config["channel"]["po"]
+            else:
+                tmp = defaults["channel"]["po"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                po_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, float) and tmp >= 0.0:
+                po_list = [tmp]
+            else:
+                raise ValueError("Invalid PO range.")
+
+            # Combine parameters for Rayleigh
+            mapped["channel_params"] = [
+                (snr, fo, po, num_taps, awgn_flag)
+                for snr in snr_list
+                for fo in fo_list
+                for po in po_list
+            ]
+
+        elif config["channel"]["type"] == "rician":
+            mapped["channel_type"] = "rician"
+
+            # K-factor
+            k_factor = config["channel"].get("k_factor", 10.0)
+            if not isinstance(k_factor, (int, float)) or k_factor < 0.0:
+                raise ValueError("Invalid K-factor.")
+            
+            # Number of taps
+            num_taps = config["channel"].get("num_taps", 8)
+            if not isinstance(num_taps, int) or num_taps <= 0:
+                raise ValueError("Invalid number of taps.")
+
+            # AWGN
+            awgn_enabled = config["channel"].get("awgn", defaults["channel"].get("awgn", True))
+            awgn_flag = 1 if awgn_enabled else 0
+
+             # SNR range
+            if "snr" in config["channel"].keys():
+                tmp = config["channel"]["snr"]
+            else:
+                print("No channel SNR parameters provided. Using defaults.")
+                tmp = defaults["channel"]["snr"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                snr_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, int):
+                snr_list = [tmp]
+            else:
+                raise ValueError("Invalid SNR range.")
+            
+            # FO and PO ranges
+            if "fo" in config["channel"].keys():
+                tmp = config["channel"]["fo"]
+            else:
+                tmp = defaults["channel"]["fo"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                fo_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, float) and tmp >= 0.0:
+                fo_list = [tmp]
+            else:
+                raise ValueError("Invalid FO range.")
+            fo_list = [_fo * np.pi for _fo in fo_list]
+
+            if "po" in config["channel"].keys():
+                tmp = config["channel"]["po"]
+            else:
+                tmp = defaults["channel"]["po"]
+            if isinstance(tmp, list):
+                assert check_range(tmp, positive=False)
+                po_list = np.arange(tmp[0], tmp[1] + (0.5 * tmp[2]), tmp[2])
+            elif isinstance(tmp, float) and tmp >= 0.0:
+                po_list = [tmp]
+            else:
+                raise ValueError("Invalid PO range.")
+            
+            # Path delays
+            path_delays = config["channel"].get("path_delays", defaults["channel"].get("path_delays", [0]))
+            if not isinstance(path_delays, list) or not all(isinstance(d, (int, float)) for d in path_delays):
+                raise ValueError("Invalid path delays.")
+            
+            # Path gains
+            path_gains = config["channel"].get("path_gains", defaults["channel"].get("path_gains", [0]))
+            if not isinstance(path_gains, list) or len(path_gains) != len(path_delays):
+                raise ValueError("Invalid path gains.")
+
+            # Combine parameters for Rician
+            mapped["channel_params"] = [
+                (snr, fo, po, k_factor, num_taps, awgn_flag, path_delays, path_gains)
+                for snr in snr_list
+                for fo in fo_list
+                for po in po_list
+            ]
         else:
             raise ValueError("Invalid channel type.")
     else:

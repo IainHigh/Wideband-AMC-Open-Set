@@ -39,18 +39,57 @@ def generate_linear(idx_start, mod, config):
     sig_params = [sig_params[_idx] for _idx in idx]
     idx = np.random.choice(len(config["channel_params"]), config["n_captures"])
     channel_params = [config["channel_params"][_idx] for _idx in idx]
+    channel_type = config["channel_type"]
 
     for i in tqdm(
         range(0, config["n_captures"]), desc=f"Generating Data for: {mod[-1]}"
     ):
         seed = ctypes.c_int(np.random.randint(1e9))
-        snr = ctypes.c_float(channel_params[i][0])
-        fo = ctypes.c_float(2.0 * channel_params[i][1] * np.pi)
-        po = ctypes.c_float(channel_params[i][2])
+
+        # Extract channel parameters based on type
+        if channel_type == "awgn":
+            snr, fo, po = channel_params[i]
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+
+        elif channel_type == "rayleigh":
+            snr, fo, po, num_taps, awgn_flag = channel_params[i]
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+            num_taps = ctypes.c_int(num_taps)
+            awgn = ctypes.c_int(awgn_flag)
+            
+        elif channel_type == "rician":
+            (
+                snr,
+                fo,
+                po,
+                k_factor,
+                num_taps,
+                awgn_flag,
+                path_delays,
+                path_gains,
+            ) = channel_params[i]
+
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+            k_factor = ctypes.c_float(k_factor)
+            num_taps = ctypes.c_int(num_taps)
+            awgn = ctypes.c_int(awgn_flag)
+
+            # Convert path_delays and path_gains to ctypes arrays
+            path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
+
+
+        else:
+            raise ValueError("Undefined channel type.")
 
         order = ctypes.c_int(mod[1])
         sps = ctypes.c_int(sig_params[i][0])
-        n_sym = ctypes.c_int(int(np.ceil(n_samps.value / sps.value)))
         beta = ctypes.c_float(sig_params[i][1])
         delay = ctypes.c_uint(int(sig_params[i][2]))
         dt = ctypes.c_float(sig_params[i][3])
@@ -88,7 +127,48 @@ def generate_linear(idx_start, mod, config):
                 modtype, order, chunk_n_sym, s, smI, smQ, verbose, seed
             )
             ctx.rrc_tx(chunk_n_sym, sps, delay, beta, dt, smI, smQ, xI, xQ, verbose)
-            cchan.channel(snr, chunk_n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
+
+            # Channel Type
+            if channel_type == "awgn":
+                cchan.channel(
+                    snr, chunk_n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed
+                )
+            elif channel_type == "rayleigh":
+                cchan.rayleigh_channel(
+                    snr,
+                    chunk_n_sym,
+                    sps,
+                    fo,
+                    po,
+                    num_taps,
+                    awgn,
+                    xI,
+                    xQ,
+                    yI,
+                    yQ,
+                    verbose,
+                    seed,
+                )
+            elif channel_type == "rician":
+                cchan.rician_channel(
+                    snr,
+                    chunk_n_sym,
+                    sps,
+                    fo,
+                    po,
+                    k_factor,
+                    num_taps,
+                    awgn,
+                    xI,
+                    xQ,
+                    yI,
+                    yQ,
+                    path_delays_ctypes,
+                    path_gains_ctypes,
+                    verbose,
+                    seed,
+                )
+
 
             # Convert to numpy arrays
             I = np.array([_i for _i in yI])

@@ -21,11 +21,12 @@
         "fo": 0.0,
         "po": 0.0,
         "k_factor": 4.0,
+        "doppler_freq": 4.0,
         "num_taps": 3,
         "path_delays": [0, 2, 3],
         "path_gains": [0, -2, -10]
     },
-    "savepath": "/exports/eddie/scratch/s2062378/data/validation",
+    "savepath": "/exports/eddie/scratch/s2062378/data/testing",
     "verbose": 0,
     "archive": false
 }

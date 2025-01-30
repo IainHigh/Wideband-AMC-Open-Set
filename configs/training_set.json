@@ -1,5 +1,5 @@
 {
-    "n_captures": 1000,
+    "n_captures": 10000,
     "n_samps": 1024, 
     "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
     "symbol_rate": 8,
@@ -15,10 +15,15 @@
         }
     ],
     "channel": {
-        "type": "awgn",
-        "snr": 20,
+        "type": "rician",
+        "awgn": true,
+        "snr": [-20, 20, 2],
         "fo": 0.0,
-        "po": 0.0
+        "po": 0.0,
+        "k_factor": 4.0,
+        "num_taps": 3,
+        "path_delays": [0, 2, 3],
+        "path_gains": [0, -2, -10]
     },
     "savepath": "/exports/eddie/scratch/s2062378/data/training",
     "verbose": 0,
