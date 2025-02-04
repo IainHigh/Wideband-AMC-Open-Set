@@ -1,23 +1,4 @@
 # TODO
-FRIDAY:
-- Fix Rayleigh implementation.
-3) Plan plots + CNN models to show implementation of Rayleigh + Rician multipath. e.g. different parameters to plot / train with and compare to.
-    - Get CNN-Model-From-Literature trained on Rician data at different SNRs - this will validate Rician + all data generation.
-    3.1) Decide "Default" Rician & Rayleigh parameters (Rician mirror parameters from existing literature)
-    3.2) Plots to create:
-        - Rician with default parameters at SNR = 0; 10; 20.
-        - Rayleigh with default parameters at SNR = 0; 10; 20.
-        - The BPSK can then be compared to the plots from last week.
-    ~~3.2) Create new model based on the implementation details in Deep Learning Based Automatic Modulation Classification Using Robust CNN~~
-    3.3) Model training with Rician & Rayleigh (train on new model - Rician results should be identical as same dataset generation and model implementation):
-        - Rician with default parameters at SNR ranges (-20 -> 20)
-        - Rayleigh with default parameters at SNR ranges (-20 -> 20)
-        - AWGN at SNR ranges (-20 -> 20)
-- Record results in the report document.
-- By EOB should have Rician + Rayleigh fully implemented + documented.
-- Should be looking to move onto wideband after this.
-
-
 4) Move to wideband data generation
 - Move to wideband by combining multiple different narrowbands together at different frequencies?
 5) Plot + train models on wideband data generation - this will require a new CNN model most likely.
@@ -29,9 +10,8 @@ FRIDAY:
         "fo": 0.0,                  frequency offset (see below)
         "po": 0.0,                  phase offset (see below)
         "k_factor": 4.0,            Ratio of line-of-sight (LOS) to non-line-of-sight (NLOS). Higher value = more placed on LOS. K=0 = equal weight of LOS vs NLOS components.
-        "num_taps": 3,              number of different NLOS paths.
-        "path_delays": [0, 2, 3],   path delays - length should equal num_taps - measured in samples.
-        "path_gains": [0, -2, -10]  path gains - length should equal num_taps - measured in dB. Usually negative.
+        "path_delays": [0, 2, 3],   path delays - measured in samples
+        "path_gains": [0, -2, -10]  path gains - measured in dB. Usually negative.
     },
 
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:

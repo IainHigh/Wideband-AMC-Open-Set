@@ -6,7 +6,6 @@ import os
 from tqdm import tqdm
 import glob
 import time
-from collections import defaultdict
 
 from ModulationDataset import ModulationDataset
 from CNNs.LiteratureCNN import ModulationClassifier # CHANGE THIS TO THE MODEL YOU WANT TO USE
@@ -14,22 +13,24 @@ from CNNs.LiteratureCNN import ModulationClassifier # CHANGE THIS TO THE MODEL Y
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
 ##############################################
-create_new_dataset = True
+create_new_dataset = False
 save_model = False
 data_dir = "/exports/eddie/scratch/s2062378/data"
 batch_size = 128
-epochs = 30
+epochs = 40
 learning_rate = 0.02
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ##############################################
 ########## END OF MODIFIABLE PARAMETERS ######
 ##############################################
-
-print(f"\n\nCUDA available: {torch.cuda.is_available()}")
-print(f"CUDA version: {torch.version.cuda}")
-print(f"Available devices: {torch.cuda.device_count()}")
-print(f"Current device: {torch.cuda.current_device()}")
-print(f"Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No CUDA device'}")
+if torch.cuda.is_available():
+    print("\n\n CUDA is available.")
+    print(f"CUDA version: {torch.version.cuda}")
+    print(f"Available devices: {torch.cuda.device_count()}")
+    print(f"Current device: {torch.cuda.current_device()}")
+    print(f"Device name: {torch.cuda.get_device_name(0)}")
+else:
+    print("\n\nCUDA is not available. Using CPU.")
 print("\n")
 
 
@@ -91,8 +92,8 @@ def test_model(model, test_loader, device):
     model.eval()
     total_correct = 0
     total_samples = 0
-    snr_correct = defaultdict(int)
-    snr_total = defaultdict(int)
+    snr_correct = {}
+    snr_total = {}
 
     with torch.no_grad():
         for inputs, labels, snrs in tqdm(test_loader, desc="Testing Model"):
@@ -107,7 +108,10 @@ def test_model(model, test_loader, device):
 
             # Update accuracy per SNR
             for i in range(len(snrs)):
-                snr_value = snrs[i]  # Extract SNR
+                snr_value = snrs[i].item()  # Extract SNR value
+                if snr_value not in snr_correct:
+                    snr_correct[snr_value] = 0
+                    snr_total[snr_value] = 0
                 snr_correct[snr_value] += (predicted[i] == labels[i]).item()
                 snr_total[snr_value] += 1
 

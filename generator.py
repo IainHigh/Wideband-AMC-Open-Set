@@ -54,12 +54,25 @@ def generate_linear(idx_start, mod, config):
             po = ctypes.c_float(po)
 
         elif channel_type == "rayleigh":
-            snr, fo, po, num_taps, awgn_flag = channel_params[i]
+            (
+                snr,
+                fo,
+                po,
+                awgn_flag,
+                path_delays,
+                path_gains,
+            ) = channel_params[i]
+
+            assert len(path_delays) == len(path_gains), "Path delays and path gains must have the same length."
             snr = ctypes.c_float(snr)
             fo = ctypes.c_float(fo)
             po = ctypes.c_float(po)
-            num_taps = ctypes.c_int(num_taps)
+            num_taps = ctypes.c_int(len(path_delays))
             awgn = ctypes.c_int(awgn_flag)
+
+            # Convert path_delays and path_gains to ctypes arrays
+            path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
             
         elif channel_type == "rician":
             (
@@ -67,17 +80,16 @@ def generate_linear(idx_start, mod, config):
                 fo,
                 po,
                 k_factor,
-                num_taps,
                 awgn_flag,
                 path_delays,
                 path_gains,
             ) = channel_params[i]
-
+            assert len(path_delays) == len(path_gains), "Path delays and path gains must have the same length."
             snr = ctypes.c_float(snr)
             fo = ctypes.c_float(fo)
             po = ctypes.c_float(po)
             k_factor = ctypes.c_float(k_factor)
-            num_taps = ctypes.c_int(num_taps)
+            num_taps = ctypes.c_int(len(path_delays))
             awgn = ctypes.c_int(awgn_flag)
 
             # Convert path_delays and path_gains to ctypes arrays
@@ -146,6 +158,8 @@ def generate_linear(idx_start, mod, config):
                     xQ,
                     yI,
                     yQ,
+                    path_delays_ctypes,
+                    path_gains_ctypes,
                     verbose,
                     seed,
                 )

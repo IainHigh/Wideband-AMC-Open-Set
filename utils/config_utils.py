@@ -245,14 +245,6 @@ def map_config(config, defaults):
             awgn_enabled = config["channel"].get("awgn", defaults["channel"].get("awgn", True))
             awgn_flag = 1 if awgn_enabled else 0
 
-            # Number of taps
-            if "num_taps" in config["channel"].keys():
-                num_taps = config["channel"]["num_taps"]
-            else:
-                num_taps = defaults["channel"]["num_taps"]
-            if not isinstance(num_taps, int) or num_taps <= 0:
-                raise ValueError("Invalid number of taps.")
-
             # SNR range
             if "snr" in config["channel"].keys():
                 tmp = config["channel"]["snr"]
@@ -292,10 +284,20 @@ def map_config(config, defaults):
                 po_list = [tmp]
             else:
                 raise ValueError("Invalid PO range.")
+            
+            # Path delays
+            path_delays = config["channel"].get("path_delays", defaults["channel"].get("path_delays", [0]))
+            if not isinstance(path_delays, list) or not all(isinstance(d, (int, float)) for d in path_delays):
+                raise ValueError("Invalid path delays.")
+            
+            # Path gains
+            path_gains = config["channel"].get("path_gains", defaults["channel"].get("path_gains", [0]))
+            if not isinstance(path_gains, list) or len(path_gains) != len(path_delays):
+                raise ValueError("Invalid path gains.")
 
             # Combine parameters for Rayleigh
             mapped["channel_params"] = [
-                (snr, fo, po, num_taps, awgn_flag)
+                (snr, fo, po, awgn_flag, path_delays, path_gains)
                 for snr in snr_list
                 for fo in fo_list
                 for po in po_list
@@ -308,11 +310,6 @@ def map_config(config, defaults):
             k_factor = config["channel"].get("k_factor", 10.0)
             if not isinstance(k_factor, (int, float)) or k_factor < 0.0:
                 raise ValueError("Invalid K-factor.")
-            
-            # Number of taps
-            num_taps = config["channel"].get("num_taps", 8)
-            if not isinstance(num_taps, int) or num_taps <= 0:
-                raise ValueError("Invalid number of taps.")
 
             # AWGN
             awgn_enabled = config["channel"].get("awgn", defaults["channel"].get("awgn", True))
@@ -370,7 +367,7 @@ def map_config(config, defaults):
 
             # Combine parameters for Rician
             mapped["channel_params"] = [
-                (snr, fo, po, k_factor, num_taps, awgn_flag, path_delays, path_gains)
+                (snr, fo, po, k_factor, awgn_flag, path_delays, path_gains)
                 for snr in snr_list
                 for fo in fo_list
                 for po in po_list
