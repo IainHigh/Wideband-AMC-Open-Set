@@ -1,6 +1,6 @@
 {
     "n_captures": 1,
-    "n_samps": 65536,
+    "n_samps": 16384,
     "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
     "symbol_rate": 8,
     "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},

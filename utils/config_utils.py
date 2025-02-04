@@ -69,6 +69,32 @@ def map_config(config, defaults):
         print("No symbol rate provided. Using defaults.")
         mapped["symbol_rate"] = defaults["symbol_rate"]
 
+    ## Sampling rate (for wideband signals)
+    if "sampling_rate" in config.keys():
+        assert isinstance(config["sampling_rate"], (int, float)), "sampling_rate must be a number."
+        assert config["sampling_rate"] > 0, "sampling_rate must be positive."
+        mapped["sampling_rate"] = config["sampling_rate"]
+    else:
+        print("No sampling rate provided. Using defaults.")
+        mapped["sampling_rate"] = defaults.get("sampling_rate", 1e6)  # Default to 1 MHz if not provided.
+
+    ## Center frequencies (for wideband signals)
+    if "center_frequencies" in config.keys():
+        assert isinstance(config["center_frequencies"], list), "center_frequencies must be a list."
+        assert all(isinstance(f, (int, float)) and f > 0 for f in config["center_frequencies"]), "All center frequencies must be positive numbers."
+        mapped["center_frequencies"] = config["center_frequencies"]
+    else:
+        print("No center frequencies provided. Using defaults.")
+        mapped["center_frequencies"] = defaults.get("center_frequencies", [mapped["sampling_rate"] / 2])  # Default to Nyquist frequency.
+
+    ## If center frequencies list is empty, default to a single frequency at Nyquist
+    if not mapped["center_frequencies"]:
+        mapped["center_frequencies"] = [mapped["sampling_rate"] / 2]
+
+    ## Validate that the total bandwidth does not exceed the sampling rate
+    max_bandwidth = max(mapped["center_frequencies"]) - min(mapped["center_frequencies"])
+    assert max_bandwidth < mapped["sampling_rate"], "Total bandwidth exceeds sampling rate. Adjust center frequencies."
+
     ## AM/FM parameters
     mapped["am_defaults"] = {}
     if "am_defaults" in config.keys():

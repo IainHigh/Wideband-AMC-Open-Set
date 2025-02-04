@@ -49,7 +49,11 @@ def save_sigmf(i, q, config, idx):
                                   "filter":"v0.0.1"}}
     f = sigmf.SigMFFile(data_file=data_name, global_info=_global)
     f.add_capture(0, metadata={"core:length":config["n_samps"], "core:time":datetime.today().isoformat()})
-    f.add_annotation(0, config["n_samps"], metadata={"rfml_labels":{"modclass":config["modname"]}})
+    f.add_annotation(0, config["n_samps"], metadata={
+            "rfml_labels": {"modclass": config["modname"]},
+            "sampling_rate": config["sampling_rate"],
+            "center_frequencies": config["center_frequencies"],
+        })
     if mod_int2modem[config["modclass"]] is None:
         f.add_annotation(0, config["n_samps"], metadata={"channel":{"type":config["channel_type"],
                                                                     "snr":config["snr"],

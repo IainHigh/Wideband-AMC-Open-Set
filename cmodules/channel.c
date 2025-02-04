@@ -53,24 +53,23 @@ void channel(float snr, int n_sym, int sps, float fo, float po, float xI[], floa
     }
 
     // fo, awgn, sep IQ
-    float complex o = cexpf(_Complex_I*(fo + po));
+    float complex o;
     float complex x_o;
     float complex n;
     float complex y;
-    for (unsigned int i=0; i<n_samps; i++)
-    {
-        // fo & po
-        x_o = (crealf(x[i])*crealf(o)) + (crealf(x[i])*cimagf(o)*_Complex_I) + (cimagf(x[i])*crealf(o)*_Complex_I) + (cimagf(x[i])*cimagf(o)*-1.0);
+    for (unsigned int i = 0; i < n_samps; i++) {
+        o = cexpf(_Complex_I * (fo * ((float)i / (float)sps) + po));  // Apply per symbol
+        x_o = (crealf(x[i]) * crealf(o)) + (crealf(x[i]) * cimagf(o) * _Complex_I) + 
+            (cimagf(x[i]) * crealf(o) * _Complex_I) + (cimagf(x[i]) * cimagf(o) * -1.0);
 
-	    // manual awgn
+        // manual awgn
         n = nstd*(randnf() + _Complex_I*randnf())/sqrtf(2.0f);
         y = x_o + n; 
 
         // split IQ
 	    yI[i] = crealf(y);
-	    yQ[i] = cimagf(y);	
-    }
-
+	    yQ[i] = cimagf(y);
+    }	
 }
 
 void rayleigh_channel(float snr, int n_sym, int sps, float fo, float po, int num_taps, int awgn, 
@@ -117,8 +116,9 @@ void rayleigh_channel(float snr, int n_sym, int sps, float fo, float po, int num
         }
 
         // Apply frequency offset (fo) and phase offset (po)
-        float complex o = cexpf(_Complex_I * (fo * i + po));
+        float complex o = cexpf(_Complex_I * (fo * ((float)i / (float)sps) + po));
         y[i] *= o;
+
 
         // Add AWGN if enabled
         if (awgn) {
@@ -184,8 +184,9 @@ void rician_channel(float snr, int n_sym, int sps, float fo, float po, float k_f
         }
 
         // Apply frequency offset (fo) and phase offset (po)
-        float complex o = cexpf(_Complex_I * (fo * i + po));
+       float complex o = cexpf(_Complex_I * (fo * ((float)i / (float)sps) + po));
         y[i] *= o;
+
 
         // Add AWGN if enabled
         if (awgn) {
