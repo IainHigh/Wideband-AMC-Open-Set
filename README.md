@@ -1,13 +1,17 @@
-    "channel": {
-        "type": "rician",
-        "awgn": true,               Include AWGN as well (True / False)
-        "snr": 20,                  Signal to Noise Ratio (dB)
-        "fo": 0.0,                  frequency offset (see below)
-        "po": 0.0,                  phase offset (see below)
-        "k_factor": 4.0,            Ratio of line-of-sight (LOS) to non-line-of-sight (NLOS). Higher value = more placed on LOS. K=0 = equal weight of LOS vs NLOS components.
-        "path_delays": [0, 2, 3],   path delays - measured in samples
-        "path_gains": [0, -2, -10]  path gains - measured in dB. Usually negative.
-    },
+# TODO
+
+Week Commencing 10/02/25:
+1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
+2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
+3) Replicate parameters and model training from literature paper, should be able to get very similar results.
+4) Should also add background noise across all the entire spectrum – currently noise is only
+added to transmitted signals whereas we’d ideally want constant background noise across the
+entire spectrum.
+
+Week Commencing 17/02/25:
+1) Currently all signals generated on the wideband are of the same modulation scheme. This
+should be relatively easy to fix.
+2) Create a model that works on predicting signal modulation schemes in the wideband.
 
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
 ### The conda environment set up will need to be run monthly (reminder in outlook calendar)
@@ -51,14 +55,6 @@ To close:
     $ deactivate
 2) Exit wsl
     $ exit
-  
-
-# Requirements:
-matplotlib==3.5.3
-numpy==1.23.2
-SigMF==1.1.1
-tqdm==4.67.1
-Pytorch (depends on CUDA) - https://pytorch.org/get-started/locally/
 
 # Synthetic Radio Frequency Data Generator
 
@@ -76,20 +72,6 @@ python generator.py ./configs/example.json
 
 A JSON configuration file must be provided on the command line which contains the desired dataset size, signal types, and signal generation parameters.
 Basic error checking is performed in `./utils/config_utils.py`, and defaults parameters (set in `./configs/defaults.json`) are provided for any missing values.
-Configuration files should contain the following parameters:
-
- - `n_captures`: the number of captures to generate per modulation scheme. e.g. 10 will create 10 different files for each modulation type.
- - `n_samps`: the number of raw IQ samples per capture. This will be the length the IQ list after taking samples.
- - `modulations`: the modulation schemes to include in the dataset (may include "bpsk", "qpsk", "8psk", "16psk", "4dpsk", "16qam", "32qam", "64qam", "16apsk", "32apsk", "fsk5k", "fsk75k", "gfsk5k", "gfsk75k", "msk", "gmsk", "fmnb", "fmwb", "dsb", "dsbsc", "lsb", "usb", and "awgn")
- - `symbol_rate`: number of symbols per frame, list of desired symbol rates accepted. Lower value means less samples per signal = more signals over total sample space. AKA Samples per Symbol.
- - `am_defaults`: default analog modulation parameters, including modulation index in the form [start, stop, step]
- - `fmnb_defaults`: default narrowband frequency modulation parameters, including modulation factor in the form [start, stop, step]
- - `fmwb_defaults`: default wideband frequency modulation parameters, including modulation factor in the form [start, stop, step]
- - `filter`: default transmit filter parameters, including the type of filter (Gaussian or root-raised cosine (RRC)), the excess bandwidth or `beta`, the symbol overlap or `delay`, and the fractional sample delay or `dt` (all gfsk/gmsk signals use Gaussian filters, all remaining fsk/msk signals use square filters, all psk/qam signals use RRC filters)
- - `channel`: synthetic channel parameters, including the type of channel (only AWGN is implemented, currently), signal-to-noise-ratio (`snr`), frequency offset (`fo`), and phase offset (`po`) in the form [start, stop, step]
- - `savepath`: the dataset location
- - `verbose`: 0 for minimal verbosity, 1 for debugging
- - `archive`: create a SigMF archive of dataset when complete
 
 Datasets are saved in SigMF format. 
 Each dataset is a *SigMF Archive* composed of multiple *SigMF Recordings*. 
@@ -98,7 +80,13 @@ See the [SigMF specification](https://github.com/gnuradio/SigMF/blob/master/sigm
 
 ## Requirements & Setup
 
-In addition to the python packages listed in `requirements.txt`, the code in this repo is dependent upon [liquid-dsp](https://github.com/jgaeddert/liquid-dsp). 
+matplotlib==3.5.3
+numpy==1.23.2
+SigMF==1.1.1
+tqdm==4.67.1
+Pytorch (depends on CUDA) - https://pytorch.org/get-started/locally/
+
+In addition to the python packages listed above, the code in this repo is dependent upon [liquid-dsp](https://github.com/jgaeddert/liquid-dsp). 
 To install liquid-dsp, clone the repo linked, and follow the installation instructions in the README. 
 Ensure that you rebind your dynamic libraries using `sudo ldconfig`.
 
