@@ -16,8 +16,8 @@ from CNNs.LiteratureCNN import ModulationClassifier # CHANGE THIS TO THE MODEL Y
 create_new_dataset = False
 save_model = False
 data_dir = "/exports/eddie/scratch/s2062378/data"
-batch_size = 128
-epochs = 40
+batch_size = 512
+epochs = 20
 learning_rate = 0.02
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ##############################################

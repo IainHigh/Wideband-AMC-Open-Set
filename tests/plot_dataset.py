@@ -24,7 +24,7 @@ constellation_diagram_output_path = "./tests/figures/Constellation-Diagrams"
 spectrogram_output_path = "./tests/figures/Spectrograms"
 
 # Time domain plotting parameters - time domain is too large to plot all at once
-time_domain_length = 400
+time_domain_length = 200
 time_domain_start_index = 0
 
 # Spectrogram plotting parameters:
@@ -68,8 +68,8 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     plot_length = min(time_domain_length, num_samples - time_domain_start_index)
     
     # Extract I/Q components with correct indexing
-    I = f_data[time_domain_start_index * 2 : (time_domain_start_index + plot_length) * 2 : 4]
-    Q = f_data[time_domain_start_index * 2 + 1 : (time_domain_start_index + plot_length) * 2 : 4]
+    I = f_data[time_domain_start_index * 2 : (time_domain_start_index + plot_length) * 2 : 2]
+    Q = f_data[time_domain_start_index * 2 + 1 : (time_domain_start_index + plot_length) * 2 : 2]
 
     # Ensure I and Q are the same length
     min_length = min(len(I), len(Q))

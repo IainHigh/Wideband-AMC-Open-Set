@@ -1,8 +1,3 @@
-# TODO
-4) Move to wideband data generation
-- Move to wideband by combining multiple different narrowbands together at different frequencies?
-5) Plot + train models on wideband data generation - this will require a new CNN model most likely.
-
     "channel": {
         "type": "rician",
         "awgn": true,               Include AWGN as well (True / False)
