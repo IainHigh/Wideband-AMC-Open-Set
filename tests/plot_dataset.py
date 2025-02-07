@@ -5,6 +5,7 @@ import json
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import numpy as np
+from scipy.signal import resample_poly
 
 np.Inf = np.inf  # Fix for a bug in the numpy library
 
@@ -28,7 +29,7 @@ time_domain_length = 200
 time_domain_start_index = 0
 
 # Spectrogram plotting parameters:
-spectrogram_fft_size = 2048  # Size of the FFT
+spectrogram_fft_size = 65536  # Size of the FFT
 
 #####################################################################
 #################### END OF MODIFIABLE VARIABLES #####################
@@ -126,28 +127,43 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
     plt.savefig(f"{frequency_domain_output_path}/{modscheme}.png")
     plt.close()
 
-def plot_constellation_diagram(f_data, modscheme):
-    I = f_data[0::2]
-    Q = f_data[1::2]
+def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate):
+    """
+    Selects samples from the wideband IQ data at each center frequency before plotting
+    the constellation diagram.
+    """
+    complex_signal = f_data[0::2] + 1j * f_data[1::2]  # Treat as complex IQ data
+
+    for f_c in center_frequencies:
+        sample_step = int(sampling_rate / f_c)  # Determine step size for each center frequency
+        
+        # Extract only the samples corresponding to this frequency
+        selected_samples = complex_signal[::sample_step]
+        
+        # Split back into I and Q components
+        I_selected = np.real(selected_samples)
+        Q_selected = np.imag(selected_samples)
+
+        # Density estimation for visualization
+        xy = np.vstack([I_selected, Q_selected])
+        z = gaussian_kde(xy)(xy)
+        idx = z.argsort()
+        I_selected, Q_selected, z = I_selected[idx], Q_selected[idx], z[idx]
+
+        plt.figure()
+        plt.scatter(I_selected, Q_selected, c=z, s=1, cmap="viridis")
+        plt.axhline(0, color="gray", linewidth=0.5, linestyle="--")
+        plt.axvline(0, color="gray", linewidth=0.5, linestyle="--")
+        plt.xlabel("I (In-phase)")
+        plt.ylabel("Q (Quadrature)")
+        plt.title(f"Constellation Diagram ({modscheme}) at {f_c/1e6:.2f} MHz")
+        cbar = plt.colorbar()
+        cbar.set_label("Density")
+        plt.grid(True, linestyle="--", alpha=0.5)
+        plt.savefig(f"{constellation_diagram_output_path}/{modscheme}_{int(f_c/1e6)}MHz.png")
+        plt.close()
 
 
-    xy = np.vstack([I, Q])
-    z = gaussian_kde(xy)(xy)
-    idx = z.argsort()
-    I, Q, z = I[idx], Q[idx], z[idx]
-
-    plt.figure()
-    plt.scatter(I, Q, c=z, s=1, cmap="viridis")
-    plt.axhline(0, color="gray", linewidth=0.5, linestyle="--")
-    plt.axvline(0, color="gray", linewidth=0.5, linestyle="--")
-    plt.xlabel("I (In-phase)")
-    plt.ylabel("Q (Quadrature)")
-    plt.title(f"Constellation Diagram ({modscheme})")
-    cbar = plt.colorbar()
-    cbar.set_label("Density")
-    plt.grid(True, linestyle="--", alpha=0.5)
-    plt.savefig(f"{constellation_diagram_output_path}/{modscheme}.png")
-    plt.close()
 
 def plot_spectrogram(f_data, modscheme, sampling_rate):
     I = f_data[0::2]
@@ -185,7 +201,7 @@ def main():
         f_data, modscheme, center_frequencies, sampling_rate = get_data(file)
         plot_time_domain_diagram(f_data, modscheme, sampling_rate)
         plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate)
-        plot_constellation_diagram(f_data, modscheme)
+        plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate)
         plot_spectrogram(f_data, modscheme, sampling_rate)
 
 if __name__ == "__main__":

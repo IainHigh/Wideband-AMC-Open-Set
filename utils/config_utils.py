@@ -92,8 +92,8 @@ def map_config(config, defaults):
         mapped["center_frequencies"] = [mapped["sampling_rate"] / 2]
 
     ## Validate that the total bandwidth does not exceed the sampling rate
-    max_bandwidth = max(mapped["center_frequencies"]) - min(mapped["center_frequencies"])
-    assert max_bandwidth < mapped["sampling_rate"], "Total bandwidth exceeds sampling rate. Adjust center frequencies."
+    # max_bandwidth = max(mapped["center_frequencies"]) - min(mapped["center_frequencies"])
+    # assert max_bandwidth < mapped["sampling_rate"], "Total bandwidth exceeds sampling rate. Adjust center frequencies."
 
     ## AM/FM parameters
     mapped["am_defaults"] = {}

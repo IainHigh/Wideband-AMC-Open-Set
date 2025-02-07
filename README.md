@@ -1,6 +1,7 @@
 # TODO
 
 Week Commencing 10/02/25:
+0) Address Popoolas comments on previous Project Report
 1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
 2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
 3) Replicate parameters and model training from literature paper, should be able to get very similar results.
@@ -12,6 +13,10 @@ Week Commencing 17/02/25:
 1) Currently all signals generated on the wideband are of the same modulation scheme. This
 should be relatively easy to fix.
 2) Create a model that works on predicting signal modulation schemes in the wideband.
+
+Backburner:
+1) Research "Standardised" Rician and Rayleigh multipath scenarios. e.g. path delays + path gains for city / rural / town environments.
+2) Look into blind equalisation as a pre-processing step before ML model training for Rician and Rayleigh multipath fading. Other methods include maximum likelihood.
 
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
 ### The conda environment set up will need to be run monthly (reminder in outlook calendar)
