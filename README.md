@@ -6,19 +6,19 @@ Week Commencing 10/02/25:
         1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
         2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
     Friday
-        1) Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json)
         2) Ensure random numbers are seeded correctly:
-            - Test SNR/BER values for BPSK modulation scheme. Run the script twice, ensure you get same answer
+            - Test SNR/BER values for BPSK modulation scheme. Run the script twice, ensure you get same answer. Will need to decrease n_samples to something smaller for testing so it runs quicker.
             - Test Training a simple CNN model. Once again run twice, ensure same answer twice.
-        3) Ensure new code is functional with parameters in the system_config file.
+        3) Ensure new code is functional with parameters in the system_config file. This should be confirmed by the above tests.
         4) Move code off of Eddie & Get it working locally (should simply be a case of modifying the system_config) parameters.
         5) Document the above changes (BER/SNR plots in weekly research report) + paragraph about seeding for reproducibility.
             - Document the system_config file in the read_me.md.
         6) Go through Eddie conda environment set up again (this should ensure it's there when Eddie comes back online.)
+        7) Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json) - DO THIS LAST, WILL TAKE A WHILE TO RUN.
 
 Week Commencing 17/02/25:
-1) Replicate parameters and model training from literature paper, should be able to get very similar results.
-2) Should also add background noise across all the entire spectrum – currently noise is only
+1) Replicate parameters and model training from literature paper, should be able to get very similar results. Will need to be running locally.
+2) Should also add background noise across the entire spectrum – currently noise is only
         added to transmitted signals whereas we’d ideally want constant background noise across the
         entire spectrum. (THIS MIGHT ALREADY BE DONE)
 3) Currently all signals generated on the wideband are of the same modulation scheme. This
