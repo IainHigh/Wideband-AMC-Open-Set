@@ -6,16 +6,29 @@ import os
 from tqdm import tqdm
 import glob
 import time
+import json
+import sys
 
 from ModulationDataset import ModulationDataset
 from CNNs.LiteratureCNN import ModulationClassifier # CHANGE THIS TO THE MODEL YOU WANT TO USE
+
+# Read the configs/system_parameters.json file.
+with open("./configs/system_parameters.json") as f:
+    system_parameters = json.load(f)
+
+working_directory = system_parameters["Working_Directory"]
+sys.path.append(working_directory)
+
+rng_seed = system_parameters["Random_Seed"]
+
+dataset_directory = system_parameters["Dataset_Directory"]
 
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
 ##############################################
 create_new_dataset = False
 save_model = False
-data_dir = "/exports/eddie/scratch/s2062378/data"
+data_dir = dataset_directory
 batch_size = 512
 epochs = 20
 learning_rate = 0.02
@@ -23,6 +36,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ##############################################
 ########## END OF MODIFIABLE PARAMETERS ######
 ##############################################
+
+torch.manual_seed(rng_seed)
+
 if torch.cuda.is_available():
     print("\n\n CUDA is available.")
     print(f"CUDA version: {torch.version.cuda}")
