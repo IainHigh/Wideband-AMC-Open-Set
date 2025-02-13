@@ -191,10 +191,10 @@ def generate_linear(idx_start, mod, config):
             Q_total += Q_shifted
 
         # Normalize final signal
-        max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
-        if max_amp > 0:
-            I_total /= max_amp
-            Q_total /= max_amp
+        #max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
+        #if max_amp > 0:
+        #    I_total /= max_amp
+        #    Q_total /= max_amp
 
         # Metadata
         metadata = {

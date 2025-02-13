@@ -5,7 +5,7 @@ import json
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import numpy as np
-from scipy.signal import resample_poly
+from scipy.signal import butter, filtfilt
 
 np.Inf = np.inf  # Fix for a bug in the numpy library
 
@@ -29,11 +29,48 @@ time_domain_length = 200
 time_domain_start_index = 0
 
 # Spectrogram plotting parameters:
-spectrogram_fft_size = 65536  # Size of the FFT
+spectrogram_fft_size = 4096  # Size of the FFT
+
+# Channel bandwidth for bandpass filtering (in Hz)
+channel_bw = 3e6
 
 #####################################################################
-#################### END OF MODIFIABLE VARIABLES #####################
+######################### HELPER FUNCTIONS #########################
 #####################################################################
+
+def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
+    """
+    Designs and applies a Butterworth bandpass filter to a real-valued signal.
+    Ensures that the critical frequencies are strictly between 0 and 1.
+    """
+    nyq = 0.5 * sampling_rate
+
+    # Prevent the lowcut from being <= 0 by clamping it to a small value (e.g., 1 Hz)
+    if lowcut <= 0:
+        lowcut = 1.0
+
+    # Prevent the highcut from being >= nyq by clamping it just below nyq if needed
+    if highcut >= nyq:
+        highcut = nyq - 1.0
+
+    low = lowcut / nyq
+    high = highcut / nyq
+
+    # Debug: you can print the normalized frequencies if needed:
+    # print(f"Normalized band: low={low}, high={high}")
+
+    b, a = butter(order, [low, high], btype='band')
+    y = filtfilt(b, a, data)
+    return y
+
+def bandpass_complex(x, sampling_rate, lowcut, highcut, order=5):
+    """
+    Applies the bandpass filter separately to the real and imaginary parts of a complex signal.
+    """
+    real_filtered = bandpass_filter(x.real, sampling_rate, lowcut, highcut, order)
+    imag_filtered = bandpass_filter(x.imag, sampling_rate, lowcut, highcut, order)
+    return real_filtered + 1j * imag_filtered
+
 
 def delete_existing_plots():
     for path in [
@@ -60,6 +97,10 @@ def get_data(file):
     center_frequencies = f_meta["annotations"][0]["center_frequencies"]
 
     return f_data, modscheme, center_frequencies, sampling_rate
+
+#####################################################################
+######################### PLOTTER FUNCTIONS #########################
+#####################################################################
 
 def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     # Ensure we have enough data
@@ -129,29 +170,43 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
 
 def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate):
     """
-    Selects samples from the wideband IQ data at each center frequency before plotting
+    For each channel, isolate the desired band using a bandpass filter,
+    downconvert it to baseband (undo the frequency shift), and then plot
     the constellation diagram.
     """
-    complex_signal = f_data[0::2] + 1j * f_data[1::2]  # Treat as complex IQ data
+    # Extract composite I/Q signal
+    I_total = f_data[0::2]
+    Q_total = f_data[1::2]
+    x = I_total + 1j * Q_total  # Composite wideband signal
 
     for f_c in center_frequencies:
-        sample_step = int(sampling_rate / f_c)  # Determine step size for each center frequency
-        
-        # Extract only the samples corresponding to this frequency
-        selected_samples = complex_signal[::sample_step]
-        
-        # Split back into I and Q components
-        I_selected = np.real(selected_samples)
-        Q_selected = np.imag(selected_samples)
+        # Define bandpass filter cutoff frequencies for channel f_c.
+        lowcut = f_c - channel_bw/2
+        highcut = f_c + channel_bw/2
 
-        # Density estimation for visualization
-        xy = np.vstack([I_selected, Q_selected])
+        # Isolate the channel by filtering the composite signal.
+        x_filtered = bandpass_complex(x, sampling_rate, lowcut, highcut, order=5)
+
+        # Create a time vector for downconversion.
+        t = np.arange(len(x_filtered)) / sampling_rate
+
+        # Downconvert by applying the conjugate of the carrier frequency shift.
+        # This shifts the channel to baseband.
+        x_downconverted = x_filtered * np.exp(-1j * 2 * np.pi * f_c * t)
+
+        # Extract the baseband I and Q components.
+        I_unshifted = np.real(x_downconverted)
+        Q_unshifted = np.imag(x_downconverted)
+
+        # Perform density estimation for a nicer visualization.
+        xy = np.vstack([I_unshifted, Q_unshifted])
         z = gaussian_kde(xy)(xy)
         idx = z.argsort()
-        I_selected, Q_selected, z = I_selected[idx], Q_selected[idx], z[idx]
+        I_unshifted, Q_unshifted, z = I_unshifted[idx], Q_unshifted[idx], z[idx]
 
+        # Plot the constellation diagram.
         plt.figure()
-        plt.scatter(I_selected, Q_selected, c=z, s=1, cmap="viridis")
+        plt.scatter(I_unshifted, Q_unshifted, c=z, s=1, cmap="viridis")
         plt.axhline(0, color="gray", linewidth=0.5, linestyle="--")
         plt.axvline(0, color="gray", linewidth=0.5, linestyle="--")
         plt.xlabel("I (In-phase)")

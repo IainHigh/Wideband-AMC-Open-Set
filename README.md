@@ -1,13 +1,16 @@
 # TODO
 
 Week Commencing 10/02/25:
-0) Address Popoolas comments on previous Project Report
-1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
-2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
-3) Replicate parameters and model training from literature paper, should be able to get very similar results.
-4) Should also add background noise across all the entire spectrum – currently noise is only
-added to transmitted signals whereas we’d ideally want constant background noise across the
-entire spectrum.
+    Monday
+        0) Address Popoolas comments on previous Project Report
+        1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
+        2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
+    Thursday
+        3) Replicate parameters and model training from literature paper, should be able to get very similar results.
+    Friday
+        4) Should also add background noise across all the entire spectrum – currently noise is only
+        added to transmitted signals whereas we’d ideally want constant background noise across the
+        entire spectrum.
 
 Week Commencing 17/02/25:
 1) Currently all signals generated on the wideband are of the same modulation scheme. This

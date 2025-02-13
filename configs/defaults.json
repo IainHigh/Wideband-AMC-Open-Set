@@ -1,10 +1,10 @@
 {
     "n_captures": 1,
-    "n_samps": 16384,
+    "n_samps": 32768,
     "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
     "symbol_rate": 8,
-    "sampling_rate": 50e6,
-    "center_frequencies": [1e6, 5e6, 8e6],
+    "sampling_rate": 20e6,
+    "center_frequencies": [3e6, 8e6],
 
     "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},
     "fmnb_defaults": {"modulation_factor": [0.03, 0.08, 0.01]},
@@ -14,7 +14,7 @@
         {
             "type": "rrc",
             "beta": 0.05,
-            "delay": 5,
+            "delay": 1,
             "dt": 0.0
         }
     ],
