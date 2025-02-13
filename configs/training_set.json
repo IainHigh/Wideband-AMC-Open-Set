@@ -20,7 +20,7 @@
         "fo": 0.0,
         "po": 0.0
     },
-    "savepath": "/exports/eddie/scratch/s2062378/data/training",
+    "savepath": "training",
     "verbose": 0,
     "archive": false
 }

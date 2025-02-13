@@ -2,6 +2,7 @@
 
 ## python imports
 import argparse
+import sys
 import json
 import numpy as np
 import os
@@ -9,9 +10,20 @@ import ctypes
 from tqdm import tqdm
 from utils import *
 
-
 buf = 4096
 halfbuf = 2048
+
+# Read the configs/system_parameters.json file.
+with open("./configs/system_parameters.json") as f:
+    system_parameters = json.load(f)
+
+working_directory = system_parameters["Working_Directory"]
+sys.path.append(working_directory)
+
+rng_seed = system_parameters["Random_Seed"]
+np.random.seed(rng_seed)
+
+dataset_directory = system_parameters["Dataset_Directory"]
 
 ## load c modules
 clinear = ctypes.CDLL(os.path.abspath("./cmodules/linear_modulate"))
@@ -20,6 +32,58 @@ cfm = ctypes.CDLL(os.path.abspath("./cmodules/fm_modulate"))
 cfsk = ctypes.CDLL(os.path.abspath("./cmodules/fsk_modulate"))
 ctx = ctypes.CDLL(os.path.abspath("./cmodules/rrc_tx"))
 cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
+
+import numpy as np
+
+def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
+    """
+    Calculate the Bit Error Rate (BER) for BPSK.
+    
+    Parameters
+    ----------
+    xI, xQ : array_like
+        Transmitted (baseband) in-phase and quadrature components.
+    yI, yQ : array_like
+        Received in-phase and quadrature components (after channel, frequency shift, etc.).
+    sps : int
+        Samples per symbol.
+    trim : int
+        Number of samples to trim from beginning and end.
+    
+    Returns
+    -------
+    ber : float
+        Bit error rate.
+    """
+    # Convert inputs to numpy arrays
+    xI = np.array(xI)
+    xQ = np.array(xQ)
+    yI = np.array(yI)
+    yQ = np.array(yQ)
+    
+    # Trim the signals (to match what is saved/used)
+    tx_I = xI[trim:-trim]
+    tx_Q = xQ[trim:-trim]
+    rx_I = yI[trim:-trim]
+    rx_Q = yQ[trim:-trim]
+    
+    rx_complex = rx_I + 1j * rx_Q
+    tx_complex = tx_I + 1j * tx_Q
+    
+    # Calculate the transmitted and received symbols by using the sps. Average over sps samples.
+    tx_symbols = np.mean(tx_complex.reshape(-1, sps), axis=1)
+    rx_symbols = np.mean(rx_complex.reshape(-1, sps), axis=1)  
+    
+    # Demap the symbols to bits (BPSK decision on the real part).
+    tx_bits = (np.real(tx_symbols) >= 0).astype(int)
+    rx_bits = (np.real(rx_symbols) >= 0).astype(int)
+    
+    # # Calculate bit errors and BER.
+    bit_errors = np.sum(tx_bits != rx_bits)
+    total_bits = len(tx_bits)
+    ber = bit_errors / total_bits
+    
+    return ber
 
 
 def generate_linear(idx_start, mod, config):
@@ -46,10 +110,12 @@ def generate_linear(idx_start, mod, config):
 
     center_frequencies = config["center_frequencies"]
 
+    ber_dict = {}
+
     for i in tqdm(
         range(0, config["n_captures"]), desc=f"Generating Data for: {mod[-1]}"
     ):
-        seed = ctypes.c_int(np.random.randint(1e9))
+        seed = ctypes.c_int(rng_seed)
 
         I_total = np.zeros(n_samps - buf, dtype=np.float32)
         Q_total = np.zeros(n_samps - buf, dtype=np.float32)
@@ -213,12 +279,28 @@ def generate_linear(idx_start, mod, config):
             "delay": delay.value,
             "beta": beta.value,
             "dt": dt.value,
-            "savepath": config["savepath"],
+            "savepath": f"{dataset_directory}/{config["savepath"]}",
             "savename": config["savename"],
         }
+        if mod[-1] == "bpsk":
+            ber = calculate_ber_BPSK(xI, xQ, yI, yQ, sps.value, trim=halfbuf)
+            if snr.value not in ber_dict:
+                ber_dict[snr.value] = [ber]
+            else:
+                ber_dict[snr.value].append(ber)
 
         # Save the concatenated data for this capture in SigMF format
-        save_sigmf(I_total, Q_total, metadata, idx_start + i)
+        save_sigmf(I_total, Q_total, dataset_directory, metadata, idx_start + i)
+        
+    # After processing all captures, calculate and print the average BER per SNR.
+    avg_ber_dict = {snr: sum(ber_list)/len(ber_list) for snr, ber_list in ber_dict.items()}
+    
+    # Sort the dictionary by SNR
+    avg_ber_dict = dict(sorted(avg_ber_dict.items()))
+    
+    print("Average BER per SNR:")
+    for snr, avg_ber in avg_ber_dict.items():
+        print(f"SNR = {snr}: AVG_BER = {avg_ber}")
 
     return idx_start + config["n_captures"]
 
@@ -235,7 +317,7 @@ def generate_am(idx_start, mod, config):
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
     for i in range(0, config["n_captures"]):
-        seed = ctypes.c_int(np.random.randint(1e9))
+        seed = ctypes.c_int(rng_seed)
         snr = ctypes.c_float(channel_params[i][0])
         fo = ctypes.c_float(2.0 * channel_params[i][1] * np.pi)
         po = ctypes.c_float(channel_params[i][2])
@@ -265,7 +347,7 @@ def generate_am(idx_start, mod, config):
             "snr": snr.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": config["savepath"],
+            "savepath": f"{dataset_directory}/{config["savepath"]}",
             "savename": config["savename"],
         }
 
@@ -276,7 +358,7 @@ def generate_am(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, metadata, idx_start + i)
+        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -298,7 +380,7 @@ def generate_fm(idx_start, mod, config):
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
     for i in range(0, config["n_captures"]):
-        seed = ctypes.c_int(np.random.randint(1e9))
+        seed = ctypes.c_int(rng_seed)
 
         mod_factor = ctypes.c_float(sig_params[i])
 
@@ -329,7 +411,7 @@ def generate_fm(idx_start, mod, config):
             "snr": snr.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": config["savepath"],
+            "savepath": f"{dataset_directory}/{config["savepath"]}",
             "savename": config["savename"],
         }
 
@@ -340,7 +422,7 @@ def generate_fm(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, metadata, idx_start + i)
+        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -363,7 +445,7 @@ def generate_fsk(idx_start, mod, config):
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
     for i in range(0, int(config["n_captures"])):
-        seed = ctypes.c_int(np.random.randint(1e9))
+        seed = ctypes.c_int(rng_seed)
         snr = ctypes.c_float(channel_params[i][0])
         fo = ctypes.c_float(2.0 * channel_params[i][1] * np.pi)
         po = ctypes.c_float(0.0)  ## assume po = 0.0
@@ -423,7 +505,7 @@ def generate_fsk(idx_start, mod, config):
             "dt": dt.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": config["savepath"],
+            "savepath": f"{dataset_directory}/{config["savepath"]}",
             "savename": config["savename"],
         }
 
@@ -434,7 +516,7 @@ def generate_fsk(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, metadata, idx_start + i)
+        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -448,7 +530,7 @@ def generate_noise(idx_start, mod, config):
     channel_params = [config["channel_params"][_idx] for _idx in idx]
 
     for i in range(0, config["n_captures"]):
-        seed = ctypes.c_int(np.random.randint(1e9))
+        seed = ctypes.c_int(rng_seed)
         snr = ctypes.c_float(channel_params[i][0])
         fo = ctypes.c_float(2.0 * channel_params[i][1] * np.pi)
         po = ctypes.c_float(0.0)
@@ -470,7 +552,7 @@ def generate_noise(idx_start, mod, config):
             "sps": sps.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": config["savepath"],
+            "savepath": f"{dataset_directory}/{config["savepath"]}",
             "savename": config["savename"],
         }
 
@@ -481,7 +563,7 @@ def generate_noise(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, metadata, idx_start + i)
+        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -508,7 +590,7 @@ def run_tx(config):
         print(_mod[-1] + ": " + str(idx - start_idx))
 
     if config["archive"]:
-        archive_sigmf(config["savepath"])
+        archive_sigmf(f"{dataset_directory}/{config["savepath"]}")
 
 
 if __name__ == "__main__":

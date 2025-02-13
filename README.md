@@ -1,21 +1,20 @@
 # TODO
 
 Week Commencing 10/02/25:
-    Monday
+    Thursday
         0) Address Popoolas comments on previous Project Report
         1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
         2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
-    Thursday
-        3) Replicate parameters and model training from literature paper, should be able to get very similar results.
     Friday
-        4) Should also add background noise across all the entire spectrum – currently noise is only
-        added to transmitted signals whereas we’d ideally want constant background noise across the
-        entire spectrum.
+        3) Replicate parameters and model training from literature paper, should be able to get very similar results.
 
 Week Commencing 17/02/25:
-1) Currently all signals generated on the wideband are of the same modulation scheme. This
+1) Should also add background noise across all the entire spectrum – currently noise is only
+        added to transmitted signals whereas we’d ideally want constant background noise across the
+        entire spectrum.
+2) Currently all signals generated on the wideband are of the same modulation scheme. This
 should be relatively easy to fix.
-2) Create a model that works on predicting signal modulation schemes in the wideband.
+3) Create a model that works on predicting signal modulation schemes in the wideband.
 
 Backburner:
 1) Research "Standardised" Rician and Rayleigh multipath scenarios. e.g. path delays + path gains for city / rural / town environments.

@@ -6,18 +6,32 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import numpy as np
 from scipy.signal import butter, filtfilt
+import sys
 
 np.Inf = np.inf  # Fix for a bug in the numpy library
 
 # Results can be compared to the IQEngine Signal Generator:
 # https://iqengine.org/siggen
 
+# Read the configs/system_parameters.json file.
+with open("./configs/system_parameters.json") as f:
+    system_parameters = json.load(f)
+
+working_directory = system_parameters["Working_Directory"]
+sys.path.append(working_directory)
+
+rng_seed = system_parameters["Random_Seed"]
+np.random.seed(rng_seed)
+
+dataset_directory = system_parameters["Dataset_Directory"]
+
+
 #####################################################################
 ####################### MODIFIABLE VARIABLES ########################
 #####################################################################
 
 # Directories:
-dataset_path = "/exports/eddie/scratch/s2062378/data/default"
+dataset_name = "default"
 
 time_domain_output_path = "./tests/figures/Time-Domain"
 frequency_domain_output_path = "./tests/figures/Frequency-Domain"
@@ -30,9 +44,6 @@ time_domain_start_index = 0
 
 # Spectrogram plotting parameters:
 spectrogram_fft_size = 4096  # Size of the FFT
-
-# Channel bandwidth for bandpass filtering (in Hz)
-channel_bw = 3e6
 
 #####################################################################
 ######################### HELPER FUNCTIONS #########################
@@ -56,9 +67,6 @@ def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
     low = lowcut / nyq
     high = highcut / nyq
 
-    # Debug: you can print the normalized frequencies if needed:
-    # print(f"Normalized band: low={low}, high={high}")
-
     b, a = butter(order, [low, high], btype='band')
     y = filtfilt(b, a, data)
     return y
@@ -70,7 +78,6 @@ def bandpass_complex(x, sampling_rate, lowcut, highcut, order=5):
     real_filtered = bandpass_filter(x.real, sampling_rate, lowcut, highcut, order)
     imag_filtered = bandpass_filter(x.imag, sampling_rate, lowcut, highcut, order)
     return real_filtered + 1j * imag_filtered
-
 
 def delete_existing_plots():
     for path in [
@@ -92,11 +99,15 @@ def get_data(file):
         f_data = np.load(_f)
 
     # Extract metadata
-    modscheme = f_meta["annotations"][0]["rfml_labels"]["modclass"]
-    sampling_rate = f_meta["annotations"][0]["sampling_rate"]
-    center_frequencies = f_meta["annotations"][0]["center_frequencies"]
+    annotation = f_meta["annotations"][0]
+    modscheme = annotation["rfml_labels"]["modclass"]
+    sampling_rate = annotation["sampling_rate"]
+    center_frequencies = annotation["center_frequencies"]
+    # Try to get additional parameters needed for bandwidth calculation.
+    sps = f_meta["annotations"][1]["filter"]["sps"]
+    beta = f_meta["annotations"][1]["filter"]["rolloff"]
 
-    return f_data, modscheme, center_frequencies, sampling_rate
+    return f_data, modscheme, center_frequencies, sampling_rate, sps, beta
 
 #####################################################################
 ######################### PLOTTER FUNCTIONS #########################
@@ -131,7 +142,6 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     plt.legend()
     plt.savefig(f"{time_domain_output_path}/{modscheme}.png")
     plt.close()
-
 
 def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate):
     I = f_data[0::2]
@@ -168,7 +178,7 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
     plt.savefig(f"{frequency_domain_output_path}/{modscheme}.png")
     plt.close()
 
-def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate):
+def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate, channel_bw):
     """
     For each channel, isolate the desired band using a bandpass filter,
     downconvert it to baseband (undo the frequency shift), and then plot
@@ -178,6 +188,8 @@ def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_r
     I_total = f_data[0::2]
     Q_total = f_data[1::2]
     x = I_total + 1j * Q_total  # Composite wideband signal
+
+    print(channel_bw)
 
     for f_c in center_frequencies:
         # Define bandpass filter cutoff frequencies for channel f_c.
@@ -218,8 +230,6 @@ def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_r
         plt.savefig(f"{constellation_diagram_output_path}/{modscheme}_{int(f_c/1e6)}MHz.png")
         plt.close()
 
-
-
 def plot_spectrogram(f_data, modscheme, sampling_rate):
     I = f_data[0::2]
     Q = f_data[1::2]
@@ -248,15 +258,25 @@ def plot_spectrogram(f_data, modscheme, sampling_rate):
 
 def main():
     delete_existing_plots()
+    dataset_path = dataset_directory + "/" + dataset_name
     files = os.listdir(os.path.abspath(dataset_path))
     files = [os.path.join(dataset_path, f.split(".")[0]) for f in files]
     files = list(set(files))
 
     for file in files:
-        f_data, modscheme, center_frequencies, sampling_rate = get_data(file)
+        # Get the data and metadata. Note that we now also retrieve sps and beta.
+        f_data, modscheme, center_frequencies, sampling_rate, sps, beta = get_data(file)
         plot_time_domain_diagram(f_data, modscheme, sampling_rate)
         plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate)
-        plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate)
+        
+        # Compute channel_bw from the symbol rate and roll-off factor if available.
+        if sps is not None and beta is not None:
+            symbol_rate = sampling_rate / sps
+            channel_bw = symbol_rate * (1 + beta)
+            plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate, channel_bw)
+        else:
+            print("Symbol rate or roll-off factor not available. Cannot compute channel bandwidth.")
+
         plot_spectrogram(f_data, modscheme, sampling_rate)
 
 if __name__ == "__main__":

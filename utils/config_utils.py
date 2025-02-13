@@ -76,7 +76,7 @@ def map_config(config, defaults):
         mapped["sampling_rate"] = config["sampling_rate"]
     else:
         print("No sampling rate provided. Using defaults.")
-        mapped["sampling_rate"] = defaults.get("sampling_rate", 1e6)  # Default to 1 MHz if not provided.
+        mapped["sampling_rate"] = defaults.get("sampling_rate", 20e6)  # Default to 2 MHz if not provided.
 
     ## Center frequencies (for wideband signals)
     if "center_frequencies" in config.keys():
@@ -85,9 +85,9 @@ def map_config(config, defaults):
         mapped["center_frequencies"] = config["center_frequencies"]
     else:
         print("No center frequencies provided. Using defaults.")
-        mapped["center_frequencies"] = defaults.get("center_frequencies", [mapped["sampling_rate"] / 2])  # Default to Nyquist frequency.
+        mapped["center_frequencies"] = defaults.get("center_frequencies", [mapped["sampling_rate"] / 4])  # Default to half Nyquist frequency.
 
-    ## If center frequencies list is empty, default to a single frequency at Nyquist
+    ## If center frequencies list is empty, default to a single frequency at half Nyquist
     if not mapped["center_frequencies"]:
         mapped["center_frequencies"] = [mapped["sampling_rate"] / 2]
 

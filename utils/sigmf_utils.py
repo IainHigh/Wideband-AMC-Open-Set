@@ -23,8 +23,8 @@ def archive_sigmf(savepath):
             assert(f[-5:] in ['-data', '-meta']), "Invalid file type found in " + savepath
             out.add(savepath + "/" + f, arcname=f)
 
-def save_sigmf(i, q, config, idx):
-    record_name = config["savepath"] + "/" + config["savename"] + "-" + str(idx)
+def save_sigmf(i, q, dataset_directory, config, idx):
+    record_name = dataset_directory + "/" + config["savepath"] + "/" + config["savename"] + "-" + str(idx)
     data_name = record_name + ".sigmf-data"
     meta_name = record_name + ".sigmf-meta"
 

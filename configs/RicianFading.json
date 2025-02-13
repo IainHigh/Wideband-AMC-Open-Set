@@ -24,7 +24,7 @@
         "path_delays": [14, 27],
         "path_gains":  [-2, -10]
     },
-    "savepath": "/exports/eddie/scratch/s2062378/data/default",
+    "savepath": "default",
     "verbose": 0,
     "archive": false
 }
