@@ -6,12 +6,12 @@ export LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LIBRARY_PATH
 
 #$ -N DatasetAnalysis              
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator    
-#$ -l h_rt=00:59:00 
+#$ -l h_rt=04:59:00 
 #$ -l h_vmem=20G
 #$ -o /home/s2062378/OutputFiles
 #$ -e /home/s2062378/OutputFiles
-# -m beas
-# -M "s2062378@ed.ac.uk"
+#$ -m beas
+#$ -M "s2062378@ed.ac.uk"
 #$ -R y
 
 # Initialise the environment modules and cuda

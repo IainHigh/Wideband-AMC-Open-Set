@@ -279,7 +279,7 @@ def generate_linear(idx_start, mod, config):
             "delay": delay.value,
             "beta": beta.value,
             "dt": dt.value,
-            "savepath": f"{dataset_directory}/{config["savepath"]}",
+            "savepath": config["savepath"],
             "savename": config["savename"],
         }
         if mod[-1] == "bpsk":
@@ -290,7 +290,7 @@ def generate_linear(idx_start, mod, config):
                 ber_dict[snr.value].append(ber)
 
         # Save the concatenated data for this capture in SigMF format
-        save_sigmf(I_total, Q_total, dataset_directory, metadata, idx_start + i)
+        save_sigmf(I_total, Q_total, metadata, idx_start + i)
         
     # After processing all captures, calculate and print the average BER per SNR.
     avg_ber_dict = {snr: sum(ber_list)/len(ber_list) for snr, ber_list in ber_dict.items()}
@@ -336,7 +336,7 @@ def generate_am(idx_start, mod, config):
         ## calls to c code
         cam.am_modulate(modtype, mod_idx, n_samps, x, xI, xQ, verbose, seed)
         cchan.channel(snr, n_samps, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
-
+        
         metadata = {
             "modname": mod[-1],
             "modclass": mod[0],
@@ -347,7 +347,7 @@ def generate_am(idx_start, mod, config):
             "snr": snr.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": f"{dataset_directory}/{config["savepath"]}",
+            "savepath": config["savepath"],
             "savename": config["savename"],
         }
 
@@ -358,7 +358,7 @@ def generate_am(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
+        save_sigmf(I, Q, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -411,7 +411,7 @@ def generate_fm(idx_start, mod, config):
             "snr": snr.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": f"{dataset_directory}/{config["savepath"]}",
+            "savepath": config["savepath"],
             "savename": config["savename"],
         }
 
@@ -422,7 +422,7 @@ def generate_fm(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
+        save_sigmf(I, Q, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -505,7 +505,7 @@ def generate_fsk(idx_start, mod, config):
             "dt": dt.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": f"{dataset_directory}/{config["savepath"]}",
+            "savepath": config["savepath"],
             "savename": config["savename"],
         }
 
@@ -516,7 +516,7 @@ def generate_fsk(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
+        save_sigmf(I, Q, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -552,7 +552,7 @@ def generate_noise(idx_start, mod, config):
             "sps": sps.value,
             "fo": fo.value,
             "po": po.value,
-            "savepath": f"{dataset_directory}/{config["savepath"]}",
+            "savepath": config["savepath"],
             "savename": config["savename"],
         }
 
@@ -563,7 +563,7 @@ def generate_noise(idx_start, mod, config):
         Q = Q[halfbuf:-halfbuf]
 
         ## save record in sigmf format
-        save_sigmf(I, Q, dataset_directory, metadata, idx_start + i)
+        save_sigmf(I, Q, metadata, idx_start + i)
 
     return idx_start + i + 1
 
@@ -590,7 +590,7 @@ def run_tx(config):
         print(_mod[-1] + ": " + str(idx - start_idx))
 
     if config["archive"]:
-        archive_sigmf(f"{dataset_directory}/{config["savepath"]}")
+        archive_sigmf(config["savepath"])
 
 
 if __name__ == "__main__":
@@ -609,6 +609,6 @@ if __name__ == "__main__":
     with open("./configs/defaults.json") as f:
         defaults = json.load(f)
 
-    config = map_config(config, defaults)
+    config = map_config(config, defaults, dataset_directory)
 
     run_tx(config)

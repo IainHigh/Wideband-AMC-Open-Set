@@ -18,7 +18,7 @@ def check_range(x, positive=True):
     else:
         return True
 
-def map_config(config, defaults):
+def map_config(config, defaults, dataset_dir):
     mapped = {}
 
     ## num samples
@@ -427,10 +427,10 @@ def map_config(config, defaults):
 
     ## savename
     if "savepath" in config.keys():
-        tmp = config["savepath"]
+        tmp = dataset_dir + "/" + config["savepath"]
     else:
         print("No savename provided. Using defaults.")
-        tmp = defaults["savepath"]
+        tmp = dataset_dir + "/" + defaults["savepath"]
     if os.path.exists(tmp):
         ## modify pathname with date (DD-MM-YY) and time (H-M-S)
         t = datetime.today()
