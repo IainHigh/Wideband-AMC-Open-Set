@@ -21,11 +21,11 @@ class ModulationDataset(Dataset):
 
             with open(meta_path, "r") as f:
                 metadata = json.load(f)
-                
+
                 # Extract modulation class
                 label = metadata["annotations"][0]["rfml_labels"]["modclass"]
                 labels.append(label)
-                
+
                 # Extract SNR (assuming the SNR is found in the "channel" section of the second annotation)
                 try:
                     snr = metadata["annotations"][1]["channel"]["snr"]
@@ -55,4 +55,8 @@ class ModulationDataset(Dataset):
         if self.transform:
             x = self.transform(x)
 
-        return torch.tensor(x, dtype=torch.float32), torch.tensor(label, dtype=torch.long), snr
+        return (
+            torch.tensor(x, dtype=torch.float32),
+            torch.tensor(label, dtype=torch.long),
+            snr,
+        )

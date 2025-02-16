@@ -49,6 +49,7 @@ spectrogram_fft_size = 4096  # Size of the FFT
 ######################### HELPER FUNCTIONS #########################
 #####################################################################
 
+
 def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
     """
     Designs and applies a Butterworth bandpass filter to a real-valued signal.
@@ -67,9 +68,10 @@ def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
     low = lowcut / nyq
     high = highcut / nyq
 
-    b, a = butter(order, [low, high], btype='band')
+    b, a = butter(order, [low, high], btype="band")
     y = filtfilt(b, a, data)
     return y
+
 
 def bandpass_complex(x, sampling_rate, lowcut, highcut, order=5):
     """
@@ -78,6 +80,7 @@ def bandpass_complex(x, sampling_rate, lowcut, highcut, order=5):
     real_filtered = bandpass_filter(x.real, sampling_rate, lowcut, highcut, order)
     imag_filtered = bandpass_filter(x.imag, sampling_rate, lowcut, highcut, order)
     return real_filtered + 1j * imag_filtered
+
 
 def delete_existing_plots():
     for path in [
@@ -88,6 +91,7 @@ def delete_existing_plots():
     ]:
         for file in os.listdir(path):
             os.remove(f"{path}/{file}")
+
 
 def get_data(file):
     ## get meta
@@ -109,9 +113,11 @@ def get_data(file):
 
     return f_data, modscheme, center_frequencies, sampling_rate, sps, beta
 
+
 #####################################################################
 ######################### PLOTTER FUNCTIONS #########################
 #####################################################################
+
 
 def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     # Ensure we have enough data
@@ -119,10 +125,15 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
 
     # Adjust time_domain_length dynamically if needed
     plot_length = min(time_domain_length, num_samples - time_domain_start_index)
-    
+
     # Extract I/Q components with correct indexing
-    I = f_data[time_domain_start_index * 2 : (time_domain_start_index + plot_length) * 2 : 2]
-    Q = f_data[time_domain_start_index * 2 + 1 : (time_domain_start_index + plot_length) * 2 : 2]
+    I = f_data[
+        time_domain_start_index * 2 : (time_domain_start_index + plot_length) * 2 : 2
+    ]
+    Q = f_data[
+        time_domain_start_index * 2
+        + 1 : (time_domain_start_index + plot_length) * 2 : 2
+    ]
 
     # Ensure I and Q are the same length
     min_length = min(len(I), len(Q))
@@ -130,7 +141,7 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     Q = Q[:min_length]
 
     # Generate correct time axis based on actual sample length
-    time_axis = np.arange(min_length) / sampling_rate  
+    time_axis = np.arange(min_length) / sampling_rate
 
     plt.figure()
     plt.plot(time_axis, I, label="I", alpha=0.8)
@@ -143,6 +154,7 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     plt.savefig(f"{time_domain_output_path}/{modscheme}.png")
     plt.close()
 
+
 def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate):
     I = f_data[0::2]
     Q = f_data[1::2]
@@ -151,7 +163,7 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
     # Compute FFT and shift spectrum
     X = np.fft.fft(x)
     X = np.fft.fftshift(X)
-    freqs = np.fft.fftshift(np.fft.fftfreq(len(x), d=1/sampling_rate))
+    freqs = np.fft.fftshift(np.fft.fftfreq(len(x), d=1 / sampling_rate))
 
     # Convert FFT magnitude to dB
     PSD = 10 * np.log10(np.abs(X) ** 2 + 1e-12)  # Avoid log(0)
@@ -164,12 +176,14 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
     valid_idx = freqs_extended >= 0
     freqs_final = freqs_extended[valid_idx]
     PSD_final = PSD_extended[valid_idx]
-    
+
     plt.figure()
     plt.plot(freqs_final, PSD_final, label="PSD")
     for f in center_frequencies:
-        plt.axvline(f, color="red", linestyle="--", alpha=0.7, label=f"Center {f/1e6:.2f} MHz")
-    
+        plt.axvline(
+            f, color="red", linestyle="--", alpha=0.7, label=f"Center {f/1e6:.2f} MHz"
+        )
+
     plt.grid()
     plt.title(f"Frequency Domain ({modscheme})")
     plt.xlabel("Frequency [Hz]")
@@ -178,7 +192,10 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
     plt.savefig(f"{frequency_domain_output_path}/{modscheme}.png")
     plt.close()
 
-def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate, channel_bw):
+
+def plot_constellation_diagram(
+    f_data, modscheme, center_frequencies, sampling_rate, channel_bw
+):
     """
     For each channel, isolate the desired band using a bandpass filter,
     downconvert it to baseband (undo the frequency shift), and then plot
@@ -193,8 +210,8 @@ def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_r
 
     for f_c in center_frequencies:
         # Define bandpass filter cutoff frequencies for channel f_c.
-        lowcut = f_c - channel_bw/2
-        highcut = f_c + channel_bw/2
+        lowcut = f_c - channel_bw / 2
+        highcut = f_c + channel_bw / 2
 
         # Isolate the channel by filtering the composite signal.
         x_filtered = bandpass_complex(x, sampling_rate, lowcut, highcut, order=5)
@@ -227,8 +244,11 @@ def plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_r
         cbar = plt.colorbar()
         cbar.set_label("Density")
         plt.grid(True, linestyle="--", alpha=0.5)
-        plt.savefig(f"{constellation_diagram_output_path}/{modscheme}_{int(f_c/1e6)}MHz.png")
+        plt.savefig(
+            f"{constellation_diagram_output_path}/{modscheme}_{int(f_c/1e6)}MHz.png"
+        )
         plt.close()
+
 
 def plot_spectrogram(f_data, modscheme, sampling_rate):
     I = f_data[0::2]
@@ -256,6 +276,7 @@ def plot_spectrogram(f_data, modscheme, sampling_rate):
     plt.savefig(f"{spectrogram_output_path}/{modscheme}.png")
     plt.close()
 
+
 def main():
     delete_existing_plots()
     dataset_path = dataset_directory + "/" + dataset_name
@@ -267,17 +288,24 @@ def main():
         # Get the data and metadata. Note that we now also retrieve sps and beta.
         f_data, modscheme, center_frequencies, sampling_rate, sps, beta = get_data(file)
         plot_time_domain_diagram(f_data, modscheme, sampling_rate)
-        plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate)
-        
+        plot_frequency_domain_diagram(
+            f_data, modscheme, center_frequencies, sampling_rate
+        )
+
         # Compute channel_bw from the symbol rate and roll-off factor if available.
         if sps is not None and beta is not None:
             symbol_rate = sampling_rate / sps
             channel_bw = symbol_rate * (1 + beta)
-            plot_constellation_diagram(f_data, modscheme, center_frequencies, sampling_rate, channel_bw)
+            plot_constellation_diagram(
+                f_data, modscheme, center_frequencies, sampling_rate, channel_bw
+            )
         else:
-            print("Symbol rate or roll-off factor not available. Cannot compute channel bandwidth.")
+            print(
+                "Symbol rate or roll-off factor not available. Cannot compute channel bandwidth."
+            )
 
         plot_spectrogram(f_data, modscheme, sampling_rate)
+
 
 if __name__ == "__main__":
     main()

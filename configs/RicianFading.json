@@ -21,8 +21,8 @@
         "fo": 0.0,
         "po": 0.0,
         "k_factor": 4.0,
-        "path_delays": [14, 27],
-        "path_gains":  [-2, -10]
+        "path_delays": [0, 14, 27],
+        "path_gains":  [0, -2, -10]
     },
     "savepath": "default",
     "verbose": 0,

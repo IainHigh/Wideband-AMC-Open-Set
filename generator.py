@@ -13,15 +13,14 @@ from utils import *
 buf = 4096
 halfbuf = 2048
 
+rng_seed = None
+
 # Read the configs/system_parameters.json file.
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
 
 working_directory = system_parameters["Working_Directory"]
 sys.path.append(working_directory)
-
-rng_seed = system_parameters["Random_Seed"]
-np.random.seed(rng_seed)
 
 dataset_directory = system_parameters["Dataset_Directory"]
 
@@ -35,10 +34,11 @@ cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
 
 import numpy as np
 
+
 def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     """
     Calculate the Bit Error Rate (BER) for BPSK.
-    
+
     Parameters
     ----------
     xI, xQ : array_like
@@ -49,7 +49,7 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
         Samples per symbol.
     trim : int
         Number of samples to trim from beginning and end.
-    
+
     Returns
     -------
     ber : float
@@ -60,29 +60,30 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     xQ = np.array(xQ)
     yI = np.array(yI)
     yQ = np.array(yQ)
-    
+
     # Trim the signals (to match what is saved/used)
     tx_I = xI[trim:-trim]
     tx_Q = xQ[trim:-trim]
     rx_I = yI[trim:-trim]
     rx_Q = yQ[trim:-trim]
-    
+
     rx_complex = rx_I + 1j * rx_Q
     tx_complex = tx_I + 1j * tx_Q
-    
+
     # Calculate the transmitted and received symbols by using the sps. Average over sps samples.
+    # TODO: TRY THIS WITH THE MAXIMUM ABSOLUTE VALUE INSTEAD OF THE MEAN - PROBABLY MORE ACCURATE TO THE THEORETICAL BER.
     tx_symbols = np.mean(tx_complex.reshape(-1, sps), axis=1)
-    rx_symbols = np.mean(rx_complex.reshape(-1, sps), axis=1)  
-    
+    rx_symbols = np.mean(rx_complex.reshape(-1, sps), axis=1)
+
     # Demap the symbols to bits (BPSK decision on the real part).
     tx_bits = (np.real(tx_symbols) >= 0).astype(int)
     rx_bits = (np.real(rx_symbols) >= 0).astype(int)
-    
+
     # # Calculate bit errors and BER.
     bit_errors = np.sum(tx_bits != rx_bits)
     total_bits = len(tx_bits)
     ber = bit_errors / total_bits
-    
+
     return ber
 
 
@@ -139,7 +140,9 @@ def generate_linear(idx_start, mod, config):
                     path_gains,
                 ) = channel_params[i]
 
-                assert len(path_delays) == len(path_gains), "Path delays and path gains must have the same length."
+                assert len(path_delays) == len(
+                    path_gains
+                ), "Path delays and path gains must have the same length."
                 snr = ctypes.c_float(snr)
                 fo = ctypes.c_float(fo)
                 po = ctypes.c_float(po)
@@ -149,7 +152,7 @@ def generate_linear(idx_start, mod, config):
                 # Convert path_delays and path_gains to ctypes arrays
                 path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
                 path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
-                
+
             elif channel_type == "rician":
                 (
                     snr,
@@ -160,7 +163,9 @@ def generate_linear(idx_start, mod, config):
                     path_delays,
                     path_gains,
                 ) = channel_params[i]
-                assert len(path_delays) == len(path_gains), "Path delays and path gains must have the same length."
+                assert len(path_delays) == len(
+                    path_gains
+                ), "Path delays and path gains must have the same length."
                 snr = ctypes.c_float(snr)
                 fo = ctypes.c_float(fo)
                 po = ctypes.c_float(po)
@@ -172,7 +177,6 @@ def generate_linear(idx_start, mod, config):
                 path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
                 path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
 
-
             else:
                 raise ValueError("Undefined channel type.")
 
@@ -182,9 +186,10 @@ def generate_linear(idx_start, mod, config):
             delay = ctypes.c_uint(int(sig_params[i][2]))
             dt = ctypes.c_float(sig_params[i][3])
 
-
             # Adjust n_sym for chunk processing
-            n_sym = int(np.ceil(n_samps / sps.value))  # Ensure the right number of symbols
+            n_sym = int(
+                np.ceil(n_samps / sps.value)
+            )  # Ensure the right number of symbols
 
             # Create return arrays
             s = (ctypes.c_uint * n_sym)(*np.zeros(n_sym, dtype=int))
@@ -196,14 +201,16 @@ def generate_linear(idx_start, mod, config):
             yQ = (ctypes.c_float * n_samps)(*np.zeros(n_samps))
 
             # Call C modules for chunk processing
-            clinear.linear_modulate(modtype, order, ctypes.c_int(n_sym), s, smI, smQ, verbose, seed)
-            ctx.rrc_tx(ctypes.c_int(n_sym), sps, delay, beta, dt, smI, smQ, xI, xQ, verbose)
+            clinear.linear_modulate(
+                modtype, order, ctypes.c_int(n_sym), s, smI, smQ, verbose, seed
+            )
+            ctx.rrc_tx(
+                ctypes.c_int(n_sym), sps, delay, beta, dt, smI, smQ, xI, xQ, verbose
+            )
 
             # Channel Type
             if channel_type == "awgn":
-                cchan.channel(
-                    snr, n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed
-                )
+                cchan.channel(snr, n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
             elif channel_type == "rayleigh":
                 cchan.rayleigh_channel(
                     snr,
@@ -242,7 +249,6 @@ def generate_linear(idx_start, mod, config):
                     seed,
                 )
 
-
             I = np.array(yI)[halfbuf:-halfbuf]
             Q = np.array(yQ)[halfbuf:-halfbuf]
 
@@ -257,8 +263,8 @@ def generate_linear(idx_start, mod, config):
             Q_total += Q_shifted
 
         # Normalize final signal
-        #max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
-        #if max_amp > 0:
+        # max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
+        # if max_amp > 0:
         #    I_total /= max_amp
         #    Q_total /= max_amp
 
@@ -291,16 +297,19 @@ def generate_linear(idx_start, mod, config):
 
         # Save the concatenated data for this capture in SigMF format
         save_sigmf(I_total, Q_total, metadata, idx_start + i)
-        
+
     # After processing all captures, calculate and print the average BER per SNR.
-    avg_ber_dict = {snr: sum(ber_list)/len(ber_list) for snr, ber_list in ber_dict.items()}
-    
+    avg_ber_dict = {
+        snr: sum(ber_list) / len(ber_list) for snr, ber_list in ber_dict.items()
+    }
+
     # Sort the dictionary by SNR
     avg_ber_dict = dict(sorted(avg_ber_dict.items()))
-    
-    print("Average BER per SNR:")
-    for snr, avg_ber in avg_ber_dict.items():
-        print(f"SNR = {snr}: AVG_BER = {avg_ber}")
+
+    if avg_ber_dict != {}:
+        print("Average BER per SNR:")
+        for snr, avg_ber in avg_ber_dict.items():
+            print(f"SNR = {snr}: AVG_BER = {avg_ber}")
 
     return idx_start + config["n_captures"]
 
@@ -336,7 +345,7 @@ def generate_am(idx_start, mod, config):
         ## calls to c code
         cam.am_modulate(modtype, mod_idx, n_samps, x, xI, xQ, verbose, seed)
         cchan.channel(snr, n_samps, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
-        
+
         metadata = {
             "modname": mod[-1],
             "modclass": mod[0],
@@ -601,10 +610,22 @@ if __name__ == "__main__":
         type=str,
         help="Path to configuration file to use for data generation.",
     )
+    parser.add_argument(
+        "rng_seed",
+        type=int,
+        help="Random seed for data generation.",
+    )
     args = parser.parse_args()
 
     with open(args.config_file) as f:
         config = json.load(f)
+
+    # If a rng seed is provided, use it. Otherwise, use the one from the config file.
+    if args.rng_seed is not None:
+        rng_seed = args.rng_seed
+    else:
+        rng_seed = system_parameters["Random_Seed"]
+    np.random.seed(rng_seed)
 
     with open("./configs/defaults.json") as f:
         defaults = json.load(f)

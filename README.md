@@ -1,29 +1,31 @@
+# DONE
+ - Ensure random numbers are seeded to help with reproducibility - even in the C code.
+ - Add the config file with random number seed and directory locations to make swapping between Eddie and local easier.
+ - Ensure new code is functional with parameters in the system_config file.
+ - Ensure random numbers are seeded correctly:
+        - Test SNR/BER values for BPSK modulation scheme. Run the script twice, ensure you get same answer. Will need to decrease n_samples to something smaller for testing so it runs quicker.
+        - Test Training a simple CNN model. Once again run twice, ensure same answer twice.
+        - Check "Verifying Seeded Random.txt" Evidence of Output.
+        - Can now seed for identical data generation and identical model training, ensuring repeatability of further experiments.
+ - Move code off of Eddie & Get it working locally (should simply be a case of modifying the system_config) parameters.
+ - Go through Eddie conda environment set up again (this should ensure it's there when Eddie comes back online.)
+ - Complete "Verifying Seeded Random.txt" - simply run the code multiple times.
+
 # TODO
 
-Week Commencing 10/02/25:
-    Thursday
-        0) Address Popoolas comments on previous Project Report
-        1) Ensure random numbers are seeded to help with reproducibility - even in the C code.
-        2) Add the config file with random number seed and directory locations to make swapping between Eddie and local easier. 
-    Friday
-        2) Ensure random numbers are seeded correctly:
-            - Test SNR/BER values for BPSK modulation scheme. Run the script twice, ensure you get same answer. Will need to decrease n_samples to something smaller for testing so it runs quicker.
-            - Test Training a simple CNN model. Once again run twice, ensure same answer twice.
-        3) Ensure new code is functional with parameters in the system_config file. This should be confirmed by the above tests.
-        4) Move code off of Eddie & Get it working locally (should simply be a case of modifying the system_config) parameters.
-        5) Document the above changes (BER/SNR plots in weekly research report) + paragraph about seeding for reproducibility.
-            - Document the system_config file in the read_me.md.
-        6) Go through Eddie conda environment set up again (this should ensure it's there when Eddie comes back online.)
-        7) Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json) - DO THIS LAST, WILL TAKE A WHILE TO RUN.
-
 Week Commencing 17/02/25:
-1) Replicate parameters and model training from literature paper, should be able to get very similar results. Will need to be running locally.
-2) Should also add background noise across the entire spectrum – currently noise is only
+ - Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json)
+ - Replicate parameters and model training from literature paper, should be able to get very similar results. Will need to be running locally.
+ - Should also add background noise across the entire spectrum – currently noise is only
         added to transmitted signals whereas we’d ideally want constant background noise across the
         entire spectrum. (THIS MIGHT ALREADY BE DONE)
-3) Currently all signals generated on the wideband are of the same modulation scheme. This
+ - Currently all signals generated on the wideband are of the same modulation scheme. This
 should be relatively easy to fix.
-4) Create a model that works on predicting signal modulation schemes in the wideband.
+ - Create a model that works on predicting signal modulation schemes in the wideband.
+ Document the above changes (BER/SNR plots in weekly research report) + paragraph about seeding for reproducibility.
+            - Document the system_config file in the read_me.md.
+            - Address Popoolas comments on previous Project Report in this weeks project report.
+            - Document everything currently in the "DONE" section.
 
 Backburner:
 1) Research "Standardised" Rician and Rayleigh multipath scenarios. e.g. path delays + path gains for city / rural / town environments.

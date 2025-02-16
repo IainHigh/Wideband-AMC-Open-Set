@@ -4,10 +4,11 @@ import torch.nn.functional as F
 
 # This model was implemented to be an improvement over the simple CNN model, it has more layers and uses residual connections.
 
+
 class ModulationClassifier(nn.Module):
     def __init__(self, num_classes, input_len=1024):  # Default input length = 1024
         super(ModulationClassifier, self).__init__()
-        
+
         # Initial convolutional block
         self.conv1 = nn.Conv1d(2, 64, kernel_size=7, stride=1, padding=3)
         self.bn1 = nn.BatchNorm1d(64)
@@ -19,15 +20,18 @@ class ModulationClassifier(nn.Module):
         self.res1_bn1 = nn.BatchNorm1d(256)
         self.res1_conv2 = nn.Conv1d(256, 256, kernel_size=3, stride=1, padding=1)
         self.res1_bn2 = nn.BatchNorm1d(256)
-        self.res1_downsample = nn.Conv1d(128, 256, kernel_size=1, stride=1)  # Projection layer for residual
+        self.res1_downsample = nn.Conv1d(
+            128, 256, kernel_size=1, stride=1
+        )  # Projection layer for residual
 
         # Residual block 2
         self.res2_conv1 = nn.Conv1d(256, 512, kernel_size=3, stride=1, padding=1)
         self.res2_bn1 = nn.BatchNorm1d(512)
         self.res2_conv2 = nn.Conv1d(512, 512, kernel_size=3, stride=1, padding=1)
         self.res2_bn2 = nn.BatchNorm1d(512)
-        self.res2_downsample = nn.Conv1d(256, 512, kernel_size=1, stride=1)  # Projection layer for residual
-
+        self.res2_downsample = nn.Conv1d(
+            256, 512, kernel_size=1, stride=1
+        )  # Projection layer for residual
 
         # Convolutional block before fully connected layers
         self.conv3 = nn.Conv1d(512, 1024, kernel_size=3, stride=1, padding=1)

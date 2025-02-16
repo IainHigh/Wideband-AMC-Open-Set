@@ -1,5 +1,5 @@
 {
-    "n_captures": 100000,
+    "n_captures": 1000,
     "n_samps": 65536,
     "modulation": ["bpsk"],
     "symbol_rate": 8,
@@ -18,13 +18,10 @@
     ],
 
     "channel": {
-        "type": "rayleigh",
-        "awgn": true,
+        "type": "awgn",
         "snr": [-20,20,1],
         "fo": 0.0,
-        "po": 0.0,
-        "path_delays": [10, 20, 25, 30, 35, 40],
-        "path_gains":  [-1, -1, -3, -5, -7, -9]
+        "po": 0.0
     },
 
     "savepath": "default",

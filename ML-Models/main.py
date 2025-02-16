@@ -8,9 +8,24 @@ import glob
 import time
 import json
 import sys
-
 from ModulationDataset import ModulationDataset
-from CNNs.LiteratureCNN import ModulationClassifier # CHANGE THIS TO THE MODEL YOU WANT TO USE
+
+##############################################
+########### MODIFIABLE PARAMETERS ############
+##############################################
+
+from CNNs.LiteratureCNN import (
+    ModulationClassifier,
+)  # Change this to the model you want to use.
+
+create_new_dataset = False
+save_model = False
+batch_size = 4
+epochs = 10
+learning_rate = 0.04
+##############################################
+########## END OF MODIFIABLE PARAMETERS ######
+##############################################
 
 # Read the configs/system_parameters.json file.
 with open("./configs/system_parameters.json") as f:
@@ -21,22 +36,8 @@ sys.path.append(working_directory)
 
 rng_seed = system_parameters["Random_Seed"]
 
-dataset_directory = system_parameters["Dataset_Directory"]
-
-##############################################
-########### MODIFIABLE PARAMETERS ############
-##############################################
-create_new_dataset = False
-save_model = False
-data_dir = dataset_directory
-batch_size = 512
-epochs = 20
-learning_rate = 0.02
+data_dir = system_parameters["Dataset_Directory"]
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-##############################################
-########## END OF MODIFIABLE PARAMETERS ######
-##############################################
-
 torch.manual_seed(rng_seed)
 
 if torch.cuda.is_available():
@@ -59,9 +60,10 @@ def create_dataset():
             os.removedirs(f"{data_dir}/{set}")
 
     # Generate the new dataset using the generator.py script.
-    os.system(f"python3 generator.py ./configs/training_set.json")
-    os.system(f"python3 generator.py ./configs/validation_set.json")
-    os.system(f"python3 generator.py ./configs/testing_set.json")
+    # Different rng seeds are used to generate different sets. Otherwise the sets would be identical.
+    os.system(f"python3 generator.py ./configs/training_set.json {rng_seed + 1}")
+    os.system(f"python3 generator.py ./configs/validation_set.json {rng_seed + 2}")
+    os.system(f"python3 generator.py ./configs/testing_set.json {rng_seed + 3}")
 
 
 def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, device):
@@ -104,6 +106,7 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
 
     return model
 
+
 def test_model(model, test_loader, device):
     model.eval()
     total_correct = 0
@@ -138,8 +141,7 @@ def test_model(model, test_loader, device):
     for snr in sorted(snr_correct.keys()):
         snr_acc = (snr_correct[snr] / snr_total[snr]) * 100
         print(f"SNR {snr} dB -> Accuracy: {snr_acc:.2f}%")
-    
-    
+
 
 def main():
 
@@ -159,7 +161,9 @@ def main():
 
     # Model, Loss, Optimizer
     num_classes = len(train_dataset.label_to_idx)
-    model = ModulationClassifier(num_classes, input_len=1024) # Number of classes and length of each IQ sample.
+    model = ModulationClassifier(
+        num_classes, input_len=1024
+    )  # Number of classes and length of each IQ sample.
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
 
@@ -178,9 +182,9 @@ def main():
 
 if __name__ == "__main__":
     start_time = time.time()
-    
+
     main()
-    
+
     end_time = time.time()
     time_diff = end_time - start_time
     hours = time_diff // 3600

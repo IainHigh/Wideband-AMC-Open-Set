@@ -1,5 +1,9 @@
 # Documentation of Config JSON Files
 
+# TODO: THIS HAS TO BE UPDATED TO INCLUDE THE FOLLOWING:
+    "sampling_rate": 20e6,
+    "center_frequencies": [5e6],
+
     "channel": {
         "type": "rician",
         "awgn": true,               Include AWGN as well (True / False)
