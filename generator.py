@@ -70,10 +70,12 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     rx_complex = rx_I + 1j * rx_Q
     tx_complex = tx_I + 1j * tx_Q
 
-    # Calculate the transmitted and received symbols by using the sps. Average over sps samples.
-    # TODO: TRY THIS WITH THE MAXIMUM ABSOLUTE VALUE INSTEAD OF THE MEAN - PROBABLY MORE ACCURATE TO THE THEORETICAL BER.
-    tx_symbols = np.mean(tx_complex.reshape(-1, sps), axis=1)
-    rx_symbols = np.mean(rx_complex.reshape(-1, sps), axis=1)
+    tx_symbols = tx_complex[::sps]
+    rx_symbols = rx_complex[::sps]
+
+    # Demap the symbols to bits (BPSK decision on the real part).
+    tx_bits = (np.real(tx_symbols) >= 0).astype(int)
+    rx_bits = (np.real(rx_symbols) >= 0).astype(int)
 
     # Demap the symbols to bits (BPSK decision on the real part).
     tx_bits = (np.real(tx_symbols) >= 0).astype(int)
@@ -613,6 +615,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "rng_seed",
         type=int,
+        nargs="?",
         help="Random seed for data generation.",
     )
     args = parser.parse_args()

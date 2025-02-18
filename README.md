@@ -10,12 +10,12 @@
  - Move code off of Eddie & Get it working locally (should simply be a case of modifying the system_config) parameters.
  - Go through Eddie conda environment set up again (this should ensure it's there when Eddie comes back online.)
  - Complete "Verifying Seeded Random.txt" - simply run the code multiple times.
+  - Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json)
 
 # TODO
 
 Week Commencing 17/02/25:
- - Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json)
- - Replicate parameters and model training from literature paper, should be able to get very similar results. Will need to be running locally.
+ - Replicate parameters and model training from literature paper, should be able to get very similar results.
  - Should also add background noise across the entire spectrum – currently noise is only
         added to transmitted signals whereas we’d ideally want constant background noise across the
         entire spectrum. (THIS MIGHT ALREADY BE DONE)

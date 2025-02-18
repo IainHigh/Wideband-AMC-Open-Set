@@ -18,11 +18,11 @@ from CNNs.LiteratureCNN import (
     ModulationClassifier,
 )  # Change this to the model you want to use.
 
-create_new_dataset = False
+create_new_dataset = True
 save_model = False
-batch_size = 4
-epochs = 10
-learning_rate = 0.04
+batch_size = 8
+epochs = 30
+learning_rate = 0.02
 ##############################################
 ########## END OF MODIFIABLE PARAMETERS ######
 ##############################################
