@@ -5,7 +5,7 @@ import json
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import numpy as np
-from scipy.signal import butter, filtfilt
+from scipy.signal import butter, filtfilt, firwin
 import sys
 
 np.Inf = np.inf  # Fix for a bug in the numpy library
@@ -50,7 +50,7 @@ spectrogram_fft_size = 4096  # Size of the FFT
 #####################################################################
 
 
-def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
+def bandpass_filter(data, sampling_rate, lowcut, highcut, order=10):
     """
     Designs and applies a Butterworth bandpass filter to a real-valued signal.
     Ensures that the critical frequencies are strictly between 0 and 1.
@@ -73,12 +73,24 @@ def bandpass_filter(data, sampling_rate, lowcut, highcut, order=5):
     return y
 
 
-def bandpass_complex(x, sampling_rate, lowcut, highcut, order=5):
+def fir_bandpass_filter(data, sampling_rate, lowcut, highcut, numtaps=101, beta=8.6):
+    nyq = 0.5 * sampling_rate
+    taps = firwin(
+        numtaps, [lowcut / nyq, highcut / nyq], pass_zero=False, window=("kaiser", beta)
+    )
+    # Using filtfilt for zero-phase filtering
+    y = filtfilt(taps, [1.0], data)
+    return y
+
+
+def bandpass_complex(x, sampling_rate, lowcut, highcut):
     """
     Applies the bandpass filter separately to the real and imaginary parts of a complex signal.
     """
-    real_filtered = bandpass_filter(x.real, sampling_rate, lowcut, highcut, order)
-    imag_filtered = bandpass_filter(x.imag, sampling_rate, lowcut, highcut, order)
+    # real_filtered = bandpass_filter(x.real, sampling_rate, lowcut, highcut)
+    # imag_filtered = bandpass_filter(x.imag, sampling_rate, lowcut, highcut)
+    real_filtered = fir_bandpass_filter(x.real, sampling_rate, lowcut, highcut)
+    imag_filtered = fir_bandpass_filter(x.imag, sampling_rate, lowcut, highcut)
     return real_filtered + 1j * imag_filtered
 
 
@@ -119,7 +131,7 @@ def get_data(file):
 #####################################################################
 
 
-def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
+def plot_time_domain_diagram(f_data, sampling_rate):
     # Ensure we have enough data
     num_samples = len(f_data) // 2  # Number of I/Q pairs
 
@@ -147,15 +159,15 @@ def plot_time_domain_diagram(f_data, modscheme, sampling_rate):
     plt.plot(time_axis, I, label="I", alpha=0.8)
     plt.plot(time_axis, Q, label="Q", alpha=0.8)
     plt.grid()
-    plt.title(f"Time Domain ({modscheme})")
+    plt.title(f"Time Domain")
     plt.xlabel("Time [s]")
     plt.ylabel("Amplitude")
     plt.legend()
-    plt.savefig(f"{time_domain_output_path}/{modscheme}.png")
+    plt.savefig(f"{time_domain_output_path}/TimeDomain.png")
     plt.close()
 
 
-def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, sampling_rate):
+def plot_frequency_domain_diagram(f_data, center_frequencies, sampling_rate):
     I = f_data[0::2]
     Q = f_data[1::2]
     x = I + 1j * Q  # Construct complex signal
@@ -185,16 +197,16 @@ def plot_frequency_domain_diagram(f_data, modscheme, center_frequencies, samplin
         )
 
     plt.grid()
-    plt.title(f"Frequency Domain ({modscheme})")
+    plt.title(f"Frequency Domain")
     plt.xlabel("Frequency [Hz]")
     plt.ylabel("PSD [dB]")
     plt.legend()
-    plt.savefig(f"{frequency_domain_output_path}/{modscheme}.png")
+    plt.savefig(f"{frequency_domain_output_path}/FrequencyDomain.png")
     plt.close()
 
 
 def plot_constellation_diagram(
-    f_data, modscheme, center_frequencies, sampling_rate, channel_bw
+    f_data, modschemes, center_frequencies, sampling_rate, channel_bw
 ):
     """
     For each channel, isolate the desired band using a bandpass filter,
@@ -206,15 +218,15 @@ def plot_constellation_diagram(
     Q_total = f_data[1::2]
     x = I_total + 1j * Q_total  # Composite wideband signal
 
-    print(channel_bw)
+    for i, f_c in enumerate(center_frequencies):
+        modscheme = modschemes[i]
 
-    for f_c in center_frequencies:
         # Define bandpass filter cutoff frequencies for channel f_c.
         lowcut = f_c - channel_bw / 2
         highcut = f_c + channel_bw / 2
 
         # Isolate the channel by filtering the composite signal.
-        x_filtered = bandpass_complex(x, sampling_rate, lowcut, highcut, order=5)
+        x_filtered = bandpass_complex(x, sampling_rate, lowcut, highcut)
 
         # Create a time vector for downconversion.
         t = np.arange(len(x_filtered)) / sampling_rate
@@ -250,7 +262,7 @@ def plot_constellation_diagram(
         plt.close()
 
 
-def plot_spectrogram(f_data, modscheme, sampling_rate):
+def plot_spectrogram(f_data, sampling_rate):
     I = f_data[0::2]
     Q = f_data[1::2]
     x = I + 1j * Q
@@ -270,10 +282,10 @@ def plot_spectrogram(f_data, modscheme, sampling_rate):
         cmap="inferno",
     )
     plt.colorbar(label="Power [dB]")
-    plt.title(f"Spectrogram ({modscheme})")
+    plt.title(f"Spectrogram")
     plt.xlabel("Frequency [Hz]")
     plt.ylabel("Time [s]")
-    plt.savefig(f"{spectrogram_output_path}/{modscheme}.png")
+    plt.savefig(f"{spectrogram_output_path}/Spectrogram.png")
     plt.close()
 
 
@@ -286,25 +298,25 @@ def main():
 
     for file in files:
         # Get the data and metadata. Note that we now also retrieve sps and beta.
-        f_data, modscheme, center_frequencies, sampling_rate, sps, beta = get_data(file)
-        plot_time_domain_diagram(f_data, modscheme, sampling_rate)
-        plot_frequency_domain_diagram(
-            f_data, modscheme, center_frequencies, sampling_rate
+        f_data, modschemes, center_frequencies, sampling_rate, sps, beta = get_data(
+            file
         )
+        plot_time_domain_diagram(f_data, sampling_rate)
+        plot_frequency_domain_diagram(f_data, center_frequencies, sampling_rate)
 
         # Compute channel_bw from the symbol rate and roll-off factor if available.
         if sps is not None and beta is not None:
             symbol_rate = sampling_rate / sps
             channel_bw = symbol_rate * (1 + beta)
             plot_constellation_diagram(
-                f_data, modscheme, center_frequencies, sampling_rate, channel_bw
+                f_data, modschemes, center_frequencies, sampling_rate, channel_bw
             )
         else:
             print(
                 "Symbol rate or roll-off factor not available. Cannot compute channel bandwidth."
             )
 
-        plot_spectrogram(f_data, modscheme, sampling_rate)
+        plot_spectrogram(f_data, sampling_rate)
 
 
 if __name__ == "__main__":

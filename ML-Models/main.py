@@ -1,14 +1,19 @@
 import torch
 import torch.optim as optim
-from torch.utils.data import DataLoader
 import torch.nn as nn
 import os
-from tqdm import tqdm
 import glob
 import time
 import json
 import sys
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.metrics import confusion_matrix
 from ModulationDataset import ModulationDataset
+from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
@@ -18,7 +23,7 @@ from CNNs.LiteratureCNN import (
     ModulationClassifier,
 )  # Change this to the model you want to use.
 
-create_new_dataset = True
+create_new_dataset = False
 save_model = False
 batch_size = 8
 epochs = 30
@@ -108,39 +113,115 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
 
 
 def test_model(model, test_loader, device):
+    # Check if the plot directory exists; if not, create it.
+    plot_dir = "plots"
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+
     model.eval()
     total_correct = 0
     total_samples = 0
+
+    # Dictionaries to track accuracy per SNR (using counts)
     snr_correct = {}
     snr_total = {}
+
+    # Lists for overall confusion matrix data
+    overall_true = []
+    overall_pred = []
+
+    # Dictionaries for per-SNR confusion matrix data.
+    snr_trues = {}
+    snr_preds = {}
 
     with torch.no_grad():
         for inputs, labels, snrs in tqdm(test_loader, desc="Testing Model"):
             inputs, labels = inputs.to(device), labels.to(device)
-
             outputs = model(inputs)
             _, predicted = torch.max(outputs, 1)
 
-            # Update overall accuracy
+            # Update overall accuracy and record predictions for confusion matrix.
             total_correct += (predicted == labels).sum().item()
             total_samples += labels.size(0)
+            overall_true.extend(labels.cpu().numpy())
+            overall_pred.extend(predicted.cpu().numpy())
 
-            # Update accuracy per SNR
+            # Update per-SNR accuracy and record data for confusion matrices.
             for i in range(len(snrs)):
-                snr_value = snrs[i].item()  # Extract SNR value
+                snr_value = snrs[i].item()
                 if snr_value not in snr_correct:
                     snr_correct[snr_value] = 0
                     snr_total[snr_value] = 0
-                snr_correct[snr_value] += (predicted[i] == labels[i]).item()
+                    snr_trues[snr_value] = []
+                    snr_preds[snr_value] = []
+                if predicted[i] == labels[i]:
+                    snr_correct[snr_value] += 1
                 snr_total[snr_value] += 1
 
-    # Compute accuracy per SNR
+                # Append true and predicted labels for the given SNR.
+                snr_trues[snr_value].append(labels[i].item())
+                snr_preds[snr_value].append(predicted[i].item())
+
+    # Compute and print overall accuracy.
     overall_accuracy = total_correct / total_samples * 100
     print(f"\nOverall Test Accuracy: {overall_accuracy:.2f}%")
 
+    # Compute and print per-SNR accuracy.
     for snr in sorted(snr_correct.keys()):
         snr_acc = (snr_correct[snr] / snr_total[snr]) * 100
         print(f"SNR {snr} dB -> Accuracy: {snr_acc:.2f}%")
+
+    # ------------------------------
+    # Overall Confusion Matrix Plot
+    # ------------------------------
+    cm_overall = confusion_matrix(overall_true, overall_pred)
+    # Convert each row to percentages (i.e. percentage of true class instances predicted as each class)
+    cm_overall_perc = np.zeros_like(cm_overall, dtype=float)
+    for i in range(cm_overall.shape[0]):
+        row_sum = np.sum(cm_overall[i])
+        if row_sum > 0:
+            cm_overall_perc[i] = (cm_overall[i] / row_sum) * 100
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        cm_overall_perc,
+        annot=True,
+        fmt=".2f",
+        cmap="Blues",
+        xticklabels=list(range(cm_overall.shape[0])),
+        yticklabels=list(range(cm_overall.shape[0])),
+    )
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.title("Overall Confusion Matrix (%)")
+    plt.savefig(os.path.join(plot_dir, "confusion_matrix_overall.png"))
+    plt.close()
+
+    # ------------------------------
+    # Per-SNR Confusion Matrices
+    # ------------------------------
+    for snr in sorted(snr_trues.keys()):
+        cm = confusion_matrix(snr_trues[snr], snr_preds[snr])
+        cm_perc = np.zeros_like(cm, dtype=float)
+        for i in range(cm.shape[0]):
+            row_sum = np.sum(cm[i])
+            if row_sum > 0:
+                cm_perc[i] = (cm[i] / row_sum) * 100
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            cm_perc,
+            annot=True,
+            fmt=".2f",
+            cmap="Blues",
+            xticklabels=list(range(cm.shape[0])),
+            yticklabels=list(range(cm.shape[0])),
+        )
+        plt.xlabel("Predicted Label")
+        plt.ylabel("True Label")
+        plt.title(f"Confusion Matrix for SNR {snr} dB (%)")
+        plt.savefig(os.path.join(plot_dir, f"confusion_matrix_snr_{snr}.png"))
+        plt.close()
 
 
 def main():

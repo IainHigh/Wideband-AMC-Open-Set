@@ -76,112 +76,26 @@ def save_sigmf(i, q, config, idx):
             "center_frequencies": config["center_frequencies"],
         },
     )
-    if mod_int2modem[config["modclass"]] is None:
-        f.add_annotation(
-            0,
-            config["n_samps"],
-            metadata={
-                "channel": {
-                    "type": config["channel_type"],
-                    "snr": config["snr"],
-                    "fo": config["fo"],
-                    "po": config["po"],
-                }
+
+    f.add_annotation(
+        0,
+        config["n_samps"],
+        metadata={
+            "channel": {
+                "type": config["channel_type"],
+                "snr": config["snr"],
+                "fo": config["fo"],
+                "po": config["po"],
             },
-        )
-    elif mod_int2modem[config["modclass"]] == "linear":
-        f.add_annotation(
-            0,
-            config["n_samps"],
-            metadata={
-                "modulation": {
-                    "type": mod_int2type[config["modclass"]],
-                    "class": mod_int2class[config["modclass"]],
-                    "order": config["order"],
-                    "symbol_variant": mod_int2symbolvariant[config["modclass"]],
-                },
-                "channel": {
-                    "type": config["channel_type"],
-                    "snr": config["snr"],
-                    "fo": config["fo"],
-                    "po": config["po"],
-                },
-                "filter": {
-                    "type": config["filter_type"],
-                    "sps": config["sps"],
-                    "delay": config["delay"],
-                    "rolloff": config["beta"],
-                    "dt": config["dt"],
-                },
+            "filter": {
+                "type": config["filter_type"],
+                "sps": config["sps"],
+                "delay": config["delay"],
+                "rolloff": config["beta"],
+                "dt": config["dt"],
             },
-        )
-    elif mod_int2modem[config["modclass"]] == "amplitude":
-        f.add_annotation(
-            0,
-            config["n_samps"],
-            metadata={
-                "modulation": {
-                    "type": mod_int2type[config["modclass"]],
-                    "class": mod_int2class[config["modclass"]],
-                    "modulation_index": config["mod_idx"],
-                    "variant": am_variants[config["modvariant"]],
-                },
-                "channel": {
-                    "type": config["channel_type"],
-                    "snr": config["snr"],
-                    "fo": config["fo"],
-                    "po": config["po"],
-                },
-            },
-        )
-    elif mod_int2modem[config["modclass"]] == "frequency":
-        f.add_annotation(
-            0,
-            config["n_samps"],
-            metadata={
-                "modulation": {
-                    "type": mod_int2type[config["modclass"]],
-                    "class": mod_int2class[config["modclass"]],
-                    "modulation_factor": config["mod_factor"],
-                    "variant": fm_variants[config["modvariant"]],
-                },
-                "channel": {
-                    "type": config["channel_type"],
-                    "snr": config["snr"],
-                    "fo": config["fo"],
-                    "po": config["po"],
-                },
-            },
-        )
-    elif mod_int2modem[config["modclass"]] == "freq_shift":
-        f.add_annotation(
-            0,
-            config["n_samps"],
-            metadata={
-                "modulation": {
-                    "type": mod_int2type[config["modclass"]],
-                    "class": mod_int2class[config["modclass"]],
-                    "modulation_index": config["mod_idx"],
-                    "carrier_spacing": config["carrier_spacing"],
-                },
-                "channel": {
-                    "type": config["channel_type"],
-                    "snr": config["snr"],
-                    "fo": config["fo"],
-                    "po": config["po"],
-                },
-                "filter": {
-                    "type": config["filter_type"],
-                    "sps": config["sps"],
-                    "delay": config["delay"],
-                    "beta": config.get("beta", "none"),
-                    "dt": config["dt"],
-                },
-            },
-        )
-    else:
-        print("Undefined modem.")
-        raise
+        },
+    )
 
     with open(meta_name, "w") as mf:
         f.dump(mf, pretty=True)
