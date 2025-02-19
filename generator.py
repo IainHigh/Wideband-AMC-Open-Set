@@ -115,9 +115,10 @@ def generate_linear(config):
     center_frequencies = config["center_frequencies"]
 
     ber_dict = {}
-    mod_list = []
+
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
         seed = ctypes.c_int(rng_seed + i)
+        mod_list = []
 
         I_total = np.zeros(n_samps - buf, dtype=np.float32)
         Q_total = np.zeros(n_samps - buf, dtype=np.float32)

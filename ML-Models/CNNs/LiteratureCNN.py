@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class ModulationClassifier(nn.Module):
-    def __init__(self, num_classes, input_len=1024):
+    def __init__(self, num_classes, input_len=None):
         super(ModulationClassifier, self).__init__()
 
         # Conv Block 1
