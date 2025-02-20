@@ -9,10 +9,11 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.signal import filtfilt, firwin
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+
+np.Inf = np.inf
 
 ##############################################
 ########### MODIFIABLE PARAMETERS ############
@@ -25,11 +26,20 @@ from CNNs.LiteratureCNN import (
 # Change this between ModulationDataset and WidebandModulationDataset
 from ModulationDataset import WidebandModulationDataset as ModulationDataset
 
+# Dataset creation parameters
 create_new_dataset = True
+
+# Model saving/loading parameters
 save_model = False
+test_only = True  # If True, will skip training and only test a previously saved model.
+save_model_path = (
+    "modulation_classifier.pth"  # Path to save/load model if test_only is True.
+)
+
+# Model training parameters
 batch_size = 8
-epochs = 30
-learning_rate = 0.002
+epochs = 1
+learning_rate = 0.02
 
 ##############################################
 ########## END OF MODIFIABLE PARAMETERS ######
@@ -153,7 +163,7 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
         total = 0
 
         with torch.no_grad():
-            for inputs, labels, snrs in val_loader:
+            for inputs, labels, _ in val_loader:
                 if inputs.size(0) == 0:
                     continue
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -176,6 +186,10 @@ def test_model(model, test_loader, device):
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
+    # Empty out the plots directory
+    for f in glob.glob(f"{plot_dir}/*"):
+        os.remove(f)
+
     model.eval()
     total_correct = 0
     total_samples = 0
@@ -183,10 +197,6 @@ def test_model(model, test_loader, device):
     # Dictionaries for SNR-based results
     snr_correct = {}
     snr_total = {}
-
-    # For confusion matrix
-    overall_true = []
-    overall_pred = {}
 
     # We will just store predicted and label in lists
     overall_pred_list = []
@@ -339,10 +349,44 @@ def main():
 
     # Optional: save the trained model
     if save_model:
-        torch.save(trained_model.state_dict(), "modulation_classifier.pth")
+        torch.save(trained_model.state_dict(), save_model_path)
 
 
 if __name__ == "__main__":
+    # If we have a saved model and we only want to test it
+    if test_only:
+        if not os.path.exists(save_model_path):
+            print("Error: Model file not found.")
+            sys.exit(1)
+        if create_new_dataset:
+            print(
+                "Warning: create_new_dataset is set to True, but we are only testing a model. No new dataset will be created."
+            )
+        if save_model:
+            print(
+                "Warning: save_model is set to True, but we are only testing a model. A new model won't be created and hence will not be saved."
+            )
+
+        # Load the model and test it
+        test_dataset = ModulationDataset(
+            os.path.join(data_dir, "testing"), transform=None
+        )
+
+        model = ModulationClassifier(len(test_dataset.label_to_idx))
+        model.load_state_dict(torch.load(save_model_path))
+        model.to(device)
+
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=multi_signal_collate_fn,
+        )
+
+        test_model(model, test_loader, device)
+        sys.exit(0)
+
+    # Otherwise, train a model.
     start_time = time.time()
     main()
     end_time = time.time()

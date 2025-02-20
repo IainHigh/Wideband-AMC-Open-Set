@@ -20,12 +20,14 @@ should be relatively easy to fix.
 - Create a model that works on predicting signal modulation schemes in the wideband. 
     - This will probably require implementing a bandpass filter similar to the plotters before running the CNN.
 - Replicate parameters and model training from literature paper, should be able to get very similar results. Won't be exactly the same - batch size can't be 128, will try again when working on Eddie again. NOT SURE IF THIS IS POSSIBLE NOW AS WE HAVE MOVED TO WIDEBAND. MOVING TO DONE WILL BE DOCUMENTED AND DISCUSSED.
+- Added model saving / loading to test pretrained models.
 
 # TODO
 - Document the above changes (BER/SNR plots in weekly research report) + paragraph about seeding for reproducibility.
             - Document the system_config file in the read_me.md.
             - Address Popoolas comments on previous Project Report in this weeks project report.
             - Document everything currently in the "DONE" section.
+- See TODO in ModulationDataset.py: TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
 - Symbol rate / baud rate should be unique for each center frequency. Do we even need it still now that the we've got center frequency and sampling frequence?
 
 

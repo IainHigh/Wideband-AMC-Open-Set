@@ -2,17 +2,16 @@ import os
 import torch
 import numpy as np
 import json
-from scipy.signal import butter, filtfilt, firwin, find_peaks
+from scipy.signal import filtfilt, firwin, find_peaks
 from torch.utils.data import Dataset
 
 
 class WidebandModulationDataset(Dataset):
     """
-    For each wideband .sigmf-data file, detect multiple signals, return a list of sub-samples.
-    Each sub-sample is a single modulation with shape (2, sub_signal_len).
+    For each wideband .sigmf-data file, detect multiple signals, return a list of samples.
     """
 
-    def __init__(self, directory, transform=None, sub_signal_len=1024):
+    def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
         self.files = [
@@ -21,7 +20,6 @@ class WidebandModulationDataset(Dataset):
             if f.endswith(".sigmf-data")
         ]
         self.transform = transform
-        self.sub_signal_len = sub_signal_len
 
         # Build label -> index mapping by scanning all metadata
         self.label_to_idx = self._build_label_mapping()
@@ -75,7 +73,7 @@ class WidebandModulationDataset(Dataset):
     def __getitem__(self, idx):
         """
         Return:
-          sub_samples: list of shape [2, sub_signal_len] Tensors
+          sub_samples: list of shape [2, len] Tensors
           sub_labels:  list of int
           sub_snrs:    list of floats (or None)
         """
@@ -107,27 +105,16 @@ class WidebandModulationDataset(Dataset):
 
         # For SNR (if you store it in "channel" or "channel_params" etc.)
         # We'll store one SNR per sub-signal, or None if not found.
-        snr_value = None
-        if "channel" in annotation:
-            snr_value = annotation["channel"].get("snr", None)
-
-        # 1) We'll check we "detected" these center frequencies, or just proceed.
-        #    Example: simple approach is to do an FFT peak detection. Adjust threshold as needed.
-        X = np.fft.fftshift(np.fft.fft(x_wide))
-        mag = np.abs(X)
-        # Find peaks that are at least 20% of the max amplitude, separated by 1/10 of length
-        peak_height = mag.max() * 0.2
-        distance = int(0.1 * len(X))
-        peaks, _ = find_peaks(mag, height=peak_height, distance=distance)
-        # Convert peak indices to frequencies
-        freqs = np.fft.fftshift(np.fft.fftfreq(len(x_wide), 1 / fs))
-        detected_freqs = freqs[peaks]
+        try:
+            snr_value = meta["annotations"][1]["channel"]["snr"]
+        except (KeyError, IndexError):
+            snr_value = None
 
         sub_samples = []
         sub_labels = []
         sub_snrs = []
 
-        # 2) For each known center frequency in meta, produce sub-sample
+        # 2) For each known center frequency in meta, produce sub-sample. TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
         for i, fc in enumerate(center_freqs):
             mod_str = mod_list[i]
             label_idx = self.label_to_idx[mod_str]
