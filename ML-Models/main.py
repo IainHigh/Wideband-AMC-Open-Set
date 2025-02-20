@@ -27,18 +27,18 @@ from CNNs.LiteratureCNN import (
 from ModulationDataset import WidebandModulationDataset as ModulationDataset
 
 # Dataset creation parameters
-create_new_dataset = True
+create_new_dataset = False
 
 # Model saving/loading parameters
-save_model = False
-test_only = True  # If True, will skip training and only test a previously saved model.
+save_model = True
+test_only = False  # If True, will skip training and only test a previously saved model.
 save_model_path = (
     "modulation_classifier.pth"  # Path to save/load model if test_only is True.
 )
 
 # Model training parameters
 batch_size = 8
-epochs = 1
+epochs = 10
 learning_rate = 0.02
 
 ##############################################
@@ -137,7 +137,7 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, epochs, d
         model.train()
         running_loss = 0.0
 
-        for inputs, labels, snrs in tqdm(
+        for inputs, labels, _ in tqdm(
             train_loader, desc=f"Training Epoch {epoch + 1}/{epochs}"
         ):
             # Skip empty batch
@@ -190,19 +190,20 @@ def test_model(model, test_loader, device):
     for f in glob.glob(f"{plot_dir}/*"):
         os.remove(f)
 
+    idx_to_label = {v: k for k, v in test_loader.dataset.label_to_idx.items()}
+    class_labels = [idx_to_label[i] for i in range(len(idx_to_label))]
+
     model.eval()
     total_correct = 0
     total_samples = 0
-
-    # Dictionaries for SNR-based results
-    snr_correct = {}
-    snr_total = {}
 
     # We will just store predicted and label in lists
     overall_pred_list = []
     overall_true_list = []
 
-    # Dictionaries for storing predictions/labels per SNR
+    # Dictionaries for SNR-based results
+    snr_correct = {}
+    snr_total = {}
     snr_trues = {}
     snr_preds = {}
 
@@ -260,8 +261,8 @@ def test_model(model, test_loader, device):
         annot=True,
         fmt=".2f",
         cmap="Blues",
-        xticklabels=range(cm_overall.shape[0]),
-        yticklabels=range(cm_overall.shape[0]),
+        xticklabels=class_labels,
+        yticklabels=class_labels,
     )
     plt.xlabel("Predicted Label")
     plt.ylabel("True Label")
@@ -286,8 +287,8 @@ def test_model(model, test_loader, device):
             annot=True,
             fmt=".2f",
             cmap="Blues",
-            xticklabels=range(cm_snr.shape[0]),
-            yticklabels=range(cm_snr.shape[0]),
+            xticklabels=class_labels,
+            yticklabels=class_labels,
         )
         plt.xlabel("Predicted Label")
         plt.ylabel("True Label")

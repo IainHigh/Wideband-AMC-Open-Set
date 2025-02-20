@@ -1,39 +1,14 @@
 # DONE
- - Ensure random numbers are seeded to help with reproducibility - even in the C code.
- - Add the config file with random number seed and directory locations to make swapping between Eddie and local easier.
- - Ensure new code is functional with parameters in the system_config file.
- - Ensure random numbers are seeded correctly:
-        - Test SNR/BER values for BPSK modulation scheme. Run the script twice, ensure you get same answer. Will need to decrease n_samples to something smaller for testing so it runs quicker.
-        - Test Training a simple CNN model. Once again run twice, ensure same answer twice.
-        - Check "Verifying Seeded Random.txt" Evidence of Output.
-        - Can now seed for identical data generation and identical model training, ensuring repeatability of further experiments.
- - Move code off of Eddie & Get it working locally (should simply be a case of modifying the system_config) parameters.
- - Go through Eddie conda environment set up again (this should ensure it's there when Eddie comes back online.)
- - Complete "Verifying Seeded Random.txt" - simply run the code multiple times.
- - Create plots for BER/SNR across different channel models (should just be a case of running existing code and changing the channel model in configs/BER_Tests.json)
- - Currently all signals generated on the wideband are of the same modulation scheme. This
-should be relatively easy to fix.
- - Should also add background noise across the entire spectrum – currently noise is only
-        added to transmitted signals whereas we’d ideally want constant background noise across the
-        entire spectrum. (THIS MIGHT ALREADY BE DONE). Don't think this has already been done - current floor is 0dB so nothing being transmitted.
- - Confusion matrix to see which classes ML models were getting incorrect.
-- Create a model that works on predicting signal modulation schemes in the wideband. 
-    - This will probably require implementing a bandpass filter similar to the plotters before running the CNN.
-- Replicate parameters and model training from literature paper, should be able to get very similar results. Won't be exactly the same - batch size can't be 128, will try again when working on Eddie again. NOT SURE IF THIS IS POSSIBLE NOW AS WE HAVE MOVED TO WIDEBAND. MOVING TO DONE WILL BE DOCUMENTED AND DISCUSSED.
-- Added model saving / loading to test pretrained models.
+- None
 
 # TODO
-- Document the above changes (BER/SNR plots in weekly research report) + paragraph about seeding for reproducibility.
-            - Document the system_config file in the read_me.md.
-            - Address Popoolas comments on previous Project Report in this weeks project report.
-            - Document everything currently in the "DONE" section.
+- Document the system_config file in the read_me.md. Write more read_me documents - for plotting and CNNs. Ensure readme's are fully updated.
 - See TODO in ModulationDataset.py: TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
-- Symbol rate / baud rate should be unique for each center frequency. Do we even need it still now that the we've got center frequency and sampling frequence?
-
+- Research "Standardised" Rician and Rayleigh multipath scenarios. e.g. path delays + path gains for city / rural / town environments.
+- Symbol rate / baud rate should be unique for each center frequency?
 
 Backburner:
-1) Research "Standardised" Rician and Rayleigh multipath scenarios. e.g. path delays + path gains for city / rural / town environments.
-2) Look into blind equalisation as a pre-processing step before ML model training for Rician and Rayleigh multipath fading. Other methods include maximum likelihood.
+1) Look into blind equalisation as a pre-processing step before ML model training for Rician and Rayleigh multipath fading. Other methods include maximum likelihood.
 
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
 ### The conda environment set up will need to be run monthly (reminder in outlook calendar)
