@@ -3,7 +3,9 @@
 
 # TODO
 - Document the system_config file in the read_me.md. Write more read_me documents - for plotting and CNNs. Ensure readme's are fully updated.
-- See TODO in ModulationDataset.py: TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
+- See TODO's in ModulationDataset.py:
+    - TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
+    - TODO: Implement better bandwidth calculation here, similar to center frequency detection.
 - Symbol rate / baud rate should be unique for each center frequency?
 
 Backburner:

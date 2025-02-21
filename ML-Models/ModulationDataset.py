@@ -123,6 +123,7 @@ class WidebandModulationDataset(Dataset):
             # (If you do exact matching, or some tolerance approach.)
             # For now, we skip that check and always bandpass at fc.
 
+            # TODO: Implement better bandwidth calculation here, similar to center frequency detection.
             # Example channel BW. Adjust as needed:
             bw = fs / 20.0  # e.g. 1/20 of sampling rate
             lowcut = fc - (bw / 2)
