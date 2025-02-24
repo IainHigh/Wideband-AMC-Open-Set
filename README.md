@@ -1,15 +1,5 @@
-# DONE
-- None
-
-# TODO
-- Document the system_config file in the read_me.md. Write more read_me documents - for plotting and CNNs. Ensure readme's are fully updated.
-- See TODO's in ModulationDataset.py:
-    - TODO: RIGHT NOW THIS IS ESSENTIALLY CHEATING BY USING THE CENTER FREQUENCY. YOU SHOULD BE DETECTING THE SIGNALS INSTEAD.
-    - TODO: Implement better bandwidth calculation here, similar to center frequency detection.
-- Symbol rate / baud rate should be unique for each center frequency?
-
-Backburner:
-1) Look into blind equalisation as a pre-processing step before ML model training for Rician and Rayleigh multipath fading. Other methods include maximum likelihood.
+# Jira Link:
+Link to the Jira board for issue tracking is here: https://iainhigh.atlassian.net/jira/software/projects/SCRUM/boards/1
 
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
 ### The conda environment set up will need to be run monthly (reminder in outlook calendar)

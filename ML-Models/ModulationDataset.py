@@ -124,7 +124,7 @@ class WidebandModulationDataset(Dataset):
             # For now, we skip that check and always bandpass at fc.
 
             # TODO: Implement better bandwidth calculation here, similar to center frequency detection.
-            # Example channel BW. Adjust as needed:
+            # Example channel BW. Adjust as needed. This is related to peak detection, once the peak value has been found, get the bandwidth as everything that is between the peak and slightly above the background noise.
             bw = fs / 20.0  # e.g. 1/20 of sampling rate
             lowcut = fc - (bw / 2)
             highcut = fc + (bw / 2)
