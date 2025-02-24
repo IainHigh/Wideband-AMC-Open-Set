@@ -83,20 +83,41 @@ def map_config(config, defaults, dataset_dir):
             "sampling_rate", 20e6
         )  # Default to 2 MHz if not provided.
 
+    # Randomly generated center frequencies
+    if "randomly_generated_center_frequencies" in config.keys():
+        # Assert "center_frequencies" is not also provided
+        assert (
+            "center_frequencies" not in config.keys()
+        ), "center_frequencies and randomly_generated_center_frequencies cannot both be provided."
+        assert isinstance(
+            config["randomly_generated_center_frequencies"], list
+        ), "randomly_generated_center_frequencies must be a list."
+        assert all(
+            isinstance(f, (int, float)) and f > 0
+            for f in config["randomly_generated_center_frequencies"]
+        ), "All randomly_generated_center_frequencies must be positive numbers."
+        # Assert the length must be 3
+        assert (
+            len(config["randomly_generated_center_frequencies"]) == 3
+        ), "randomly_generated_center_frequencies must be a list of length 3. [Start, Stop, Number of Transmitted Signals]"
+        mapped["center_frequencies"] = config["randomly_generated_center_frequencies"]
+        mapped["center_frequencies_random"] = True
     ## Center frequencies (for wideband signals)
-    if "center_frequencies" in config.keys():
+    elif "center_frequencies" in config.keys():
         assert isinstance(
             config["center_frequencies"], list
         ), "center_frequencies must be a list."
         assert all(
             isinstance(f, (int, float)) and f > 0 for f in config["center_frequencies"]
         ), "All center frequencies must be positive numbers."
+        mapped["center_frequencies_random"] = False
         mapped["center_frequencies"] = config["center_frequencies"]
     else:
         print("No center frequencies provided. Using defaults.")
         mapped["center_frequencies"] = defaults.get(
             "center_frequencies", [mapped["sampling_rate"] / 4]
         )  # Default to half Nyquist frequency.
+        mapped["center_frequencies_random"] = False
 
     ## If center frequencies list is empty, default to a single frequency at half Nyquist
     if not mapped["center_frequencies"]:

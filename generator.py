@@ -112,11 +112,19 @@ def generate_linear(config):
     channel_params = [config["channel_params"][_idx] for _idx in idx]
     channel_type = config["channel_type"]
 
-    center_frequencies = config["center_frequencies"]
-
     ber_dict = {}
 
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
+
+        if config["center_frequencies_random"]:
+            lower_bound, upper_bound, n_max = config["center_frequencies"]
+            n = np.random.randint(1, n_max)
+            center_frequencies = np.random.uniform(lower_bound, upper_bound + 1, n)
+            # Convert from ndarray to list
+            center_frequencies = center_frequencies.tolist()
+        else:
+            center_frequencies = config["center_frequencies"]
+
         seed = ctypes.c_int(rng_seed + i)
         mod_list = []
 

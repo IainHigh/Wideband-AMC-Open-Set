@@ -1,5 +1,9 @@
 # Documentation of Config JSON Files
 
+"randomly_generated_center_frequencies": [2e6, 15e6, 4],
+Ramdomly generate center frequency carriers: [lower_bound, upper_bound, number_of_carriers]
+Should not be provided when "center_frequencies" is also provided.
+
 # TODO: THIS HAS TO BE UPDATED TO INCLUDE THE FOLLOWING:
     "sampling_rate": 20e6,
     "center_frequencies": [5e6],

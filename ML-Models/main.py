@@ -27,7 +27,7 @@ from CNNs.LiteratureCNN import (
 from ModulationDataset import WidebandModulationDataset as ModulationDataset
 
 # Dataset creation parameters
-create_new_dataset = False
+create_new_dataset = True
 
 # Model saving/loading parameters
 save_model = True
