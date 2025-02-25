@@ -1,0 +1,11 @@
+[Epoch 1/10] Average Return=-448422.4039
+[Epoch 2/10] Average Return=-427561.0076
+[Epoch 3/10] Average Return=-432097.3444
+[Epoch 4/10] Average Return=-422066.3950
+[Epoch 5/10] Average Return=-422080.5531
+[Epoch 6/10] Average Return=-422090.4723
+[Epoch 7/10] Average Return=-422133.9125
+[Epoch 8/10] Average Return=-422327.6829
+[Epoch 9/10] Average Return=-421476.0632
+[Epoch 10/10] Average Return=-419379.1086
+Test mod accuracy => 24.07%
