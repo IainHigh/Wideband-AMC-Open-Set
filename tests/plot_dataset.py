@@ -30,6 +30,9 @@ dataset_directory = system_parameters["Dataset_Directory"]
 ####################### MODIFIABLE VARIABLES ########################
 #####################################################################
 
+# Use just the first file in the dataset - useful if the dataset is large with lots of repetitions.
+just_one_file = True
+
 # Directories:
 dataset_name = "default"
 
@@ -45,6 +48,8 @@ time_domain_start_index = 0
 # Spectrogram plotting parameters:
 spectrogram_fft_size = 4096  # Size of the FFT
 
+# Constellation Diagram maximum number of points to plot
+max_points = 65536
 #####################################################################
 ######################### HELPER FUNCTIONS #########################
 #####################################################################
@@ -218,6 +223,10 @@ def plot_constellation_diagram(
     Q_total = f_data[1::2]
     x = I_total + 1j * Q_total  # Composite wideband signal
 
+    # Only plot the first max_points points to avoid cluttering the diagram.
+    if len(x) > max_points:
+        x = x[:max_points]
+
     for i, f_c in enumerate(center_frequencies):
         modscheme = modschemes[i]
 
@@ -295,6 +304,10 @@ def main():
     files = os.listdir(os.path.abspath(dataset_path))
     files = [os.path.join(dataset_path, f.split(".")[0]) for f in files]
     files = list(set(files))
+
+    if just_one_file:
+        # Just do the first one now for testing
+        files = files[:1]
 
     for file in files:
         # Get the data and metadata. Note that we now also retrieve sps and beta.

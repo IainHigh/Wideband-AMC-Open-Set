@@ -28,7 +28,7 @@ save_model_path = "modulation_classifier.pth"
 
 # REINFORCE training hyperparams
 epochs = 15
-learning_rate = 0.01
+learning_rate = 0.001
 batch_size = 256
 
 ##############################################

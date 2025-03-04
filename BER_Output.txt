@@ -1,0 +1,39 @@
+
+Parameters to Test:
+AWGN
+
+URBAN:
+    "channel": {
+        "type": "rayleigh",
+        "awgn": true,
+        "snr": [-20,20,1],
+        "fo": 0.0,
+        "po": 0.0,
+        "path_delays": [0, 4, 16, 24, 46, 74],
+        "path_gains":  [0, -0.9, -4.9, -8.0, -7.8, -23.9]
+    },
+SUBURBAN:
+    "channel": {
+        "type": "rayleigh",
+        "awgn": true,
+        "snr": [-20,20,1],
+        "fo": 0.0,
+        "po": 0.0,
+        "path_delays": [0, 8, 22],
+        "path_gains":  [0, -3, -5]
+    },
+RURAL:
+    "channel": {
+        "type": "rician",
+        "awgn": true,
+        "snr": [-20,20,1],
+        "fo": 0.0,
+        "po": 0.0,
+        "k_factor": 5.0,
+        "path_delays": [0, 1, 2],
+        "path_gains":  [0, -3, -8]
+    },
+
+AWGN:
+RNG Seed: 1984
+RNG Seed: 1984

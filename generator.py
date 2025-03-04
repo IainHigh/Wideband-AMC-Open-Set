@@ -10,7 +10,7 @@ import ctypes
 from tqdm import tqdm
 from utils import *
 
-CALCULATE_BER_SNR = False  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
+CALCULATE_BER_SNR = True  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
 
 buf = 4096
 halfbuf = 2048
@@ -133,7 +133,10 @@ def generate_linear(config):
 
         for center_freq in center_frequencies:
             # Choose a random element from the modulation list
-            index = np.random.randint(0, len(config["modulation"]) - 1)
+            if len(config["modulation"]) == 1:
+                index = 0
+            else:
+                index = np.random.randint(0, len(config["modulation"]) - 1)
             mod = config["modulation"][index]
             modtype = ctypes.c_int(mod[0])
             mod_list.append(mod[-1])
