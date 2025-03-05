@@ -79,12 +79,11 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     tx_bits = (np.real(tx_symbols) >= 0).astype(int)
     rx_bits = (np.real(rx_symbols) >= 0).astype(int)
 
-    # Demap the symbols to bits (BPSK decision on the real part).
-    tx_bits = (np.real(tx_symbols) >= 0).astype(int)
-    rx_bits = (np.real(rx_symbols) >= 0).astype(int)
+    # Invert the bits to calculate the minimum - sometimes they are just inverted.
+    rx_bits_inversed = np.logical_not(rx_bits).astype(int)
 
-    # # Calculate bit errors and BER.
-    bit_errors = np.sum(tx_bits != rx_bits)
+    # Calculate bit errors and BER.
+    bit_errors = min(np.sum(tx_bits != rx_bits), np.sum(tx_bits != rx_bits_inversed))
     total_bits = len(tx_bits)
     ber = bit_errors / total_bits
 
@@ -267,6 +266,13 @@ def generate_linear(config):
                     seed,
                 )
 
+            if (mod[-1] == "bpsk") and (CALCULATE_BER_SNR):
+                ber = calculate_ber_BPSK(xI, xQ, yI, yQ, sps.value, trim=halfbuf)
+                if snr.value not in ber_dict:
+                    ber_dict[snr.value] = [ber]
+                else:
+                    ber_dict[snr.value].append(ber)
+
             I = np.array(yI)[halfbuf:-halfbuf]
             Q = np.array(yQ)[halfbuf:-halfbuf]
 
@@ -279,13 +285,6 @@ def generate_linear(config):
             # Sum to create the wideband signal
             I_total += I_shifted
             Q_total += Q_shifted
-
-            if (mod[-1] == "bpsk") and (CALCULATE_BER_SNR):
-                ber = calculate_ber_BPSK(xI, xQ, yI, yQ, sps.value, trim=halfbuf)
-                if snr.value not in ber_dict:
-                    ber_dict[snr.value] = [ber]
-                else:
-                    ber_dict[snr.value].append(ber)
 
         # Normalize final signal
         # max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
