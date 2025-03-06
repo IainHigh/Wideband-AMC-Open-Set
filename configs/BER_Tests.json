@@ -1,5 +1,5 @@
 {
-    "n_captures": 100,
+    "n_captures": 2000,
     "n_samps": 131072,
     "modulation": ["bpsk"],
     "symbol_rate": 8,
