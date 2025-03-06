@@ -15,8 +15,6 @@ CALCULATE_BER_SNR = True  # Flag to determine if we should calculate the BER to 
 buf = 4096
 halfbuf = 2048
 
-rng_seed = None
-
 # Read the configs/system_parameters.json file.
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
@@ -37,7 +35,7 @@ cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
 import numpy as np
 
 
-def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
+def calculate_ber_BPSK(xI, yI, sps, trim):
     """
     Calculate the Bit Error Rate (BER) for BPSK.
 
@@ -59,38 +57,32 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     """
     # Convert inputs to numpy arrays
     xI = np.array(xI)
-    xQ = np.array(xQ)
     yI = np.array(yI)
-    yQ = np.array(yQ)
 
     # Trim the signals (to match what is saved/used)
     tx_I = xI[trim:-trim]
-    tx_Q = xQ[trim:-trim]
     rx_I = yI[trim:-trim]
-    rx_Q = yQ[trim:-trim]
 
-    rx_complex = rx_I + 1j * rx_Q
-    tx_complex = tx_I + 1j * tx_Q
-
-    tx_symbols = tx_complex[::sps]
-    rx_symbols = rx_complex[::sps]
+    tx_symbols = tx_I[::sps]
+    rx_symbols = rx_I[::sps]
 
     # Demap the symbols to bits (BPSK decision on the real part).
-    tx_bits = (np.real(tx_symbols) >= 0).astype(int)
-    rx_bits = (np.real(rx_symbols) >= 0).astype(int)
+    tx_bits = tx_symbols >= 0
+    rx_bits = rx_symbols >= 0
 
     # Invert the bits to calculate the minimum - sometimes they are just inverted.
-    rx_bits_inversed = np.logical_not(rx_bits).astype(int)
+    rx_bits_inversed = np.logical_not(rx_bits)
 
     # # Calculate bit errors and BER.
-    bit_errors = np.sum(tx_bits != rx_bits)
+    bit_errors = min(np.sum(tx_bits != rx_bits), np.sum(tx_bits != rx_bits_inversed))
     total_bits = len(tx_bits)
     ber = bit_errors / total_bits
 
     return ber
 
 
-def generate_linear(config):
+def generate_linear(config, rng_seed):
+    rng_seed = int(rng_seed)
     verbose = ctypes.c_int(config["verbose"])
     n_samps = config["n_samps"] + buf
     sampling_rate = config["sampling_rate"]
@@ -114,7 +106,6 @@ def generate_linear(config):
     ber_dict = {}
 
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
-
         if config["center_frequencies_random"]:
             lower_bound, upper_bound, n_max = config["center_frequencies"]
             n = np.random.randint(1, n_max)
@@ -124,13 +115,15 @@ def generate_linear(config):
         else:
             center_frequencies = config["center_frequencies"]
 
-        seed = ctypes.c_int(rng_seed + i)
         mod_list = []
 
         I_total = np.zeros(n_samps - buf, dtype=np.float32)
         Q_total = np.zeros(n_samps - buf, dtype=np.float32)
 
         for center_freq in center_frequencies:
+            if not CALCULATE_BER_SNR:
+                rng_seed += 1
+            seed = ctypes.c_int(rng_seed)
             # Choose a random element from the modulation list
             if len(config["modulation"]) == 1:
                 index = 0
@@ -267,7 +260,7 @@ def generate_linear(config):
                 )
 
             if (mod[-1] == "bpsk") and (CALCULATE_BER_SNR):
-                ber = calculate_ber_BPSK(xI, xQ, yI, yQ, sps.value, trim=halfbuf)
+                ber = calculate_ber_BPSK(xI, yI, sps.value, trim=halfbuf)
                 if snr.value not in ber_dict:
                     ber_dict[snr.value] = [ber]
                 else:
@@ -364,7 +357,7 @@ if __name__ == "__main__":
     config = map_config(config, defaults, dataset_directory)
 
     ## Generate the data
-    generate_linear(config)
+    generate_linear(config, rng_seed=rng_seed)
 
     if config["archive"]:
         archive_sigmf(config["savepath"])

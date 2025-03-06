@@ -1,8 +1,10 @@
 {
-    "n_captures": 20000,
-    "n_samps": 65536,
+    "n_captures": 100,
+    "n_samps": 131072,
     "modulation": ["bpsk"],
     "symbol_rate": 8,
+    "sampling_rate": 20e6,
+    "center_frequencies": [5e6],
 
     "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},
     "fmnb_defaults": {"modulation_factor": [0.03, 0.08, 0.01]},
@@ -18,14 +20,10 @@
     ],
 
     "channel": {
-        "type": "rician",
-        "awgn": true,
+        "type": "awgn",
         "snr": [-20,20,1],
         "fo": 0.0,
-        "po": 0.0,
-        "k_factor": 5.0,
-        "path_delays": [1, 2],
-        "path_gains":  [-3, -8]
+        "po": 0.0
     },
     "savepath": "default",
     "verbose": 0,
