@@ -82,8 +82,8 @@ def calculate_ber_BPSK(xI, xQ, yI, yQ, sps, trim):
     # Invert the bits to calculate the minimum - sometimes they are just inverted.
     rx_bits_inversed = np.logical_not(rx_bits).astype(int)
 
-    # Calculate bit errors and BER.
-    bit_errors = min(np.sum(tx_bits != rx_bits), np.sum(tx_bits != rx_bits_inversed))
+    # # Calculate bit errors and BER.
+    bit_errors = np.sum(tx_bits != rx_bits)
     total_bits = len(tx_bits)
     ber = bit_errors / total_bits
 
