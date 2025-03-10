@@ -1,5 +1,5 @@
 {
-    "Working_Directory": "/mnt/c/Users/s2062378/Desktop/Synthetic-Radio-Frequency-Data-Generator",
-    "Dataset_Directory": "/mnt/c/Users/s2062378/Desktop/Synthetic-Radio-Frequency-Data-Generator/data",
+    "Working_Directory": "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator",
+    "Dataset_Directory": "/exports/eddie/scratch/s2062378/data",
     "Random_Seed": 2025
 }

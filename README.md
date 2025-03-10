@@ -1,6 +1,3 @@
-# Jira Link:
-Link to the Jira board for issue tracking is here: https://iainhigh.atlassian.net/jira/software/projects/SCRUM/boards/1
-
 # NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
 ### The conda environment set up will need to be run monthly (reminder in outlook calendar)
 1)  $ cd /home/s2062378
@@ -14,8 +11,9 @@ Link to the Jira board for issue tracking is here: https://iainhigh.atlassian.ne
 9)  $ conda create -n mypython python=3.7 matplotlib numpy tqdm scipy -y
 10) $ conda activate mypython
 11) $ conda install pip -y
+12) $ pip3 install seaborn
 12) $ pip3 install torch torchvision torchaudio
-13) $ pip install SigMF==1.1.1
+13) $ pip3 install SigMF==1.1.1
 
 ### To rebuild C code on Eddie:
 Need to run the following commands in terminal before running make:
