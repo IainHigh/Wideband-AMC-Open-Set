@@ -1,23 +1,11 @@
+# Documentation of sytem_parameters.json
+This JSON is designed to hold the system parameters which are required in several places by the Python code. By design, this should be the only file that should have to be modified to get the code functional and recreate results. It requires modifying the following parameters:
+
+- `Working_Directory`: The full system path to where the Synthetic-Radio-Frequency-Data-Generator directory is found.
+- `Dataset_Directory`: The full system path of the directory the generated dataset will be saved to.
+- `Random_Seed`: The initial seed for all random number generation used throughout the code. By default 2025.
+
 # Documentation of Config JSON Files
-
-"randomly_generated_center_frequencies": [2e6, 15e6, 4],
-Ramdomly generate center frequency carriers: [lower_bound, upper_bound, number_of_carriers]
-Should not be provided when "center_frequencies" is also provided.
-
-# TODO: THIS HAS TO BE UPDATED TO INCLUDE THE FOLLOWING:
-    "sampling_rate": 20e6,
-    "center_frequencies": [5e6],
-
-    "channel": {
-        "type": "rician",
-        "awgn": true,               Include AWGN as well (True / False)
-        "snr": 20,                  Signal to Noise Ratio (dB)
-        "fo": 0.0,                  frequency offset (see below)
-        "po": 0.0,                  phase offset (see below)
-        "k_factor": 4.0,            Ratio of line-of-sight (LOS) to non-line-of-sight (NLOS). Higher value = more placed on LOS. K=0 = equal weight of LOS vs NLOS components.
-        "path_delays": [0, 2, 3],   path delays - measured in samples
-        "path_gains": [0, -2, -10]  path gains - measured in dB. Usually negative.
-    },
     
 Configuration files should contain the following parameters:
 
@@ -29,7 +17,24 @@ Configuration files should contain the following parameters:
  - `fmnb_defaults`: default narrowband frequency modulation parameters, including modulation factor in the form [start, stop, step]
  - `fmwb_defaults`: default wideband frequency modulation parameters, including modulation factor in the form [start, stop, step]
  - `filter`: default transmit filter parameters, including the type of filter (Gaussian or root-raised cosine (RRC)), the excess bandwidth or `beta`, the symbol overlap or `delay`, and the fractional sample delay or `dt` (all gfsk/gmsk signals use Gaussian filters, all remaining fsk/msk signals use square filters, all psk/qam signals use RRC filters)
- - `channel`: synthetic channel parameters, including the type of channel (only AWGN is implemented, currently), signal-to-noise-ratio (`snr`), frequency offset (`fo`), and phase offset (`po`) in the form [start, stop, step]
+ - `channel`: synthetic channel parameters, including the type of channel, signal-to-noise-ratio (`snr`), frequency offset (`fo`), and phase offset (`po`) in the form [start, stop, step]
  - `savepath`: the dataset location
  - `verbose`: 0 for minimal verbosity, 1 for debugging
  - `archive`: create a SigMF archive of dataset when complete
+
+ New parameters added for adapting to wideband:
+ - `sampling_rate`:
+ - `center_frequencies`:
+ - `randomly_generated_center_frequencies`: Ramdomly generate center frequency carriers: [lower_bound, upper_bound, number_of_carriers]. Should not be provided when `center_frequencies` is provided.
+
+ New channel model parameters:
+`channel`: {
+        `type`:         Can either be `awgn`, `rayleigh`, or `rician`
+        `awgn`:         For `rayleigh` and `rician`: include AWGN as well (True / False)
+        `snr`:          Signal to Noise Ratio (dB)
+        `fo`:           Frequency offset (see above)
+        `po`:           Phase offset (see above)
+        `k_factor`:     For `rician`: the K-factor. The ratio of line-of-sight (LOS) to non-line-of-sight (NLOS).
+        `path_delays`:  For `rician` and `rayleigh`: path delays - measured in samples
+        `path_gains`:   For `rician` and  `rayleigh`: path gains - measured in dB. Usually negative.
+    },

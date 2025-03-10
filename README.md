@@ -1,52 +1,8 @@
-# NOTES TO RUN ON ECDF COMPUTE CLUSTER EDDIE:
-### The conda environment set up will need to be run monthly (reminder in outlook calendar)
-1)  $ cd /home/s2062378
-2)  $ rm -rf /exports/eddie/scratch/s2062378
-3)  $ mkdir /exports/eddie/scratch/s2062378/anaconda
-4)  $ mkdir /exports/eddie/scratch/s2062378/data
-5)  $ mkdir /exports/eddie/scratch/s2062378/anaconda/envs
-6)  $ mkdir /exports/eddie/scratch/s2062378/anaconda/pkgs
-7)  $ module load anaconda
-8)  $ module load cuda
-9)  $ conda create -n mypython python=3.7 matplotlib numpy tqdm scipy -y
-10) $ conda activate mypython
-11) $ conda install pip -y
-12) $ pip3 install seaborn
-12) $ pip3 install torch torchvision torchaudio
-13) $ pip3 install SigMF==1.1.1
-
-### To rebuild C code on Eddie:
-Need to run the following commands in terminal before running make:
-1) $ cd Synthetic-Radio-Frequency-Data-Generator/cmodules
-2) $ export LD_LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LD_LIBRARY_PATH
-3) $ export PATH=$HOME/liquid-dsp-install/bin:$PATH
-4) $ export C_INCLUDE_PATH=$HOME/liquid-dsp-install/include:$C_INCLUDE_PATH
-5) $ export LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LIBRARY_PATH
-6) $ make
-7) $ cd ../..
-
-# NOTES TO RUN LOCALLY:
-1) Activate WSL
-    $ wsl
-2) Activate virtual python environment
-    $ source venv/bin/activate
-3) To run code:
-    $ python3 generator.py ./configs/defaults.json
-4) Output will be found in the data directory.
-5) To run plotting python scripts:
-    $ cd tests; python3 plot_dataset.py; cd ..
-
-To close:
-1) close the virtual environment
-    $ deactivate
-2) Exit wsl
-    $ exit
-
 # Synthetic Radio Frequency Data Generator
 
 Python tool to generate synthetic radio frequency (RF) datasets.
 
-This repo contains code to synthetically generate 22 types of raw RF signals (psk, qam, fsk, analog modulation variants) in an Additive White Gaussian Noise (AWGN) channel via Python wrappers around [liquid-dsp](https://github.com/jgaeddert/liquid-dsp).
+This repo contains code to synthetically generate 22 types of raw RF signals (psk, qam, fsk, analog modulation variants) in an Additive White Gaussian Noise (AWGN) channel via Python wrappers around [liquid-dsp](https://github.com/jgaeddert/liquid-dsp). This code is originally from a deprecated Intel project, further work for adapting to wideband, improved channel models, and implementation of ML models has been completed by Iain High.
 
 ## Usage
 Datasets are generated using the `generator.py` script.
@@ -65,14 +21,7 @@ Each *SigMF Recording* contains a single capture, saved as a binary file (.sigmf
 See the [SigMF specification](https://github.com/gnuradio/SigMF/blob/master/sigmf-spec.md) to read more. 
 
 ## Requirements & Setup
-
-matplotlib==3.5.3
-numpy==1.23.2
-SigMF==1.1.1
-tqdm==4.67.1
-Pytorch (depends on CUDA) - https://pytorch.org/get-started/locally/
-
-In addition to the python packages listed above, the code in this repo is dependent upon [liquid-dsp](https://github.com/jgaeddert/liquid-dsp). 
+In addition to the python packages listed in JobScripts/install_requirements.sh, the code in this repo is dependent upon [liquid-dsp](https://github.com/jgaeddert/liquid-dsp). 
 To install liquid-dsp, clone the repo linked, and follow the installation instructions in the README. 
 Ensure that you rebind your dynamic libraries using `sudo ldconfig`.
 
@@ -82,3 +31,30 @@ Additionally, the first time using the synthetic RF dataset generator, you'll ne
 >> cd ./cmodules && make && cd ../
 ```
 
+Once requirements have been installed, the system_parameters also have to be modified. Details on this can be found in configs/README.md.
+
+# Notes for Self:
+This section details notes that are primarily useful for myself. These should be removed or heavily modified before final publication of the open-source software.
+
+### NOTES TO RUN LOCALLY:
+1) Activate WSL
+    $ wsl
+2) Activate virtual python environment
+    $ source venv/bin/activate
+To close:
+1) close the virtual environment
+    $ deactivate
+2) Exit wsl
+    $ exit
+
+### Notes to remake C code:
+On the ECDF Compute cluster the environment variable paths to liquid-dsp install need to be set first, hence:
+1) $ cd Synthetic-Radio-Frequency-Data-Generator/cmodules
+2) $ export LD_LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LD_LIBRARY_PATH
+3) $ export PATH=$HOME/liquid-dsp-install/bin:$PATH
+4) $ export C_INCLUDE_PATH=$HOME/liquid-dsp-install/include:$C_INCLUDE_PATH
+5) $ export LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LIBRARY_PATH
+6) $ make
+7) $ cd ../..
+
+This has to be done every time the C code is modified.
