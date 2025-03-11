@@ -59,7 +59,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(rng_seed)
 
 if torch.cuda.is_available():
-    print("\n\n CUDA is available.")
+    print("\n\nCUDA is available.")
     print(f"CUDA version: {torch.version.cuda}")
     print(f"Available devices: {torch.cuda.device_count()}")
     print(f"Current device: {torch.cuda.current_device()}")

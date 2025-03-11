@@ -10,7 +10,7 @@ import ctypes
 from tqdm import tqdm
 from utils import *
 
-CALCULATE_BER_SNR = True  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
+CALCULATE_BER_SNR = False  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
 
 buf = 4096
 halfbuf = 2048
@@ -348,8 +348,6 @@ if __name__ == "__main__":
     else:
         rng_seed = system_parameters["Random_Seed"]
     np.random.seed(rng_seed)
-
-    print("RNG Seed:", rng_seed)
 
     with open("./configs/defaults.json") as f:
         defaults = json.load(f)

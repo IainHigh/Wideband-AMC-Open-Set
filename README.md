@@ -1,3 +1,7 @@
+# TODO:
+1) Currently symbol rate (baud rate) and AWGN SNR are determined first - meaning they are consistent for all center_frequencies. Each center frequency should have it's own baud rate and its on SNR value.
+2) Implement YOLO style single step detection algorithm for wideband automatic modulation classification.
+
 # Synthetic Radio Frequency Data Generator
 
 Python tool to generate synthetic radio frequency (RF) datasets.
