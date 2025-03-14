@@ -11,7 +11,7 @@ from scipy.signal import filtfilt, firwin
 
 ##########################################
 # You can adjust these margins or set them
-BAND_MARGIN = 2e6  # 100 kHz margin, example TODO: This should be predicted from the model.
+BAND_MARGIN = 2e6  # 100 kHz margin, example TODO: CALCULATE THIS DON'T JUST ASSUME IT.
 NUMTAPS = 101
 BETA = 8.6
 ##########################################

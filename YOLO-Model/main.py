@@ -6,6 +6,7 @@ import json
 import time
 import sys
 import os
+import random
 import torch.optim as optim
 
 from tqdm import tqdm
@@ -22,6 +23,12 @@ from config_wideband_yolo import (
 
 from utils import create_dataset
 
+#############################################
+# You can adjust how many random validation 
+# frames to print each epoch
+#############################################
+VAL_PRINT_SAMPLES = 2
+
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
 
@@ -29,7 +36,6 @@ working_directory = system_parameters["Working_Directory"]
 sys.path.append(working_directory)
 
 rng_seed = system_parameters["Random_Seed"]
-
 data_dir = system_parameters["Dataset_Directory"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,7 +65,7 @@ def main():
     )
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    val_loader   = DataLoader(val_dataset,   batch_size=BATCH_SIZE, shuffle=False)
 
     # 2) Create model & loss
     num_samples = train_dataset.get_num_samples()
@@ -76,13 +82,13 @@ def main():
         total_train_loss = 0.0
 
         # For metrics:
-        train_obj_count = 0      # How many boxes actually had an object
-        train_correct_cls = 0    # How many of those objects had correct class predicted
-        train_sum_freq_err = 0.0 # Sum of freq errors for each object
+        train_obj_count = 0
+        train_correct_cls = 0
+        train_sum_freq_err = 0.0
 
         for iq_tensor, label_tensor in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
-            iq_tensor = iq_tensor.to(device)           # shape [batch, 2, N]
-            label_tensor = label_tensor.to(device)     # shape [batch, S, B, (1+1+NUM_CLASSES)]
+            iq_tensor   = iq_tensor.to(device)
+            label_tensor= label_tensor.to(device)
 
             optimizer.zero_grad()
             pred = model(iq_tensor)
@@ -91,43 +97,26 @@ def main():
             optimizer.step()
             total_train_loss += loss.item()
 
-            # ====== Compute additional training metrics ======
-            # 1) reshape pred => [batch, S, B, (1+1+NUM_CLASSES)]
+            # Additional training metrics
             bsize = pred.shape[0]
-            pred_reshape = pred.view(bsize, pred.shape[1], -1, (1+1+NUM_CLASSES))
-            # parse
-            x_pred     = pred_reshape[..., 0]               # [bsize, S, B]
-            conf_pred  = pred_reshape[..., 1]               # [bsize, S, B]
-            class_pred = pred_reshape[..., 2:]              # [bsize, S, B, num_classes]
+            pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
+            x_pred     = pred_reshape[..., 0]
+            conf_pred  = pred_reshape[..., 1]
+            class_pred = pred_reshape[..., 2:]
 
-            # from label
-            x_tgt    = label_tensor[..., 0]
-            conf_tgt = label_tensor[..., 1]
-            class_tgt= label_tensor[..., 2:]
+            x_tgt      = label_tensor[..., 0]
+            conf_tgt   = label_tensor[..., 1]
+            class_tgt  = label_tensor[..., 2:]
 
-            # object mask
             obj_mask = (conf_tgt > 0)
-            # collect predicted and true data for just those objects
-            # frequency error
-            freq_err = torch.abs(x_pred - x_tgt)   # [bsize, S, B]
+            freq_err = torch.abs(x_pred - x_tgt)
 
-            # classification => argmax
-            # predicted class (..., ) => indices
-            pred_class_idx = torch.argmax(class_pred, dim=-1)  # [bsize, S, B]
-            # true class => argmax of class_tgt
-            true_class_idx = torch.argmax(class_tgt, dim=-1)   # [bsize, S, B]
+            pred_class_idx = torch.argmax(class_pred, dim=-1)
+            true_class_idx = torch.argmax(class_tgt, dim=-1)
 
-            # sum up freq error, correct classification only where obj_mask=1
-            batch_obj_count = obj_mask.sum().item()
-
-            # gather freq error for those boxes
-            # freq_err[obj_mask] => shape (#objects, )
-            batch_sum_freq_err = freq_err[obj_mask].sum().item()
-
-            # gather classification
-            # compare pred_class_idx[obj_mask] with true_class_idx[obj_mask]
-            # => boolean => sum
-            correct_cls_mask = (pred_class_idx == true_class_idx)
+            batch_obj_count   = obj_mask.sum().item()
+            batch_sum_freq_err= freq_err[obj_mask].sum().item()
+            correct_cls_mask  = (pred_class_idx == true_class_idx)
             batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
 
             train_obj_count     += batch_obj_count
@@ -135,12 +124,10 @@ def main():
             train_correct_cls   += batch_correct_cls
 
         avg_train_loss = total_train_loss / len(train_loader)
-
         if train_obj_count > 0:
             train_mean_freq_err = train_sum_freq_err / train_obj_count
             train_cls_accuracy  = 100.0 * (train_correct_cls / train_obj_count)
         else:
-            # no objects found => trivial metrics
             train_mean_freq_err = 0.0
             train_cls_accuracy  = 0.0
 
@@ -154,25 +141,32 @@ def main():
         val_correct_cls = 0
         val_sum_freq_err = 0.0
 
+        # We'll store a list of frames for printing:
+        # each item => {
+        #    "pred_list": [(x_pred, pred_cls), ...],
+        #    "gt_list":   [(x_true, true_cls), ...]
+        # }
+        val_frames = []
+
         with torch.no_grad():
             for iq_tensor, label_tensor in tqdm(val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"):
-                iq_tensor = iq_tensor.to(device)
-                label_tensor = label_tensor.to(device)
+                iq_tensor   = iq_tensor.to(device)
+                label_tensor= label_tensor.to(device)
+
                 pred = model(iq_tensor)
                 loss = criterion(pred, label_tensor)
                 total_val_loss += loss.item()
 
-                # metrics
                 bsize = pred.shape[0]
-                pred_reshape = pred.view(bsize, pred.shape[1], -1, (1+1+NUM_CLASSES))
+                pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
 
                 x_pred     = pred_reshape[..., 0]
                 conf_pred  = pred_reshape[..., 1]
                 class_pred = pred_reshape[..., 2:]
 
-                x_tgt    = label_tensor[..., 0]
-                conf_tgt = label_tensor[..., 1]
-                class_tgt= label_tensor[..., 2:]
+                x_tgt      = label_tensor[..., 0]
+                conf_tgt   = label_tensor[..., 1]
+                class_tgt  = label_tensor[..., 2:]
 
                 obj_mask = (conf_tgt > 0)
                 freq_err = torch.abs(x_pred - x_tgt)
@@ -180,17 +174,46 @@ def main():
                 pred_class_idx = torch.argmax(class_pred, dim=-1)
                 true_class_idx = torch.argmax(class_tgt, dim=-1)
 
-                batch_obj_count = obj_mask.sum().item()
-                batch_sum_freq_err = freq_err[obj_mask].sum().item()
-                correct_cls_mask = (pred_class_idx == true_class_idx)
+                # For metric sums
+                batch_obj_count   = obj_mask.sum().item()
+                batch_sum_freq_err= freq_err[obj_mask].sum().item()
+                correct_cls_mask  = (pred_class_idx == true_class_idx)
                 batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
 
-                val_obj_count += batch_obj_count
-                val_sum_freq_err += batch_sum_freq_err
-                val_correct_cls += batch_correct_cls
+                val_obj_count     += batch_obj_count
+                val_sum_freq_err  += batch_sum_freq_err
+                val_correct_cls   += batch_correct_cls
+
+                # For printing the results in a "frame" manner:
+                # We group each sample in this batch separately.
+                for i in range(bsize):
+                    pred_list = []
+                    gt_list   = []
+
+                    for s_idx in range(pred_reshape.shape[1]):
+                        for b_idx in range(pred_reshape.shape[2]):
+                            x_p   = x_pred[i, s_idx, b_idx].item()   # raw freq
+                            conf  = conf_pred[i, s_idx, b_idx].item()
+                            cls_p = pred_class_idx[i, s_idx, b_idx].item()
+
+                            if conf > 0.05:
+                                pred_list.append((x_p, cls_p, conf))
+
+                            if conf_tgt[i, s_idx, b_idx] > 0:
+                                x_g = x_tgt[i, s_idx, b_idx].item()
+                                cls_g= true_class_idx[i, s_idx, b_idx].item()
+                                gt_list.append((x_g, cls_g))
+
+                    # sort by conf desc
+                    pred_list.sort(key=lambda tup: tup[2], reverse=True)
+
+                    frame_dict = {
+                        "pred_list": pred_list,
+                        "gt_list":   gt_list
+                    }
+                    val_frames.append(frame_dict)
 
         avg_val_loss = total_val_loss / len(val_loader)
-
         if val_obj_count > 0:
             val_mean_freq_err = val_sum_freq_err / val_obj_count
             val_cls_accuracy  = 100.0 * (val_correct_cls / val_obj_count)
@@ -206,6 +229,21 @@ def main():
         print(f"  Valid: Loss={avg_val_loss:.4f},"
               f"  MeanFreqErr={val_mean_freq_err:.4f},"
               f"  ClsAcc={val_cls_accuracy:.2f}%")
+
+        # 4) Print a random subset of "frames"
+        random.shuffle(val_frames)
+        to_print = val_frames[:VAL_PRINT_SAMPLES]  # up to VAL_PRINT_SAMPLES frames
+        print(f"\n  Some random frames from validation (only {VAL_PRINT_SAMPLES} shown):")
+        print(f"  Prediction format: (freq, class, conf)")
+        print(f"  GroundTruth format: (freq, class)")
+        for idx, frame_dict in enumerate(to_print, 1):
+            pred_list = frame_dict["pred_list"]
+            gt_list   = frame_dict["gt_list"]
+
+            print(f"    Frame {idx}:")
+            print(f"      Predicted => {pred_list}")
+            print(f"      GroundTruth=> {gt_list}")
+        print("")
 
     print("Training complete.")
 

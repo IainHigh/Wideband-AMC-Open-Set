@@ -31,8 +31,6 @@ OUT_CHANNELS = B * (1 + 1 + NUM_CLASSES)
 #   1 -> confidence
 #   NUM_CLASSES -> class probabilities
 
-CNN_CHANNELS = [16, 32, 64] # Channels in the CNN backbone
-KERNEL_SIZE = 9
 STRIDE = 2
 PADDING = 4
 
@@ -41,11 +39,11 @@ PADDING = 4
 #####################
 BATCH_SIZE = 512
 EPOCHS = 20
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.1
 
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 2.0       # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 5.0       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
