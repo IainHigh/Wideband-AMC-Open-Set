@@ -38,3 +38,15 @@ Configuration files should contain the following parameters:
         `path_delays`:  For `rician` and `rayleigh`: path delays - measured in samples
         `path_gains`:   For `rician` and  `rayleigh`: path gains - measured in dB. Usually negative.
     },
+
+
+# Channel Model Parameters.
+Part of this research involved looking into "standardised" channel model parameters for different scenarios. This is written about in much more detail in Progress Report 6 (24/02/25 - 07/03/25). For simplicity, the final parameters chosen are stated here for easy reference.
+
+All scenarios below use Rician channel model with a K-factor of 5. The path delay is measured in samples, the path gain measured in dB. This is the same units that the config files use.
+
+| **Scenario** | **Path Delay** | **path_gain**
+| --- | --- | --- |
+| Rural | [0,2] | [0,-8] |
+| Suburban | [0,8,22] | [0,-3,-8] |
+| Urban | [0,4,16,24,46,74] | [0,-4.9,-6.9,-8.0,-7.8,-23.9] |

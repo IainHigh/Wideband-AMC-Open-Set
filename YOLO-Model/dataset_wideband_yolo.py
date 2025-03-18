@@ -5,22 +5,15 @@ import os
 import json
 import torch
 import numpy as np
-
 from torch.utils.data import Dataset
 from scipy.signal import filtfilt, firwin
-
-##########################################
-# You can adjust these margins or set them
-BAND_MARGIN = 2e6  # 100 kHz margin, example TODO: CALCULATE THIS DON'T JUST ASSUME IT.
-NUMTAPS = 101
-BETA = 8.6
-##########################################
-
-# YOLO params
 from config_wideband_yolo import (
     S,      # number of grid cells
     B,      # boxes per cell
     NUM_CLASSES,
+    BAND_MARGIN,
+    NUMTAPS,
+    BETA
 )
 
 class WidebandYoloDataset(Dataset):
@@ -202,5 +195,11 @@ class WidebandYoloDataset(Dataset):
                     if class_idx is not None:
                         label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0
                     break
+        
+        # Retrieve the SNR value as well, this is useful for final results of accuracy and error per SNR value.
+        try:
+            snr_value = meta["annotations"][1]["channel"]["snr"]
+        except (KeyError, IndexError):
+            snr_value = None
 
-        return torch.tensor(x_wide), torch.tensor(label_tensor)
+        return torch.tensor(x_wide), torch.tensor(label_tensor), torch.tensor(snr_value, dtype=torch.float32)

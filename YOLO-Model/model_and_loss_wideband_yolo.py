@@ -4,7 +4,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from config_wideband_yolo import (
     S,
     B,
@@ -12,17 +11,13 @@ from config_wideband_yolo import (
     LAMBDA_COORD,
     LAMBDA_NOOBJ,
     LAMBDA_CLASS,
+    INIT_CHANNELS,
+    NUM_BLOCKS,
+    BLOCK_OUT_CH,
+    KERNEL_SIZE,
+    STRIDE,
+    IOU_SCALING_FACTOR
 )
-
-###################################################
-# Hyperparams (some can remain in config if desired)
-###################################################
-INIT_CHANNELS = 32  # for first conv
-NUM_BLOCKS = 4      # how many repeated residual blocks
-BLOCK_OUT_CH = 96   # output channels of each block
-KERNEL_SIZE = 8
-STRIDE = 1
-POOL_STRIDE=2
 
 class ResidualBlock(nn.Module):
     """
@@ -151,7 +146,7 @@ class WidebandYoloLoss(nn.Module):
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(x_pred - x_tgt)**2)
 
         # iou in 1D
-        iou_1d = 1.0 - (torch.abs(x_pred - x_tgt) / 1e6) # Divide by 1e6 to convert MHz to a more manageable scale. TODO: Make this a system parameter.
+        iou_1d = 1.0 - (torch.abs(x_pred - x_tgt) / IOU_SCALING_FACTOR)
         iou_1d = torch.clamp(iou_1d, min=0.0, max=1.0)
 
         # confidence
