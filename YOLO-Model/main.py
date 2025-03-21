@@ -37,7 +37,9 @@ rng_seed = system_parameters["Random_Seed"]
 data_dir = system_parameters["Dataset_Directory"]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 torch.manual_seed(rng_seed)
+random.seed(rng_seed)
 
 if torch.cuda.is_available():
     print("\n\nCUDA is available.")
@@ -291,7 +293,7 @@ def test_model(model, test_loader, device):
             bsize = pred.shape[0]
             Sdim = pred.shape[1]  # should be S
             # interpret bounding boxes
-            pred_reshape = pred.view(bsize, Sdim, -1,  (1+1+test_loader.dataset.NUM_CLASSES))
+            pred_reshape = pred.view(bsize, Sdim, -1,  (1+1+NUM_CLASSES))
 
             x_pred     = pred_reshape[..., 0]  # [bsize, S, B]
             conf_pred  = pred_reshape[..., 1]

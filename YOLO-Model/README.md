@@ -1,10 +1,7 @@
 # TODO:
 
 ## Now:
-- Make sure randomness is correctly seeded. Start model twice sequentially, create a new dataset each time, and make sure the results are the same.
-
-## This Week:
-- increase model size - currently training is pretty quick, model may just be fairly small - improved by increasing size.
+- increase model size - currently training is pretty quick, model may just be fairly small - improved by increasing size. Should be able to do this purely from the parameters in config_wideband_yolo.py
 
 ## Later:
 - Document this (write this readme)

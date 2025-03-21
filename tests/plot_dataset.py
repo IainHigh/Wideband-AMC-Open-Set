@@ -34,7 +34,7 @@ dataset_directory = system_parameters["Dataset_Directory"]
 just_one_file = True
 
 # Directories:
-dataset_name = "default"
+dataset_name = "testing"
 
 time_domain_output_path = "./tests/figures/Time-Domain"
 frequency_domain_output_path = "./tests/figures/Frequency-Domain"
