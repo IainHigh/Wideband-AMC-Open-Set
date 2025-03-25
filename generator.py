@@ -128,7 +128,7 @@ def generate_linear(config, rng_seed):
             if len(config["modulation"]) == 1:
                 index = 0
             else:
-                index = np.random.randint(0, len(config["modulation"]) - 1)
+                index = np.random.randint(0, len(config["modulation"]))
             mod = config["modulation"][index]
             modtype = ctypes.c_int(mod[0])
             mod_list.append(mod[-1])

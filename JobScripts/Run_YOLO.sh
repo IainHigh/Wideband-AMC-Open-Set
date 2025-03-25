@@ -3,7 +3,7 @@
 #$ -l h_rt=47:59:00
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
 #$ -q gpu
-# -l gpu=1
+#$ -l gpu=1
 #$ -pe sharedmem 4
 #$ -l h_vmem=80G
 

@@ -61,6 +61,8 @@ class WidebandYoloDataset(Dataset):
                 mod_list = [mod_list]
             for m in mod_list:
                 all_mods.add(m)
+                if len(all_mods) == NUM_CLASSES:
+                    return sorted(all_mods)
         return sorted(all_mods)
 
     def _find_num_samples(self, base):

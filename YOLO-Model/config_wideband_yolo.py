@@ -31,15 +31,15 @@ B = 2                # Boxes per cell
 NUM_CLASSES = 9      # Number of classes
 
 STRIDE = 2          # Stride for the first conv layer
-INIT_CHANNELS = 128  # for first conv
-NUM_BLOCKS = 8      # how many repeated residual blocks
+INIT_CHANNELS = 32  # for first conv
+NUM_BLOCKS = 4      # how many repeated residual blocks
 BLOCK_OUT_CH = 96   # output channels of each block
-KERNEL_SIZE = 8    # kernel size for the residual block
+KERNEL_SIZE = 8     # kernel size for the residual block
 
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 512
+BATCH_SIZE = 32
 EPOCHS = 20
 LEARNING_RATE = 0.01
 

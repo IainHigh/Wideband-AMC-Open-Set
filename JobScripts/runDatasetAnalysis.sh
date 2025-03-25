@@ -6,6 +6,7 @@ export LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LIBRARY_PATH
 
 #$ -N DatasetAnalysis
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
+#$ -q gpu
 #$ -l h_rt=00:59:00 
 #$ -l h_vmem=10G
 #$ -o /home/s2062378/OutputFiles
