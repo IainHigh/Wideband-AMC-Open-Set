@@ -108,8 +108,8 @@ def generate_linear(config, rng_seed):
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
         if config["center_frequencies_random"]:
             lower_bound, upper_bound, n_max = config["center_frequencies"]
-            n = np.random.randint(1, n_max)
-            center_frequencies = np.random.uniform(lower_bound, upper_bound + 1, n)
+            n = np.random.randint(1, n_max+4)
+            center_frequencies = np.random.uniform(lower_bound, upper_bound, n)
             # Convert from ndarray to list
             center_frequencies = center_frequencies.tolist()
         else:

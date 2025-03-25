@@ -39,7 +39,7 @@ KERNEL_SIZE = 8     # kernel size for the residual block
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 EPOCHS = 20
 LEARNING_RATE = 0.01
 
