@@ -6,14 +6,11 @@ import json
 import torch
 import numpy as np
 from torch.utils.data import Dataset
-from scipy.signal import filtfilt, firwin
 from config_wideband_yolo import (
     S,      # number of grid cells
     B,      # boxes per cell
     NUM_CLASSES,
-    BAND_MARGIN,
-    NUMTAPS,
-    BETA
+    SAMPLING_FREQUENCY
 )
 
 class WidebandYoloDataset(Dataset):
@@ -72,33 +69,6 @@ class WidebandYoloDataset(Dataset):
             iq_data = np.load(f)
         return len(iq_data)//2
 
-    def _fir_bandpass_complex(self, x_complex, fs, lowcut, highcut, numtaps=NUMTAPS, beta=BETA):
-        """
-        Bandpass filter a complex signal using an FIR filter.
-        """
-        nyq = fs * 0.5
-        low = max(1.0, lowcut)  # avoid <=0
-        high = min(highcut, nyq-1.0)
-        # Normalized freq
-        f1 = low / nyq
-        f2 = high / nyq
-        if f1 >= f2:
-            # fallback: no filtering
-            return x_complex
-        taps = firwin(numtaps, [f1, f2], pass_zero=False, window=("kaiser", beta))
-        real_filt = filtfilt(taps, [1.0], x_complex.real)
-        imag_filt = filtfilt(taps, [1.0], x_complex.imag)
-        return real_filt + 1j*imag_filt
-
-    def _downconvert_to_baseband(self, x_complex, fs, freq_shift):
-        """
-        Multiply by exp(-j2pi freq_shift * t) to bring freq_shift to DC.
-        """
-        n = len(x_complex)
-        t = np.arange(n) / fs
-        shift = np.exp(-1j * 2.0*np.pi * freq_shift * t)
-        return x_complex * shift
-
     def get_num_samples(self):
         return self.num_samples
 
@@ -129,29 +99,12 @@ class WidebandYoloDataset(Dataset):
         if isinstance(mod_list, str):
             mod_list = [mod_list]
 
-        fs = ann["sampling_rate"]
-
-        # 1) find min freq and max freq
-        c_min = min(center_freqs)
-        c_max = max(center_freqs)
-        # Add margin
-        lowcut  = c_min - BAND_MARGIN
-        highcut = c_max + BAND_MARGIN
-        if lowcut < 0:
-            lowcut = 1.0
-
-        # 2) bandpass
-        x_filt = self._fir_bandpass_complex(x_complex, fs, lowcut, highcut)
-
-        # 3) shift everything to baseband
-        # pick the midpoint of [c_min, c_max] as freq_shift
-        # so signals appear near DC
-        c_mid = 0.5*(c_min + c_max)
-        x_base = self._downconvert_to_baseband(x_filt, fs, c_mid)
-
         # convert to real 2xN
-        x_real = x_base.real.astype(np.float32)
-        x_imag = x_base.imag.astype(np.float32)
+        # x_real = x_base.real.astype(np.float32)
+        # x_imag = x_base.imag.astype(np.float32)
+        x_real = x_complex.real.astype(np.float32)
+        x_imag = x_complex.imag.astype(np.float32)
+        
         x_wide = np.stack([x_real, x_imag], axis=0)  # shape (2, N)
 
         # optional transform
@@ -161,38 +114,29 @@ class WidebandYoloDataset(Dataset):
         # 4) Build YOLO label => shape [S, B, 1+1+NUM_CLASSES]
         #   But now we treat freq offsets relative to c_mid
         label_tensor = np.zeros((S, B, 1 + 1 + NUM_CLASSES), dtype=np.float32)
-        # Each center freq => c_freq.  The new freq is (c_freq - c_mid).
-        # We'll define "norm" = (c_freq - c_mid + SHIFT)/some_range => [0,1]
-        # but in practice, let's just do a simple approach:
-        #   SHIFT the entire range is: (lowcut -> highcut) => total BW
-        #   So freq in that range => freq_norm in [0, 1].
-        total_bw = (highcut - lowcut)
-        if total_bw < 1.0:
-            total_bw = 1.0  # fallback
 
         for c_freq, m_str in zip(center_freqs, mod_list):
-            # shift freq => c_freq_new = c_freq - c_mid
-            c_freq_new = c_freq - c_mid
-            # then map to [lowcut->highcut] => offset from lowcut => c_freq_new - (lowcut - c_mid) = c_freq - lowcut
-            # simpler: freq_in_range = c_freq - lowcut
-            freq_in_range = (c_freq - lowcut)
-            freq_norm = freq_in_range / total_bw
+            # 1) Normalize frequency
+            freq_norm = c_freq / SAMPLING_FREQUENCY  # in [0, 1] if your c_freq <= FREQ_MAX
 
-            # clamp
-            if freq_norm < 0: freq_norm=0.0
-            if freq_norm > 1: freq_norm=1.0
-
+            # 2) find which cell
             cell_idx = int(freq_norm * S)
             if cell_idx >= S:
-                cell_idx = S-1
+                cell_idx = S - 1  # clamp
 
+            # 3) offset in [0,1]
             x_offset = (freq_norm * S) - cell_idx
+            if x_offset < 0: 
+                x_offset = 0.0
+            if x_offset > 1: 
+                x_offset = 1.0
 
-            # fill label
+            # 4) fill YOLO label at (cell_idx, b)
             for b_i in range(B):
+                # if no object assigned yet
                 if label_tensor[cell_idx, b_i, 1] == 0.0:
-                    label_tensor[cell_idx, b_i, 0] = x_offset
-                    label_tensor[cell_idx, b_i, 1] = 1.0
+                    label_tensor[cell_idx, b_i, 0] = x_offset  # store offset 
+                    label_tensor[cell_idx, b_i, 1] = 1.0       # confidence=1
                     class_idx = self.class_to_idx.get(m_str, None)
                     if class_idx is not None:
                         label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0

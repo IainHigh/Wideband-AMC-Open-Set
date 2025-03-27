@@ -18,23 +18,17 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 # Dataset Filtering Parameters
 #####################
 
-# TODO: See calculations in plot_dataset.py for how BAND_MARGIN is calculated (lowcut & highcut in corresponding code).
-BAND_MARGIN = 843750  # Band margin - determines the start frequency and end frequency from the calculated center frequency. TODO: CALCULATE THIS DON'T JUST ASSUME IT.
+# TODO: See calculations in plot_dataset.py for how BAND_MARGIN is calculated (lowcut & highcut in corresponding code). TODO: CALCULATE THIS DON'T JUST ASSUME IT.
+BAND_MARGIN = 843750  # Band margin - determines the start frequency and end frequency from the calculated center frequency. 
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
-BETA = 8.6 # Beta value for the filter - Higher beta means better filtering but slower processing.
+SAMPLING_FREQUENCY = 30e6
 
 #####################
 # Model Parameters
 #####################
-S = 16               # Number of grid cells
+S = 4               # Number of grid cells
 B = 2                # Boxes per cell
 NUM_CLASSES = 9      # Number of classes
-
-STRIDE = 2          # Stride for the first conv layer
-INIT_CHANNELS = 32  # for first conv
-NUM_BLOCKS = 4      # how many repeated residual blocks
-BLOCK_OUT_CH = 96   # output channels of each block
-KERNEL_SIZE = 8     # kernel size for the residual block
 
 #####################
 # Training Parameters
@@ -49,7 +43,6 @@ LEARNING_RATE = 0.01
 LAMBDA_COORD = 1.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
-IOU_SCALING_FACTOR = 1e6 # Scaling factor for IOU loss - Should be same magnitude as the frequency ranges we're working with.
 
 def print_config_file():
     """
@@ -60,15 +53,9 @@ def print_config_file():
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
     print("\tBAND_MARGIN:", BAND_MARGIN)
     print("\tNUMTAPS:", NUMTAPS)
-    print("\tBETA:", BETA)
     print("\tS:", S)
     print("\tB:", B)
     print("\tNUM_CLASSES:", NUM_CLASSES)
-    print("\tSTRIDE:", STRIDE)
-    print("\tINIT_CHANNELS:", INIT_CHANNELS)
-    print("\tNUM_BLOCKS:", NUM_BLOCKS)
-    print("\tBLOCK_OUT_CH:", BLOCK_OUT_CH)
-    print("\tKERNEL_SIZE:", KERNEL_SIZE)
     print("\tBATCH_SIZE:", BATCH_SIZE)
     print("\tEPOCHS:", EPOCHS)
     print("\tLEARNING_RATE:", LEARNING_RATE)

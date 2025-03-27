@@ -6,6 +6,7 @@ import json
 import time
 import sys
 import os
+import glob
 import random
 import torch.optim as optim
 import matplotlib.pyplot as plt
@@ -23,9 +24,10 @@ from config_wideband_yolo import (
     LEARNING_RATE,
     VAL_PRINT_SAMPLES,
     PRINT_CONFIG_FILE,
-    print_config_file
+    print_config_file,
+    SAMPLING_FREQUENCY,
+    S
 )
-from utils import create_dataset
 
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
@@ -233,8 +235,10 @@ def validate_model(model, val_loader, device, criterion, epoch):
                         conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
-                        if conf > 0.05:
-                            pred_list.append((x_p, cls_p, conf))
+                        if conf > 0.2:
+                            freq_norm = (s_idx + x_p) / S
+                            freq_hz = freq_norm * SAMPLING_FREQUENCY
+                            pred_list.append((freq_hz, cls_p, conf))
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
@@ -402,6 +406,24 @@ def test_model(model, test_loader, device):
 
     print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
     print("=== END OF TESTING ===")
+    
+def create_dataset(data_dir, rng_seed):
+    """
+    Removes existing training/validation/testing sets, then invokes generator.py
+    to create new sets using the specified JSON config files and seeds.
+    """
+    for set_name in ["training", "validation", "testing"]:
+        full_path = os.path.join(data_dir, set_name)
+        if os.path.exists(full_path):
+            for f in glob.glob(f"{full_path}/*"):
+                os.remove(f)
+            os.removedirs(full_path)
+
+    # Generate the new dataset using the generator.py script.
+    # Different rng seeds so each set is unique.
+    os.system(f"python3 generator.py ./configs/training_set.json {rng_seed + 1}")
+    os.system(f"python3 generator.py ./configs/validation_set.json {rng_seed + 2}")
+    os.system(f"python3 generator.py ./configs/testing_set.json {rng_seed + 3}")
 
 if __name__ == "__main__":
     start_time = time.time()
