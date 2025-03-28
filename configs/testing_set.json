@@ -1,29 +1,39 @@
 {
-    "n_captures": 20000,
-    "n_samps": 16384, 
-    "modulation": ["bpsk", "qpsk", "8psk", "16psk", "16qam", "32qam", "64qam", "16apsk", "32apsk"],
-    "symbol_rate": 32,
-    "sampling_rate": 30e6,
-    "randomly_generated_center_frequencies": [2e6, 15e6, 4],
+  "n_captures": 2000,
+  "n_samps": 4096,
+  "modulation": [
+    "bpsk",
+    "qpsk",
+    "8psk",
+    "16psk",
+    "16qam",
+    "32qam",
+    "64qam",
+    "16apsk",
+    "32apsk"
+  ],
+  "symbol_rate": 32,
+  "sampling_rate": 30e6,
+  "randomly_generated_center_frequencies": [2e6, 15e6, 4],
 
-    "am_defaults": {"modulation_index": [0.5, 0.7, 0.05]},
-    "fmnb_defaults": {"modulation_factor": [0.03, 0.08, 0.01]},
-    "fmwb_defaults": {"modulation_factor": [0.5, 0.8, 0.1]},
-    "filter": [
-        {
-            "type": "rrc",
-            "beta": 0.35,
-            "delay": 5,
-            "dt": 0.0
-        }
-    ],
-    "channel": {
-        "type": "awgn",
-        "snr": [-20,20,2],
-        "fo": 0.0,
-        "po": 0.0
-    },
-    "savepath": "testing",
-    "verbose": 0,
-    "archive": false
+  "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
+  "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
+  "fmwb_defaults": { "modulation_factor": [0.5, 0.8, 0.1] },
+  "filter": [
+    {
+      "type": "rrc",
+      "beta": 0.35,
+      "delay": 5,
+      "dt": 0.0
+    }
+  ],
+  "channel": {
+    "type": "awgn",
+    "snr": [-20, 20, 2],
+    "fo": 0.0,
+    "po": 0.0
+  },
+  "savepath": "testing",
+  "verbose": 0,
+  "archive": false
 }

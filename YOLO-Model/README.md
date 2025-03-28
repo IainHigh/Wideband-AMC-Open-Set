@@ -18,6 +18,9 @@ GroundTruth=> [(0.8900049328804016, 1), (0.9723557233810425, 2)]
 
 This is because the grount truth is being stored as the OFFSET relative to a unknown frequency_bin. This is why it's between [0, 1] and not [0, 0.5].
 
+TODO:
+Try moving back to using the x_offset for storing and prediction opposed to the relative frequency value. JUST BE SURE TO MODIFY THE MODEL AND LOSS TO UTILISE THE RAW FREQUENCY WHEN REQUIRED.
+
 1. Get it functional - Ensure that the loss and frequency_err are both decreasing and the classification accuracy is increasing.
 2. Check for all TODOs in the code. Either fix them or move them to here.
 3. Optimise the model - currently 3 hours per epoch is way too long, need to get it back down to 1 hour per epoch. Also depends on how fast it is on the GPU.

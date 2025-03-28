@@ -105,8 +105,8 @@ def main():
         random.shuffle(val_frames)
         to_print = val_frames[:VAL_PRINT_SAMPLES]  # up to VAL_PRINT_SAMPLES frames
         print(f"\n  Some random frames from validation (only {VAL_PRINT_SAMPLES} shown):")
-        print(f"  Prediction format: (freq, class, conf)")
-        print(f"  GroundTruth format: (freq, class)")
+        print(f"  Prediction format: (freq_offset [0,1], class, conf)")
+        print(f"  GroundTruth format: (freq_offset [0,1], class)")
         for idx, frame_dict in enumerate(to_print, 1):
             pred_list = frame_dict["pred_list"]
             gt_list   = frame_dict["gt_list"]
@@ -231,7 +231,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
-                        x_p   = x_pred[i, s_idx, b_idx].item()   # relative frequency
+                        x_p   = x_pred[i, s_idx, b_idx].item()   # raw freq
                         conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
