@@ -10,7 +10,7 @@ All modifiable parameters are grouped here.
 # Miscellaneous Parameters
 #####################
 
-CREATE_NEW_DATASET = True # If True, will generate a new dataset. If False, it will use the (presumably) existing dataset.
+CREATE_NEW_DATASET = False # If True, will generate a new dataset. If False, it will use the (presumably) existing dataset.
 VAL_PRINT_SAMPLES = 2 # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True # If True, will print the configuration file to the console.
 
@@ -43,7 +43,6 @@ LEARNING_RATE = 0.01
 LAMBDA_COORD = 1.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
-IOU_SCALING_FACTOR = 1e6 # Scaling factor for IOU loss
 
 def print_config_file():
     """

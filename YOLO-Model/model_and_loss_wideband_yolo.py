@@ -14,7 +14,7 @@ from config_wideband_yolo import (
     LAMBDA_CLASS,
     BAND_MARGIN,
     NUMTAPS,
-    SAMPLING_FREQUENCY
+    SAMPLING_FREQUENCY,
 )
 
 ###############################################################################
@@ -66,33 +66,25 @@ def build_lowpass_filter(cutoff_hz, fs, num_taps, window="hamming"):
 ###############################################################################
 class ResidualBlock(nn.Module):
     """
-    Residual block with 3 branches, like your previous pipeline approach.
-    branch1 => stride=2 with kernel_size=1
-    branch2 => stride=2 with kernel_size=3
-    branch3 => stride=2 with kernel_size=1
-    Then we concat, plus a skip connection that also has stride=2
+    A residual block with 3 branches. Each branch downsamples with stride=2.
     """
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        # branch 1
         self.branch1 = nn.Sequential(
             nn.Conv1d(in_ch, 32, kernel_size=1, stride=2),
             nn.BatchNorm1d(32),
             nn.ReLU(),
         )
-        # branch 2
         self.branch2 = nn.Sequential(
             nn.Conv1d(in_ch, 32, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm1d(32),
             nn.ReLU(),
         )
-        # branch 3
         self.branch3 = nn.Sequential(
             nn.Conv1d(in_ch, 32, kernel_size=1, stride=2),
             nn.BatchNorm1d(32),
             nn.ReLU(),
         )
-        # residual (skip)
         self.residual = nn.Sequential(
             nn.Conv1d(in_ch, out_ch, kernel_size=1, stride=2),
             nn.BatchNorm1d(out_ch),
@@ -100,37 +92,38 @@ class ResidualBlock(nn.Module):
         self.out_ch = out_ch
 
     def forward(self, x):
-        res = self.residual(x)  # shape => [batch, out_ch, length/2]
+        res = self.residual(x)
         b1 = self.branch1(x)
         b2 = self.branch2(x)
         b3 = self.branch3(x)
-        concat = torch.cat([b1, b2, b3], dim=1)  # => [batch, 32+32+32=96, length/2]
+        concat = torch.cat([b1, b2, b3], dim=1)  # [batch, 96, length/2]
         out = F.relu(concat + res)
         return out
     
 ################################################################################
 # WidebandYoloModel
-###############################################################################
+################################################################################
 class WidebandYoloModel(nn.Module):
     """
-    Two-stage approach:
-      1) Stage-1 predicts S*B frequency offsets in [0,1].
-      2) We replicate the input S*B times, downconvert each by its predicted freq.
-      3) Stage-2 extracts features and predicts only (conf, class).
-      4) We combine:
-          x_pred = freq_pred (from stage-1)
-          conf_pred, class_pred (from stage-2)
-        to produce the final YOLO output of shape [batch, S, B*(1+1+NUM_CLASSES)].
-    
-    Because x_pred is exactly freq_pred, any error in the YOLO offset loss
-    will backprop to the freq_predictor. 
+    Two-stage YOLO approach:
+      Stage-1: Predict S*B frequency offsets in [0,1] using a deeper network
+               (8 residual blocks after the initial convolution) to predict
+               the center frequency offset.
+      Stage-2: For each predicted box, downconvert the input signal and extract
+               features with 4 residual blocks before predicting confidence
+               and class.
+      
+    The final YOLO output is [batch, S, B*(1+1+NUM_CLASSES)], where:
+        index 0: the normalized offset (used for loss)
+        index 1: confidence score
+        index 2..: class probabilities.
     """
     def __init__(self, num_samples):
         super().__init__()
         self.num_samples = num_samples
         
         # =======================
-        # Stage-1: Predict freq
+        # Stage-1: Frequency Prediction
         # =======================
         self.first_conv = nn.Sequential(
             nn.Conv1d(2, 32, kernel_size=8, stride=2),
@@ -138,15 +131,22 @@ class WidebandYoloModel(nn.Module):
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride=2),
         )
-        self.first_block = ResidualBlock(32, 96)
+        # Stack 8 residual blocks
+        self.stage1_blocks = nn.Sequential(
+            ResidualBlock(32, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+        )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
-        
-        # Instead of predicting just B, we predict S*B offsets in [0,1].
+        # Predict S*B normalized offsets (in [0,1])
         self.freq_predictor = nn.Linear(96, S * B)
 
-        # =======================
-        # Fixed Lowpass Filter
-        # =======================
+        # Fixed lowpass filter (unchanged)
         lp_taps = build_lowpass_filter(
             cutoff_hz=BAND_MARGIN,
             fs=SAMPLING_FREQUENCY,
@@ -164,12 +164,11 @@ class WidebandYoloModel(nn.Module):
         with torch.no_grad():
             self.conv_lowpass.weight[0, 0, :] = lp_taps
             self.conv_lowpass.weight[1, 0, :] = lp_taps
-        # Freeze filter weights
         for param in self.conv_lowpass.parameters():
             param.requires_grad = False
 
         # =======================
-        # Stage-2: Conf/Class
+        # Stage-2: Confidence and Classification
         # =======================
         self.second_conv = nn.Sequential(
             nn.Conv1d(2, 32, kernel_size=8, stride=2),
@@ -177,95 +176,68 @@ class WidebandYoloModel(nn.Module):
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride=2),
         )
-        self.second_block = ResidualBlock(32, 96)
+        # Stack 4 residual blocks for classification features
+        self.stage2_blocks = nn.Sequential(
+            ResidualBlock(32, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+        )
         self.pool_2 = nn.AdaptiveAvgPool1d(1)
-
-        # Instead of outputting S*(1+1+NUM_CLASSES), 
-        # we only output (1 + NUM_CLASSES) per bounding-box, 
-        # i.e. confidence and class. The freq offset is *not* 
-        # re-predicted here.
+        # Predict (confidence, class probabilities) per bounding box
         self.conf_class_predictor = nn.Linear(96, 1 + NUM_CLASSES)
 
     def forward(self, x):
         """
         x: [batch, 2, num_samples]
-        Returns final YOLO: [batch, S, B*(1+1+NUM_CLASSES)]
-          i.e. for each (s,b), we produce:
-              x_pred, conf_pred, class_pred...
+        Returns final YOLO output: [batch, S, B*(1+1+NUM_CLASSES)]
         """
         bsz = x.size(0)
+        # -----------------------
+        # Stage-1: Frequency Prediction
+        # -----------------------
+        h1 = self.first_conv(x)         # [bsz, 32, T1]
+        h1 = self.stage1_blocks(h1)       # [bsz, 96, T1/256] (if each block halves T)
+        h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
+        freq_pred_unnorm = self.freq_predictor(h1)  # [bsz, S*B]
+        freq_pred = torch.sigmoid(freq_pred_unnorm) # normalized offset in [0,1]
+        freq_pred = freq_pred.view(bsz, S, B)         # [bsz, S, B]
+
+        # Convert offsets to raw frequencies for downconversion:
+        # raw frequency = (cell_index + offset) * SAMPLING_FREQUENCY / S
+        cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
+        freq_pred_raw = (cell_indices + freq_pred) * SAMPLING_FREQUENCY / S  # [bsz, S, B]
+        freq_pred_flat = freq_pred_raw.view(bsz * S * B)
 
         # -----------------------
-        # 1) Stage-1 => freq_pred
+        # Stage-2: Downconversion and Classification
         # -----------------------
-        h1 = self.first_conv(x)          # => [batch, 32, ...]
-        h1 = self.first_block(h1)        # => [batch, 96, ...]
-        h1 = self.pool_1(h1).squeeze(-1) # => [batch, 96]
-        
-        # freq_pred_unnorm => [batch, S*B], then pass it through sigmoid to ensure [0,1]
-        freq_pred_unnorm = self.freq_predictor(h1)      # => [batch, S*B]
-        freq_pred = torch.sigmoid(freq_pred_unnorm)      # => keep it in [0,1]
-        freq_pred = freq_pred.view(bsz, S, B)            # => [batch, S, B]
-
-        # Convert the frequency offset predictions to raw frequency values abs_freq = (cell_idx + offset) * fs / S
-        freq_pred_raw = torch.zeros(
-            bsz, S, B,
-            dtype=freq_pred.dtype,
-            device=freq_pred.device
-        )
-        for i in range(S):
-            for j in range(B):
-                freq_pred_raw[:, i, j] = (i + freq_pred[:, i, j]) * SAMPLING_FREQUENCY / S
-        
-        # Flatten to replicate
-        freq_pred_flat = freq_pred_raw.view(bsz * S * B)     # => [batch*S*B]
-        
-        # -----------------------
-        # 2) Downconvert
-        # -----------------------
-        # Replicate x into shape [bsz, S, B, 2, T], then flatten => [bsz*S*B, 2, T]
-        x_rep = x.unsqueeze(1).unsqueeze(1)              # => [bsz, 1, 1, 2, T]
-        x_rep = x_rep.expand(-1, S, B, -1, -1)           # => [bsz, S, B, 2, T]
-        x_rep = x_rep.contiguous().view(bsz*S*B, 2, self.num_samples)
-
+        # Replicate x for each bounding box: [bsz, S, B, 2, num_samples]
+        x_rep = x.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
+        x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
+        # Downconvert using the raw frequency predictions
         x_base = self._downconvert_multiple(x_rep, freq_pred_flat)
-        
-        # TODO: optional fixed lowpass
-        # x_filt = self.conv_lowpass(x_base)  # => [bsz*S*B, 2, T]
+        # Optionally, apply the fixed lowpass filter (currently commented out)
+        # x_filt = self.conv_lowpass(x_base) TODO THIS
         x_filt = x_base
 
-        # -----------------------
-        # 3) Stage-2 => conf/class
-        # -----------------------
-        h2 = self.second_conv(x_filt)         # => [bsz*S*B, 32, ...]
-        h2 = self.second_block(h2)            # => [bsz*S*B, 96, ...]
-        h2 = self.pool_2(h2).squeeze(-1)      # => [bsz*S*B, 96]
-        
-        # (1 + NUM_CLASSES) => conf + class
-        out_conf_class = self.conf_class_predictor(h2)   # => [bsz*S*B, 1 + NUM_CLASSES]
-        
-        # -----------------------
-        # 4) Merge freq + conf + class
-        # -----------------------
-        # out_conf_class => [bsz*S*B, 1 + NUM_CLASSES]
+        # Extract features for confidence and classification:
+        h2 = self.second_conv(x_filt)             # [bsz*S*B, 32, T2]
+        h2 = self.stage2_blocks(h2)                # [bsz*S*B, 96, T2']
+        h2 = self.pool_2(h2).squeeze(-1)           # [bsz*S*B, 96]
+        out_conf_class = self.conf_class_predictor(h2)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
 
-        # We want final => [bsz, S, B, (1 + 1 + NUM_CLASSES)] 
-        #   where index 0 = x_offset, 
-        #         index 1 = confidence,
-        #         index 2.. = class-probs
-        final_out = torch.zeros(
-            bsz, S, B, (1 + 1 + NUM_CLASSES),
-            dtype=out_conf_class.dtype,
-            device=out_conf_class.device
-        )
-        # Fill offset from freq_pred:
-        final_out[..., 0] = freq_pred   # => x_pred
-        # Fill conf + classes from Stage-2:
-        final_out[..., 1:] = out_conf_class  # => conf, then classes
-
-        # Flatten to match YOLO shape [batch, S, B*(1+1+NUM_CLASSES)]
-        final_out = final_out.view(bsz, S, B*(1 + 1 + NUM_CLASSES))
+        # Merge frequency prediction (normalized offset) with confidence and class outputs.
+        # The final output shape is [bsz, S, B, (1+1+NUM_CLASSES)], where:
+        # index 0: normalized frequency offset (for loss calculation)
+        # index 1: confidence score, indices 2..: class probabilities.
+        final_out = torch.zeros(bsz, S, B, (1 + 1 + NUM_CLASSES),
+                                  dtype=out_conf_class.dtype,
+                                  device=out_conf_class.device)
+        final_out[..., 0] = freq_pred   # use original normalized offset here
+        final_out[..., 1:] = out_conf_class
+        final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
 
     def _downconvert_multiple(self, x_flat, freq_flat):
@@ -325,6 +297,9 @@ class WidebandYoloLoss(nn.Module):
 
         # coordinate MSE
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(x_pred - x_tgt)**2)
+
+        # Use log loss for coordinates opposed to MSE - TODO: CHECK THIS
+        # coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(torch.log(1.0 + (x_pred - x_tgt)**2)))
 
         # iou in 1D
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
