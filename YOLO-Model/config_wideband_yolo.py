@@ -43,6 +43,7 @@ LEARNING_RATE = 0.01
 LAMBDA_COORD = 1.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
+IOU_SCALING_FACTOR = 1e6 # Scaling factor for IOU loss
 
 def print_config_file():
     """

@@ -231,14 +231,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
-                        x_p   = x_pred[i, s_idx, b_idx].item()   # raw freq
+                        x_p   = x_pred[i, s_idx, b_idx].item()   # relative frequency
                         conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
                         if conf > 0.2:
-                            freq_norm = (s_idx + x_p) / S
-                            freq_hz = freq_norm * SAMPLING_FREQUENCY
-                            pred_list.append((freq_hz, cls_p, conf))
+                            pred_list.append((x_p, cls_p, conf))
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()

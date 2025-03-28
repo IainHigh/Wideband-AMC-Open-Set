@@ -1,6 +1,3 @@
-##########################################
-# dataset_wideband_yolo.py
-##########################################
 import os
 import json
 import torch
@@ -14,16 +11,6 @@ from config_wideband_yolo import (
 )
 
 class WidebandYoloDataset(Dataset):
-    """
-    Reads wideband .sigmf-data files from a directory.
-    For each file, it:
-      1) Bandpass filter around [min_center_freq - margin, max_center_freq + margin]
-      2) Downconvert that filtered chunk so the middle is baseband
-      3) Builds a YOLO label [S, B, (1+1+NUM_CLASSES)] with x_offset in [0,1], etc.
-
-    If multiple signals exist, we find min and max of 'center_frequencies' (plus margin).
-    """
-
     def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
@@ -91,61 +78,50 @@ class WidebandYoloDataset(Dataset):
         with open(meta_path, "r") as f:
             meta = json.load(f)
         ann = meta["annotations"][0]
-
-        center_freqs = ann["center_frequencies"]
-        if isinstance(center_freqs, (float,int)):
-            center_freqs = [center_freqs]
-        mod_list = ann["rfml_labels"]["modclass"]
-        if isinstance(mod_list, str):
-            mod_list = [mod_list]
-
-        # convert to real 2xN
-        # x_real = x_base.real.astype(np.float32)
-        # x_imag = x_base.imag.astype(np.float32)
-        x_real = x_complex.real.astype(np.float32)
-        x_imag = x_complex.imag.astype(np.float32)
-        
-        x_wide = np.stack([x_real, x_imag], axis=0)  # shape (2, N)
-
-        # optional transform
-        if self.transform:
-            x_wide = self.transform(x_wide)
-
-        # 4) Build YOLO label => shape [S, B, 1+1+NUM_CLASSES]
-        #   But now we treat freq offsets relative to c_mid
-        label_tensor = np.zeros((S, B, 1 + 1 + NUM_CLASSES), dtype=np.float32)
-
-        for c_freq, m_str in zip(center_freqs, mod_list):
-            # 1) Normalize frequency
-            freq_norm = c_freq / SAMPLING_FREQUENCY  # in [0, 1] if your c_freq <= FREQ_MAX
-
-            # 2) find which cell
-            cell_idx = int(freq_norm * S)
-            if cell_idx >= S:
-                cell_idx = S - 1  # clamp
-
-            # 3) offset in [0,1]
-            x_offset = (freq_norm * S) - cell_idx
-            if x_offset < 0: 
-                x_offset = 0.0
-            if x_offset > 1: 
-                x_offset = 1.0
-
-            # 4) fill YOLO label at (cell_idx, b)
-            for b_i in range(B):
-                # if no object assigned yet
-                if label_tensor[cell_idx, b_i, 1] == 0.0:
-                    label_tensor[cell_idx, b_i, 0] = x_offset  # store offset 
-                    label_tensor[cell_idx, b_i, 1] = 1.0       # confidence=1
-                    class_idx = self.class_to_idx.get(m_str, None)
-                    if class_idx is not None:
-                        label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0
-                    break
         
         # Retrieve the SNR value as well, this is useful for final results of accuracy and error per SNR value.
         try:
             snr_value = meta["annotations"][1]["channel"]["snr"]
         except (KeyError, IndexError):
             snr_value = None
+
+        center_freqs = ann["center_frequencies"]
+        if isinstance(center_freqs, (float, int)):
+            center_freqs = [center_freqs]
+        mod_list = ann["rfml_labels"]["modclass"]
+        if isinstance(mod_list, str):
+            mod_list = [mod_list]
+
+        # Convert to real 2xN
+        x_real = x_complex.real.astype(np.float32)
+        x_imag = x_complex.imag.astype(np.float32)
+        x_wide = np.stack([x_real, x_imag], axis=0)  # shape (2, N)
+
+        # Optional transform
+        if self.transform:
+            x_wide = self.transform(x_wide)
+
+        # 4) Build YOLO label => shape [S, B, 1+1+NUM_CLASSES]
+        # Here we store the relative frequency value instead of the grid-cell offset.
+        label_tensor = np.zeros((S, B, 1 + 1 + NUM_CLASSES), dtype=np.float32)
+
+        for c_freq, m_str in zip(center_freqs, mod_list):
+            # 1) Normalize frequency (relative value)
+            freq_norm = c_freq / SAMPLING_FREQUENCY  # now in [0,1]
+
+            # 2) find which cell
+            cell_idx = int(freq_norm * S)
+            if cell_idx >= S:
+                cell_idx = S - 1  # clamp
+
+            # 3) Instead of computing a cell-local offset, store the full relative frequency value
+            for b_i in range(B):
+                if label_tensor[cell_idx, b_i, 1] == 0.0:
+                    label_tensor[cell_idx, b_i, 0] = freq_norm  # store relative frequency
+                    label_tensor[cell_idx, b_i, 1] = 1.0        # confidence=1
+                    class_idx = self.class_to_idx.get(m_str, None)
+                    if class_idx is not None:
+                        label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0
+                    break
 
         return torch.tensor(x_wide), torch.tensor(label_tensor), torch.tensor(snr_value, dtype=torch.float32)
