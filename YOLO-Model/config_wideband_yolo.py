@@ -35,7 +35,7 @@ NUM_CLASSES = 9      # Number of classes
 #####################
 BATCH_SIZE = 16
 EPOCHS = 20
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 
 ########################
 # Loss Function Weights
