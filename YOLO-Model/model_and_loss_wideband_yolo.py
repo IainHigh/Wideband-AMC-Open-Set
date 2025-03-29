@@ -217,9 +217,12 @@ class WidebandYoloModel(nn.Module):
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
         # Downconvert using the raw frequency predictions
         x_base = self._downconvert_multiple(x_rep, freq_pred_flat)
-        # Optionally, apply the fixed lowpass filter (currently commented out)
-        # x_filt = self.conv_lowpass(x_base) TODO THIS
-        x_filt = x_base
+        # Optionally, apply the fixed lowpass filter (currently commented out) TODO
+        # x_filt = self.conv_lowpass(x_base)
+        if True:
+            x_filt = self.conv_lowpass(x_base)
+        else:
+            x_filt = x_base
 
         # Extract features for confidence and classification:
         h2 = self.second_conv(x_filt)             # [bsz*S*B, 32, T2]
@@ -297,9 +300,6 @@ class WidebandYoloLoss(nn.Module):
 
         # coordinate MSE
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(x_pred - x_tgt)**2)
-
-        # Use log loss for coordinates opposed to MSE - TODO: CHECK THIS
-        # coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(torch.log(1.0 + (x_pred - x_tgt)**2)))
 
         # iou in 1D
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt) / 1e6
