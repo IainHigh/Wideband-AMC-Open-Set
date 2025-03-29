@@ -302,7 +302,7 @@ class WidebandYoloLoss(nn.Module):
         # coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(torch.log(1.0 + (x_pred - x_tgt)**2)))
 
         # iou in 1D
-        iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
+        iou_1d = 1.0 - torch.abs(x_pred - x_tgt) / 1e6
         iou_1d = torch.clamp(iou_1d, min=0.0, max=1.0)
 
         # confidence
