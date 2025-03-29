@@ -217,7 +217,7 @@ class WidebandYoloModel(nn.Module):
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
         # Downconvert using the raw frequency predictions
         x_base = self._downconvert_multiple(x_rep, freq_pred_flat)
-        # Optionally, apply the fixed lowpass filter (currently commented out) TODO
+        # Optionally, apply the fixed lowpass filter (currently commented out)
         # x_filt = self.conv_lowpass(x_base)
         if True:
             x_filt = self.conv_lowpass(x_base)
