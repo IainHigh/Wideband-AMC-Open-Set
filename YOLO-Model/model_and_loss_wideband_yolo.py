@@ -160,6 +160,10 @@ class WidebandYoloModel(nn.Module):
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         # Predict S*B normalized offsets (in [0,1])
@@ -177,6 +181,8 @@ class WidebandYoloModel(nn.Module):
         # Stack 4 residual blocks for classification features
         self.stage2_blocks = nn.Sequential(
             ResidualBlock(32, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),

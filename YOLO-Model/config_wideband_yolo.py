@@ -34,7 +34,7 @@ NUM_CLASSES = 9      # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 16
-EPOCHS = 20
+EPOCHS = 40
 LEARNING_RATE = 0.001
 
 ########################
