@@ -185,7 +185,7 @@ class WidebandYoloModel(nn.Module):
         # Convert offsets to raw frequencies for downconversion:
         # raw frequency = (cell_index + offset) * SAMPLING_FREQUENCY / S
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
-        freq_pred_raw = (cell_indices + freq_pred) * SAMPLING_FREQUENCY / S  # [bsz, S, B]
+        freq_pred_raw = (cell_indices + freq_pred) * (SAMPLING_FREQUENCY/2) / S  # [bsz, S, B]
         freq_pred_flat = freq_pred_raw.view(bsz * S * B)
 
         # -----------------------
@@ -199,7 +199,7 @@ class WidebandYoloModel(nn.Module):
         if True:
             x_filt = self._filter_raw(x_rep, freq_pred_flat)
         else:
-            x_filt = x_base
+            x_filt = x_rep
             
         # Downconvert using the raw frequency predictions
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
@@ -260,7 +260,8 @@ class WidebandYoloModel(nn.Module):
             pad_left = NUMTAPS // 2
             pad_right = NUMTAPS - 1 - pad_left
             xi = x_flat[i].unsqueeze(0)  # shape: [1, 2, T]
-            xi_filt = F.conv1d(xi, h_bp_kernel, groups=2, padding=(pad_left, pad_right))
+            xi_padded = F.pad(xi, (pad_left, pad_right))
+            xi_filt = F.conv1d(xi_padded, h_bp_kernel, groups=2)
             x_filt[i] = xi_filt.squeeze(0)
         return x_filt
 
@@ -273,7 +274,7 @@ class WidebandYoloModel(nn.Module):
         """
         device = x_flat.device
         dtype  = x_flat.dtype
-        bsz_times_SB, _, T = x_flat.shape
+        _, _, T = x_flat.shape
 
         t = torch.arange(T, device=device, dtype=dtype).unsqueeze(0) / SAMPLING_FREQUENCY  # => [1, T]
         freq_flat = freq_flat.unsqueeze(-1)  # => [bsz*S*B, 1]

@@ -25,8 +25,6 @@ from config_wideband_yolo import (
     VAL_PRINT_SAMPLES,
     PRINT_CONFIG_FILE,
     print_config_file,
-    SAMPLING_FREQUENCY,
-    S
 )
 
 with open("./configs/system_parameters.json") as f:
