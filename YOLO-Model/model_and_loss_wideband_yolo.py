@@ -58,6 +58,28 @@ def build_lowpass_filter(cutoff_hz, fs, num_taps, window="hamming"):
     h = h / torch.sum(h)
     return h  # shape [num_taps]
 
+
+def conv1d_batch(x, weight, pad_left, pad_right):
+    """
+    Performs a batched 1D convolution where each sample in the batch uses its own kernel.
+    
+    x: Tensor of shape [N, 1, T]
+    weight: Tensor of shape [N, 1, M]
+    pad_left, pad_right: integers for padding
+    Returns: Tensor of shape [N, 1, T] containing the convolved outputs.
+    """
+    # Pad the input along the temporal dimension.
+    x_padded = F.pad(x, (pad_left, pad_right))
+    # Unfold the input to get sliding windows of size M.
+    # The output shape will be [N, 1, T, M] (each sliding window along T).
+    x_unf = x_padded.unfold(dimension=2, size=weight.shape[-1], step=1)  # shape: [N, 1, T, M]
+    # Multiply elementwise with the weight and sum over the kernel dimension.
+    # First, reshape weight to [N, 1, 1, M] so it can broadcast.
+    weight = weight.unsqueeze(2)  # shape: [N, 1, 1, M]
+    y = (x_unf * weight).sum(dim=-1)  # shape: [N, 1, T]
+    return y
+
+
 ###############################################################################
 # Residual block
 ###############################################################################
@@ -229,49 +251,51 @@ class WidebandYoloModel(nn.Module):
         Returns:
           x_filt:   [N, 2, T] - bandpass-filtered IQ data.
           
-        The filter for each sample is designed as a modulated lowpass FIR filter:
-          h_bp[i] = h_lp * cos(2π * f0_i * (n - α) / fs)
-        where h_lp is built with cutoff = BAND_MARGIN using a Kaiser window.
-        This produces a bandpass filter with passband [f0 - BAND_MARGIN, f0 + BAND_MARGIN].
+        This method designs, for each sample, a bandpass FIR filter by modulating a 
+        base lowpass kernel (designed with cutoff = BAND_MARGIN using a Kaiser window)
+        with a cosine term based on the predicted frequency. The filter is applied 
+        in a vectorized manner using a custom batched convolution.
         """
-        N, _, T = x_flat.shape
-        # Build the base lowpass kernel (for BAND_MARGIN) with Kaiser window.
+        N, _, T = x_flat.shape  # N samples, 2 channels, T time steps
+        M = NUMTAPS
+        alpha = (M - 1) / 2.0
+        
+        # Create a time index vector (centered) of shape [M]
+        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha  # [M]
+        
+        # Build the base lowpass filter kernel using a Kaiser window.
         h_lp = build_lowpass_filter(
             cutoff_hz=BAND_MARGIN,
             fs=SAMPLING_FREQUENCY,
             num_taps=NUMTAPS,
             window="kaiser"
-        )  # shape: [NUMTAPS]
-        M = NUMTAPS
-        alpha = (M - 1) / 2.0
-        # Create time index vector (centered) of shape [M]
-        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha  # shape: [M]
-        
-        # Reshape h_lp to [1, M]
+        )  # shape: [M]
+        # Reshape h_lp to [1, M] so it can broadcast.
         h_lp = h_lp.unsqueeze(0)  # shape: [1, M]
+        
         # Reshape freq_flat from [N] to [N, 1]
         f0 = freq_flat.view(N, 1)  # shape: [N, 1]
-        # Compute modulation factors for each sample: [N, M]
+        # Compute the modulation factor for each sample: [N, M]
         cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
-        # Compute bandpass kernel for each sample: [N, M]
+        # The sample-specific bandpass kernel is given by:
         h_bp_all = h_lp * cos_factor  # shape: [N, M]
         
-        # Replicate each kernel for 2 channels: result shape [N, 2, M]
-        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)
+        # We need one filter per channel; replicate each kernel for 2 channels:
+        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)  # shape: [N, 2, M]
         
-        # Reshape input from [N, 2, T] to [N*2, 1, T] so we can use grouped convolution.
-        x_reshaped = x_flat.reshape(N * 2, 1, T)
-        # Reshape kernels to [N*2, 1, M]
-        weight = h_bp_all_expanded.reshape(N * 2, 1, M)
+        # Now, reshape the input so that we can perform a batched convolution per sample & channel.
+        # Combine the sample and channel dimensions:
+        x_reshaped = x_flat.reshape(N * 2, 1, T)  # shape: [N*2, 1, T]
+        # Similarly, reshape the kernels:
+        weight = h_bp_all_expanded.reshape(N * 2, 1, M)  # shape: [N*2, 1, M]
         
-        # Compute padding for "same" convolution.
+        # Compute the padding needed for "same" convolution.
         pad_left = M // 2
         pad_right = M - 1 - pad_left
-        x_padded = F.pad(x_reshaped, (pad_left, pad_right))
         
-        # Apply grouped convolution with groups = N*2 so that each channel gets its own kernel.
-        y = F.conv1d(x_padded, weight, groups=N * 2)
-        # Reshape the result back to [N, 2, T]
+        # Now, apply our batched 1D convolution.
+        y = conv1d_batch(x_reshaped, weight, pad_left, pad_right)  # shape: [N*2, 1, T]
+        # Reshape back to the original shape: [N, 2, T]
         y = y.reshape(N, 2, T)
         return y
 
