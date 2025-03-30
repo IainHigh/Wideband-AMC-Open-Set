@@ -146,27 +146,6 @@ class WidebandYoloModel(nn.Module):
         # Predict S*B normalized offsets (in [0,1])
         self.freq_predictor = nn.Linear(96, S * B)
 
-        # Fixed lowpass filter (unchanged)
-        lp_taps = build_lowpass_filter(
-            cutoff_hz=BAND_MARGIN,
-            fs=SAMPLING_FREQUENCY,
-            num_taps=NUMTAPS,
-            window="hamming"
-        )
-        self.conv_lowpass = nn.Conv1d(
-            in_channels=2,
-            out_channels=2,
-            kernel_size=NUMTAPS,
-            groups=2,
-            bias=False,
-            padding="same"
-        )
-        with torch.no_grad():
-            self.conv_lowpass.weight[0, 0, :] = lp_taps
-            self.conv_lowpass.weight[1, 0, :] = lp_taps
-        for param in self.conv_lowpass.parameters():
-            param.requires_grad = False
-
         # =======================
         # Stage-2: Confidence and Classification
         # =======================
@@ -215,17 +194,19 @@ class WidebandYoloModel(nn.Module):
         # Replicate x for each bounding box: [bsz, S, B, 2, num_samples]
         x_rep = x.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
-        # Downconvert using the raw frequency predictions
-        x_base = self._downconvert_multiple(x_rep, freq_pred_flat)
-        # Optionally, apply the fixed lowpass filter (currently commented out)
-        # x_filt = self.conv_lowpass(x_base)
+        
+        # Optionally, apply the fixed lowpass filter.
         if True:
-            x_filt = self.conv_lowpass(x_base)
+            x_filt = self._filter_raw(x_rep, freq_pred_flat)
         else:
             x_filt = x_base
+            
+        # Downconvert using the raw frequency predictions
+        x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
+        
 
         # Extract features for confidence and classification:
-        h2 = self.second_conv(x_filt)             # [bsz*S*B, 32, T2]
+        h2 = self.second_conv(x_base)             # [bsz*S*B, 32, T2]
         h2 = self.stage2_blocks(h2)                # [bsz*S*B, 96, T2']
         h2 = self.pool_2(h2).squeeze(-1)           # [bsz*S*B, 96]
         out_conf_class = self.conf_class_predictor(h2)  # [bsz*S*B, 1+NUM_CLASSES]
@@ -242,6 +223,46 @@ class WidebandYoloModel(nn.Module):
         final_out[..., 1:] = out_conf_class
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
+    
+    def _filter_raw(self, x_flat, freq_flat):
+        """
+        x_flat:   [N, 2, T]  -- raw IQ data for each bounding box.
+        freq_flat:[N]        -- predicted center frequencies (in Hz).
+        Returns:
+          x_filt:   [N, 2, T]  -- bandpass-filtered raw IQ data.
+        
+        For each sample, we modulate a low-pass filter kernel to create a bandpass filter
+        centered at the predicted frequency.
+        """
+        N, _, T = x_flat.shape
+        # Build a lowpass filter kernel (designed for baseband filtering).
+        h_lp = build_lowpass_filter(
+            cutoff_hz=BAND_MARGIN,
+            fs=SAMPLING_FREQUENCY,
+            num_taps=NUMTAPS,
+            window="hamming"
+        )  # shape: [NUMTAPS]
+        alpha = (NUMTAPS - 1) / 2.0
+        n = torch.arange(NUMTAPS, device=x_flat.device, dtype=x_flat.dtype) - alpha  # time indices
+
+        x_filt = torch.empty_like(x_flat)
+        # Process each bounding box sample individually.
+        for i in range(N):
+            f0 = freq_flat[i]  # predicted frequency in Hz for this box
+            # Modulate the lowpass kernel to shift its passband to f0:
+            # h_bp = h_lp * cos(2pi f0 n / fs)
+            h_bp = h_lp * torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
+            # Reshape kernel for grouped convolution.
+            # Since our input has 2 channels and we want to filter each channel independently,
+            # reshape kernel as [2, 1, NUMTAPS]
+            h_bp_kernel = h_bp.view(1, 1, -1).repeat(2, 1, 1)
+            # Apply 1D convolution (emulating "same" padding).
+            pad_left = NUMTAPS // 2
+            pad_right = NUMTAPS - 1 - pad_left
+            xi = x_flat[i].unsqueeze(0)  # shape: [1, 2, T]
+            xi_filt = F.conv1d(xi, h_bp_kernel, groups=2, padding=(pad_left, pad_right))
+            x_filt[i] = xi_filt.squeeze(0)
+        return x_filt
 
     def _downconvert_multiple(self, x_flat, freq_flat):
         """
@@ -302,7 +323,7 @@ class WidebandYoloLoss(nn.Module):
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask*(x_pred - x_tgt)**2)
 
         # iou in 1D
-        iou_1d = 1.0 - torch.abs(x_pred - x_tgt) / 1e6
+        iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
         iou_1d = torch.clamp(iou_1d, min=0.0, max=1.0)
 
         # confidence
