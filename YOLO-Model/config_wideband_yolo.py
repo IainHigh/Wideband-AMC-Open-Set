@@ -26,7 +26,7 @@ SAMPLING_FREQUENCY = 30e6
 #####################
 # Model Parameters
 #####################
-S = 16               # Number of grid cells
+S = 8               # Number of grid cells
 B = 2                # Boxes per cell
 NUM_CLASSES = 9      # Number of classes
 
