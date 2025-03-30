@@ -22,42 +22,39 @@ from config_wideband_yolo import (
 ###############################################################################
 def build_lowpass_filter(cutoff_hz, fs, num_taps, window="hamming"):
     """
-    Build a real, time-domain lowpass FIR filter via windowed-sinc method in PyTorch.
-    cutoff_hz:  The passband edge (in Hz).
-    fs:         Sampling rate (in Hz).
-    num_taps:   Number of FIR taps (must be odd for no phase shift, typically).
-    window:     'hamming', 'hanning', or 'blackman' (as an example).
+    Build a real, time-domain lowpass FIR filter via the windowed-sinc method.
+    
+    cutoff_hz: The passband edge in Hz.
+    fs: Sampling frequency in Hz.
+    num_taps: Number of taps (should be odd for zero phase shift).
+    window: One of "hamming", "hanning", "blackman", or "kaiser".
     
     Returns:
-      lp: A 1D PyTorch tensor of shape [num_taps], representing the filter kernel.
+      A 1D PyTorch tensor of shape [num_taps] representing the filter kernel.
     """
-    # Center index
     M = num_taps
     n = torch.arange(M, dtype=torch.float32)
     alpha = (M - 1) / 2.0
-    # Ideal sinc
-    cutoff_norm = float(cutoff_hz) / (fs / 2.0)  # normalized freq in [0..1], 1 => Nyquist
-    # handle corner cases
+    cutoff_norm = float(cutoff_hz) / (fs / 2.0)  # normalized cutoff in [0,1]
     eps = 1e-9
     def sinc(x):
-        return torch.where(torch.abs(x) < eps, torch.ones_like(x), torch.sin(math.pi*x)/(math.pi*x))
-
-    # time index for "normalized" frequency
-    h = cutoff_norm * sinc(cutoff_norm*(n - alpha))
+        return torch.where(torch.abs(x) < eps, torch.ones_like(x), torch.sin(math.pi * x) / (math.pi * x))
     
-    # window
+    h = cutoff_norm * sinc(cutoff_norm * (n - alpha))
+    
     if window == "hamming":
         win = 0.54 - 0.46 * torch.cos(2.0 * math.pi * (n / (M - 1)))
     elif window == "hanning":
         win = 0.5 - 0.5 * torch.cos(2.0 * math.pi * (n / (M - 1)))
     elif window == "blackman":
-        win = 0.42 - 0.5*torch.cos(2*math.pi*n/(M-1)) + 0.08*torch.cos(4*math.pi*n/(M-1))
+        win = 0.42 - 0.5 * torch.cos(2 * math.pi * n / (M - 1)) + 0.08 * torch.cos(4 * math.pi * n / (M - 1))
+    elif window == "kaiser":
+        # Use PyTorch's built-in kaiser_window if available.
+        win = torch.kaiser_window(M, beta=8.6, periodic=False)
     else:
-        # no window
         win = torch.ones(M, dtype=torch.float32)
-
+    
     h = h * win
-    # Normalize so sum of taps = 1.0
     h = h / torch.sum(h)
     return h  # shape [num_taps]
 
@@ -226,71 +223,83 @@ class WidebandYoloModel(nn.Module):
     
     def _filter_raw(self, x_flat, freq_flat):
         """
-        x_flat:   [N, 2, T]  -- raw IQ data for each bounding box.
-        freq_flat:[N]        -- predicted center frequencies (in Hz).
-        Returns:
-          x_filt:   [N, 2, T]  -- bandpass-filtered raw IQ data.
+        x_flat:   [N, 2, T] - raw IQ data for each bounding box.
+        freq_flat: [N]      - predicted center frequencies (in Hz) for each sample.
         
-        For each sample, we modulate a low-pass filter kernel to create a bandpass filter
-        centered at the predicted frequency.
+        Returns:
+          x_filt:   [N, 2, T] - bandpass-filtered IQ data.
+          
+        The filter for each sample is designed as a modulated lowpass FIR filter:
+          h_bp[i] = h_lp * cos(2π * f0_i * (n - α) / fs)
+        where h_lp is built with cutoff = BAND_MARGIN using a Kaiser window.
+        This produces a bandpass filter with passband [f0 - BAND_MARGIN, f0 + BAND_MARGIN].
         """
         N, _, T = x_flat.shape
-        # Build a lowpass filter kernel (designed for baseband filtering).
+        # Build the base lowpass kernel (for BAND_MARGIN) with Kaiser window.
         h_lp = build_lowpass_filter(
             cutoff_hz=BAND_MARGIN,
             fs=SAMPLING_FREQUENCY,
             num_taps=NUMTAPS,
-            window="hamming"
+            window="kaiser"
         )  # shape: [NUMTAPS]
-        alpha = (NUMTAPS - 1) / 2.0
-        n = torch.arange(NUMTAPS, device=x_flat.device, dtype=x_flat.dtype) - alpha  # time indices
-
-        x_filt = torch.empty_like(x_flat)
-        # Process each bounding box sample individually.
-        for i in range(N):
-            f0 = freq_flat[i]  # predicted frequency in Hz for this box
-            # Modulate the lowpass kernel to shift its passband to f0:
-            # h_bp = h_lp * cos(2pi f0 n / fs)
-            h_bp = h_lp * torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
-            # Reshape kernel for grouped convolution.
-            # Since our input has 2 channels and we want to filter each channel independently,
-            # reshape kernel as [2, 1, NUMTAPS]
-            h_bp_kernel = h_bp.view(1, 1, -1).repeat(2, 1, 1)
-            # Apply 1D convolution (emulating "same" padding).
-            pad_left = NUMTAPS // 2
-            pad_right = NUMTAPS - 1 - pad_left
-            xi = x_flat[i].unsqueeze(0)  # shape: [1, 2, T]
-            xi_padded = F.pad(xi, (pad_left, pad_right))
-            xi_filt = F.conv1d(xi_padded, h_bp_kernel, groups=2)
-            x_filt[i] = xi_filt.squeeze(0)
-        return x_filt
+        M = NUMTAPS
+        alpha = (M - 1) / 2.0
+        # Create time index vector (centered) of shape [M]
+        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha  # shape: [M]
+        
+        # Reshape h_lp to [1, M]
+        h_lp = h_lp.unsqueeze(0)  # shape: [1, M]
+        # Reshape freq_flat from [N] to [N, 1]
+        f0 = freq_flat.view(N, 1)  # shape: [N, 1]
+        # Compute modulation factors for each sample: [N, M]
+        cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
+        # Compute bandpass kernel for each sample: [N, M]
+        h_bp_all = h_lp * cos_factor  # shape: [N, M]
+        
+        # Replicate each kernel for 2 channels: result shape [N, 2, M]
+        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)
+        
+        # Reshape input from [N, 2, T] to [N*2, 1, T] so we can use grouped convolution.
+        x_reshaped = x_flat.reshape(N * 2, 1, T)
+        # Reshape kernels to [N*2, 1, M]
+        weight = h_bp_all_expanded.reshape(N * 2, 1, M)
+        
+        # Compute padding for "same" convolution.
+        pad_left = M // 2
+        pad_right = M - 1 - pad_left
+        x_padded = F.pad(x_reshaped, (pad_left, pad_right))
+        
+        # Apply grouped convolution with groups = N*2 so that each channel gets its own kernel.
+        y = F.conv1d(x_padded, weight, groups=N * 2)
+        # Reshape the result back to [N, 2, T]
+        y = y.reshape(N, 2, T)
+        return y
 
     def _downconvert_multiple(self, x_flat, freq_flat):
         """
         x_flat:   [batch*S*B, 2, T]
-        freq_flat:[batch*S*B], predicted freq for each
-        fs:       sampling rate
-        returns x_base => [batch*S*B, 2, T], downconverted
+        freq_flat: [batch*S*B] - predicted frequencies in Hz for each sample.
+        Returns:
+          x_base:   [batch*S*B, 2, T] - downconverted IQ data.
         """
         device = x_flat.device
-        dtype  = x_flat.dtype
+        dtype = x_flat.dtype
         _, _, T = x_flat.shape
 
-        t = torch.arange(T, device=device, dtype=dtype).unsqueeze(0) / SAMPLING_FREQUENCY  # => [1, T]
-        freq_flat = freq_flat.unsqueeze(-1)  # => [bsz*S*B, 1]
-        
-        angle = -2.0 * math.pi * freq_flat * t  # => [bsz*S*B, T]
+        t = torch.arange(T, device=device, dtype=dtype).unsqueeze(0) / SAMPLING_FREQUENCY  # shape: [1, T]
+        freq_flat = freq_flat.unsqueeze(-1)  # shape: [batch*S*B, 1]
+
+        angle = -2.0 * math.pi * freq_flat * t  # shape: [batch*S*B, T]
         shift_real = torch.cos(angle)
         shift_imag = torch.sin(angle)
 
         x_real = x_flat[:, 0, :]
         x_imag = x_flat[:, 1, :]
 
-        # multiply by e^{-j2pi freq t}
         y_real = x_real * shift_real - x_imag * shift_imag
         y_imag = x_real * shift_imag + x_imag * shift_real
 
-        x_base = torch.stack([y_real, y_imag], dim=1)  # => [bsz*S*B, 2, T]
+        x_base = torch.stack([y_real, y_imag], dim=1)
         return x_base
 
 class WidebandYoloLoss(nn.Module):
