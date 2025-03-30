@@ -196,7 +196,7 @@ class WidebandYoloModel(nn.Module):
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
         
         # Optionally, apply the fixed lowpass filter.
-        if True:
+        if False:
             x_filt = self._filter_raw(x_rep, freq_pred_flat)
         else:
             x_filt = x_rep
