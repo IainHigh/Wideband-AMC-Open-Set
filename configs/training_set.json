@@ -12,9 +12,9 @@
     "16apsk",
     "32apsk"
   ],
-  "symbol_rate": 32,
-  "sampling_rate": 30e6,
-  "randomly_generated_center_frequencies": [2e6, 15e6, 4],
+  "symbol_rate": 8,
+  "sampling_rate": 20e6,
+  "randomly_generated_center_frequencies": [2e6, 10e6, 3],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
