@@ -1,5 +1,5 @@
 {
-  "n_captures": 10000,
+  "n_captures": 1000,
   "n_samps": 32768,
   "modulation": [
     "bpsk",

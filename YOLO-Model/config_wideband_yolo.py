@@ -27,14 +27,13 @@ def calculate_band_margin():
     
     symbol_rate = sampling_rate / sps
     channel_bw = symbol_rate * (1 + beta)
-    print(channel_bw)
     return channel_bw, sampling_rate
     
 #####################
 # Miscellaneous Parameters
 #####################
 
-CREATE_NEW_DATASET = True # If True, will generate a new dataset. If False, it will use the (presumably) existing dataset.
+CREATE_NEW_DATASET = False # If True, will generate a new dataset. If False, it will use the (presumably) existing dataset.
 VAL_PRINT_SAMPLES = 2 # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True # If True, will print the configuration file to the console.
 
@@ -42,7 +41,8 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 # Dataset Filtering Parameters
 #####################
 
-BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency. 
+BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
+BAND_MARGIN = BAND_MARGIN
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
@@ -56,7 +56,7 @@ NUM_CLASSES = 9      # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 16
-EPOCHS = 40
+EPOCHS = 20
 LEARNING_RATE = 0.001
 
 ########################
