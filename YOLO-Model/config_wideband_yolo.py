@@ -32,7 +32,6 @@ def calculate_band_margin():
 # Miscellaneous Parameters
 #####################
 
-CREATE_NEW_DATASET = False # If True, will generate a new dataset. If False, it will use the (presumably) existing dataset.
 VAL_PRINT_SAMPLES = 2 # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True # If True, will print the configuration file to the console.
 
@@ -61,7 +60,7 @@ LEARNING_RATE = 0.001
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 50.0       # Weight for coordinate (x offset) loss
+LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
     
@@ -71,7 +70,6 @@ def print_config_file():
     Print the configuration file to the console.
     """
     print("Configuration File:")
-    print("\tCREATE_NEW_DATASET:", CREATE_NEW_DATASET)
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
     print("\tBAND_MARGIN:", BAND_MARGIN)
     print("\tNUMTAPS:", NUMTAPS)

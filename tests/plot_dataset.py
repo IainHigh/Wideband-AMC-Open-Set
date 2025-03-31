@@ -326,7 +326,6 @@ def main():
         if sps is not None and beta is not None:
             symbol_rate = sampling_rate / sps
             channel_bw = symbol_rate * (1 + beta)
-            print(channel_bw)
             plot_constellation_diagram(
                 f_data, modschemes, center_frequencies, sampling_rate, channel_bw
             )

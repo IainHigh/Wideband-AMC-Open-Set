@@ -1,6 +1,7 @@
 #############################################
 # main.py
 #############################################
+
 import torch
 import json
 import time
@@ -18,7 +19,6 @@ from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
 from config_wideband_yolo import (
     NUM_CLASSES,
-    CREATE_NEW_DATASET,
     BATCH_SIZE,
     EPOCHS,
     LEARNING_RATE,
@@ -51,11 +51,7 @@ else:
     print("\n\nCUDA is not available. Using CPU.")
 print("\n")
 
-def main():
-    # Optionally create the dataset
-    if CREATE_NEW_DATASET:
-        create_dataset(data_dir, rng_seed)
-        
+def main():        
     # Print the configuration file
     if PRINT_CONFIG_FILE:
         print_config_file()
@@ -403,23 +399,6 @@ def test_model(model, test_loader, device):
     print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
     print("=== END OF TESTING ===")
     
-def create_dataset(data_dir, rng_seed):
-    """
-    Removes existing training/validation/testing sets, then invokes generator.py
-    to create new sets using the specified JSON config files and seeds.
-    """
-    for set_name in ["training", "validation", "testing"]:
-        full_path = os.path.join(data_dir, set_name)
-        if os.path.exists(full_path):
-            for f in glob.glob(f"{full_path}/*"):
-                os.remove(f)
-            os.removedirs(full_path)
-
-    # Generate the new dataset using the generator.py script.
-    # Different rng seeds so each set is unique.
-    os.system(f"python3 generator.py ./configs/training_set.json {rng_seed + 1}")
-    os.system(f"python3 generator.py ./configs/validation_set.json {rng_seed + 2}")
-    os.system(f"python3 generator.py ./configs/testing_set.json {rng_seed + 3}")
 
 if __name__ == "__main__":
     start_time = time.time()
