@@ -61,7 +61,7 @@ LEARNING_RATE = 0.001
 ########################
 LAMBDA_COORD = 1.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
-LAMBDA_CLASS = 1.0       # Weight for classification loss
+LAMBDA_CLASS = 5.0       # Weight for classification loss
     
 
 def print_config_file():
