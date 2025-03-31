@@ -118,7 +118,7 @@ class WidebandYoloDataset(Dataset):
 
         for c_freq, m_str in zip(center_freqs, mod_list):
             # 1) Normalize frequency
-            freq_norm = c_freq / (SAMPLING_FREQUENCY / 2) # in [0, 1] if your c_freq <= FREQ_MAX. Assuming Nyquist - Fmax = Sampling_Freq / 2. TODO: Is this a safe assumption?
+            freq_norm = c_freq / (SAMPLING_FREQUENCY / 2) # in [0, 1] if your c_freq <= FREQ_MAX. Assuming Nyquist: Fmax <= Sampling_Freq / 2.
 
             # 2) find which cell
             cell_idx = int(freq_norm * S)

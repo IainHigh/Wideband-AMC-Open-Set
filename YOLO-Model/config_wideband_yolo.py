@@ -8,7 +8,6 @@ Configuration file for the wideband YOLO-style AMC system.
 All modifiable parameters are grouped here.
 """
 
-# TODO: Probably can't use this calculation for real implementation as it relies on reading metadata.
 def calculate_band_margin():
     with open("./configs/system_parameters.json") as f:
         system_parameters = json.load(f)
@@ -42,7 +41,7 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 #####################
 
 BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-BAND_MARGIN = BAND_MARGIN * 2
+BAND_MARGIN = BAND_MARGIN
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
@@ -62,7 +61,7 @@ LEARNING_RATE = 0.001
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
+LAMBDA_COORD = 50.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
     
