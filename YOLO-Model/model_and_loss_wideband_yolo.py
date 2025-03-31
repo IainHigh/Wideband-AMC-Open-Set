@@ -145,14 +145,14 @@ class WidebandYoloModel(nn.Module):
         # Stage-1: Frequency Prediction
         # =======================
         self.first_conv = nn.Sequential(
-            nn.Conv1d(2, 1024, kernel_size=8, stride=2),
-            nn.BatchNorm1d(1024),
+            nn.Conv1d(2, 32, kernel_size=8, stride=2),
+            nn.BatchNorm1d(32),
             nn.ReLU(),
             nn.MaxPool1d(kernel_size=2, stride=2),
         )
         # Stack 8 residual blocks
         self.stage1_blocks = nn.Sequential(
-            ResidualBlock(1024, 96),
+            ResidualBlock(32, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),

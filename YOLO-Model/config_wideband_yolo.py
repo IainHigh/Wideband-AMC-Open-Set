@@ -40,7 +40,6 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 #####################
 
 BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-BAND_MARGIN = BAND_MARGIN * 0.5
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
@@ -60,8 +59,8 @@ LEARNING_RATE = 0.001
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 1.0       # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
     
 

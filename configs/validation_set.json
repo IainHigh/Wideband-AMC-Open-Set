@@ -1,6 +1,6 @@
 {
-  "n_captures": 1000,
-  "n_samps": 2048,
+  "n_captures": 5000,
+  "n_samps": 4096,
   "modulation": [
     "bpsk",
     "qpsk",
@@ -13,8 +13,8 @@
     "32apsk"
   ],
   "symbol_rate": 32,
-  "sampling_rate": 10e6,
-  "randomly_generated_center_frequencies": [3e5, 4e6, 3],
+  "sampling_rate": 30e6,
+  "randomly_generated_center_frequencies": [2e6, 15e6, 4],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
