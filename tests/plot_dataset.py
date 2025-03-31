@@ -234,6 +234,11 @@ def plot_constellation_diagram(
         lowcut = f_c - channel_bw / 2
         highcut = f_c + channel_bw / 2
 
+        if lowcut < 0:
+            lowcut = 0
+        if highcut > sampling_rate / 2:
+            highcut = sampling_rate / 2
+
         # Isolate the channel by filtering the composite signal.
         x_filtered = bandpass_complex(x, sampling_rate, lowcut, highcut)
 
@@ -321,6 +326,7 @@ def main():
         if sps is not None and beta is not None:
             symbol_rate = sampling_rate / sps
             channel_bw = symbol_rate * (1 + beta)
+            print(channel_bw)
             plot_constellation_diagram(
                 f_data, modschemes, center_frequencies, sampling_rate, channel_bw
             )

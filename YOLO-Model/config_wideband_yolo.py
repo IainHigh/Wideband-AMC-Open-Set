@@ -1,11 +1,35 @@
 #############################################
 # config_wideband_yolo.py
 #############################################
+import json
+import os
 """
 Configuration file for the wideband YOLO-style AMC system.
 All modifiable parameters are grouped here.
 """
 
+# TODO: Probably can't use this calculation for real implementation as it relies on reading metadata.
+def calculate_band_margin():
+    with open("./configs/system_parameters.json") as f:
+        system_parameters = json.load(f)
+    dataset_directory = system_parameters["Dataset_Directory"] + "/training"
+    file_name = os.listdir(os.path.abspath(dataset_directory))[0]
+    file_name = os.path.join(dataset_directory, file_name.split(".")[0])
+    
+    with open(file_name + ".sigmf-meta") as _f:
+        f_meta = json.load(_f)
+
+    # Extract metadata
+    annotation = f_meta["annotations"][0]
+    sampling_rate = annotation["sampling_rate"]
+    sps = f_meta["annotations"][1]["filter"]["sps"]
+    beta = f_meta["annotations"][1]["filter"]["rolloff"]
+    
+    symbol_rate = sampling_rate / sps
+    channel_bw = symbol_rate * (1 + beta)
+    print(channel_bw)
+    return channel_bw, sampling_rate
+    
 #####################
 # Miscellaneous Parameters
 #####################
@@ -18,15 +42,13 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 # Dataset Filtering Parameters
 #####################
 
-# TODO: See calculations in plot_dataset.py for how BAND_MARGIN is calculated (lowcut & highcut in corresponding code). CALCULATE THIS DON'T JUST ASSUME IT.
-BAND_MARGIN = 843750  # Band margin - determines the start frequency and end frequency from the calculated center frequency. 
+BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency. 
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
-SAMPLING_FREQUENCY = 30e6
 
 #####################
 # Model Parameters
 #####################
-S = 8               # Number of grid cells
+S = 4               # Number of grid cells
 B = 2                # Boxes per cell
 NUM_CLASSES = 9      # Number of classes
 
@@ -43,6 +65,7 @@ LEARNING_RATE = 0.001
 LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
+    
 
 def print_config_file():
     """

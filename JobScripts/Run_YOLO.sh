@@ -1,11 +1,12 @@
 #!/bin/sh
 #$ -N YOLO
-#$ -l h_rt=47:59:00
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
+#$ -l h_rt=47:59:00
+#$ -l h_vmem=80G
+
 #$ -q gpu
 #$ -l gpu=1
 #$ -pe sharedmem 4
-#$ -l h_vmem=80G
 
 #$ -o /home/s2062378/OutputFiles
 #$ -e /home/s2062378/OutputFiles
