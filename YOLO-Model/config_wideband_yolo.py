@@ -42,7 +42,7 @@ PRINT_CONFIG_FILE = True # If True, will print the configuration file to the con
 #####################
 
 BAND_MARGIN, SAMPLING_FREQUENCY = calculate_band_margin()  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-BAND_MARGIN = BAND_MARGIN * 0.5
+BAND_MARGIN = BAND_MARGIN * 2
 NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
