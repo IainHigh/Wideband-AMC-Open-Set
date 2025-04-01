@@ -101,8 +101,6 @@ class WidebandYoloDataset(Dataset):
             center_freqs = [center_freqs]
             
         # convert to real 2xN
-        # x_real = x_base.real.astype(np.float32)
-        # x_imag = x_base.imag.astype(np.float32)
         x_real = x_complex.real.astype(np.float32)
         x_imag = x_complex.imag.astype(np.float32)
         
