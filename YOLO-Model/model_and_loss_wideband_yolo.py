@@ -121,16 +121,13 @@ class WidebandYoloModel(nn.Module):
     """
     Two-stage YOLO approach:
       Stage-1: Predict S*B frequency offsets in [0,1] using a dual-branch network.
-               One branch uses time-domain features and the new branch uses an STFT-
-               based time–frequency representation for enhanced frequency localization.
+               One branch processes time-domain features; the new branch uses the precomputed
+               frequency–domain representation for enhanced frequency localization.
                A refinement branch further corrects the coarse predictions.
-      Stage-2: For each predicted box, downconvert the input signal and extract
-               features with several residual blocks before predicting confidence
-               and class.
-      
-    The final YOLO output is [batch, S, B*(1+1+NUM_CLASSES)], where:
-        index 0: normalized frequency offset (for loss calculation)
-        index 1: confidence score, indices 2..: class probabilities.
+      Stage-2: For each predicted box, downconvert the input signal and extract features
+               for confidence and classification.
+               
+    The final YOLO output is [batch, S, B*(1+1+NUM_CLASSES)].
     """
     def __init__(self, num_samples):
         super().__init__()
@@ -139,7 +136,7 @@ class WidebandYoloModel(nn.Module):
         # -----------------------
         # Stage-1: Frequency Prediction
         # -----------------------
-        # Time-domain branch
+        # Time-domain branch.
         self.first_conv = nn.Sequential(
             nn.Conv1d(2, 32, kernel_size=8, stride=2),
             nn.BatchNorm1d(32),
@@ -162,14 +159,14 @@ class WidebandYoloModel(nn.Module):
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         
-        # New Time–Frequency branch (using STFT)
-        # This branch converts the IQ data into a spectrogram and extracts features.
+        # New Time–Frequency branch: now takes precomputed frequency data.
+        # The dataset returns x_freq of shape (batch, 2, N_rfft). We compute the magnitude.
         self.tf_branch = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=(3, 3), stride=1, padding=1),
+            nn.Conv2d(1, 8, kernel_size=(3, 1), stride=1, padding=(1,0)),  # change kernel size to (3,1)
             nn.BatchNorm2d(8),
             nn.ReLU(),
-            nn.MaxPool2d((2, 2)),
-            nn.Conv2d(8, 16, kernel_size=(3, 3), stride=1, padding=1),
+            nn.MaxPool2d((2, 1)),  # pool only along frequency axis
+            nn.Conv2d(8, 16, kernel_size=(3, 1), stride=1, padding=(1,0)),  # change kernel size to (3,1)
             nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.AdaptiveAvgPool2d((1, 1))
@@ -177,7 +174,7 @@ class WidebandYoloModel(nn.Module):
         # Project the TF branch output to a feature vector of size 32.
         self.tf_fc = nn.Linear(16, 32)
         
-        # Combine time-domain (96) and TF branch (32) features: total 128.
+        # Combine time-domain (96) and TF branch (32) features = 128.
         self.freq_predictor = nn.Linear(128, S * B)
         
         # Refinement branch for frequency correction.
@@ -191,7 +188,7 @@ class WidebandYoloModel(nn.Module):
         self.refine_fc = nn.Linear(32, S * B)
         
         # -----------------------
-        # Stage-2: Confidence and Classification
+        # Stage-2: Confidence and Classification (unchanged)
         # -----------------------
         self.second_conv = nn.Sequential(
             nn.Conv1d(2, 32, kernel_size=8, stride=2),
@@ -210,37 +207,30 @@ class WidebandYoloModel(nn.Module):
         self.pool_2 = nn.AdaptiveAvgPool1d(1)
         self.conf_class_predictor = nn.Linear(96, 1 + NUM_CLASSES)
 
-    def forward(self, x):
+    def forward(self, x_time, x_freq):
         """
-        x: [batch, 2, num_samples]
+        x_time: [batch, 2, num_samples] (time-domain IQ)
+        x_freq: [batch, 2, N_rfft] (frequency-domain representation, e.g. from np.fft.rfft)
+        
         Returns final YOLO output: [batch, S, B*(1+1+NUM_CLASSES)]
         """
-        bsz = x.size(0)
+        bsz = x_time.size(0)
         # -----------------------
         # Stage-1: Coarse Frequency Prediction
         # -----------------------
-        # Time-domain branch
-        h1 = self.first_conv(x)          # [bsz, 32, T1]
-        h1 = self.stage1_blocks(h1)        # [bsz, 96, T1']
-        h1 = self.pool_1(h1).squeeze(-1)   # [bsz, 96]
+        # Time-domain branch.
+        h1 = self.first_conv(x_time)          # [bsz, 32, T1]
+        h1 = self.stage1_blocks(h1)             # [bsz, 96, T1']
+        h1 = self.pool_1(h1).squeeze(-1)        # [bsz, 96]
         
-        # Time–Frequency branch: compute spectrogram from IQ signal.
-        # Convert IQ channels to a complex signal.
-        x_complex = torch.complex(x[:, 0], x[:, 1])  # [bsz, num_samples]
-        # Compute STFT (using n_fft=64, hop_length=16, win_length=64)
-        stft = torch.stft(
-            x_complex,
-            n_fft=64,
-            hop_length=16,
-            win_length=64,
-            window=torch.hamming_window(64, device=x.device),
-            return_complex=True
-        )  # [bsz, 33, time_frames]
-        spec = torch.abs(stft)           # Magnitude spectrogram: [bsz, 33, time_frames]
-        spec = spec.unsqueeze(1)         # [bsz, 1, 33, time_frames]
-        tf_features = self.tf_branch(spec)  # [bsz, 16, 1, 1]
-        tf_features = tf_features.view(bsz, -1)  # [bsz, 16]
-        tf_features = self.tf_fc(tf_features)     # [bsz, 32]
+        # Time–Frequency branch: use provided frequency data.
+        # Compute the magnitude spectrum.
+        # x_freq is [bsz, 2, N_rfft]; compute magnitude and reshape to (bsz, 1, N_rfft, 1)
+        spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
+        spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
+        tf_features = self.tf_branch(spec)        # [bsz, 16, 1, 1]
+        tf_features = tf_features.view(bsz, -1)    # [bsz, 16]
+        tf_features = self.tf_fc(tf_features)       # [bsz, 32]
         
         # Combine features from both branches.
         combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
@@ -249,39 +239,36 @@ class WidebandYoloModel(nn.Module):
         coarse_freq_pred = coarse_freq_pred.view(bsz, S, B)                # [bsz, S, B]
         
         # Refinement branch: compute correction delta from raw IQ.
-        refine_feat = self.refinement_branch(x)  # [bsz, 32, 1]
-        refine_feat = refine_feat.squeeze(-1)     # [bsz, 32]
-        delta = self.refine_fc(refine_feat)         # [bsz, S*B]
-        delta = 0.1 * torch.tanh(delta)             # Constrain corrections to [-0.1, 0.1]
+        refine_feat = self.refinement_branch(x_time)  # [bsz, 32, 1]
+        refine_feat = refine_feat.squeeze(-1)         # [bsz, 32]
+        delta = self.refine_fc(refine_feat)             # [bsz, S*B]
+        delta = 0.1 * torch.tanh(delta)                 # constrain correction to [-0.1, 0.1]
         delta = delta.view(bsz, S, B)
         
         # Final frequency prediction.
         freq_pred = torch.clamp(coarse_freq_pred + delta, 0.0, 1.0)  # [bsz, S, B]
         
-        # Convert normalized offsets to raw frequencies (for downconversion).
+        # Convert normalized offsets to raw frequencies for downconversion.
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
         freq_pred_raw = (cell_indices + freq_pred) * (SAMPLING_FREQUENCY / 2) / S  # [bsz, S, B]
         freq_pred_flat = freq_pred_raw.view(bsz * S * B)
         
         # -----------------------
-        # Stage-2: Downconversion and Classification
+        # Stage-2: Downconversion and Classification (uses time-domain signal only)
         # -----------------------
-        # Replicate x for each bounding box.
-        x_rep = x.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
+        # Replicate x_time for each bounding box.
+        x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
         
         # Apply the fixed lowpass filter.
-        if True:
-            x_filt = self._filter_raw(x_rep, freq_pred_flat)
-        else:
-            x_filt = x_rep
+        x_filt = self._filter_raw(x_rep, freq_pred_flat)
         # Downconvert using the raw frequency predictions.
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
         
         # Extract features for confidence and classification.
-        h2 = self.second_conv(x_base)             # [bsz*S*B, 32, T2]
-        h2 = self.stage2_blocks(h2)                # [bsz*S*B, 96, T2']
-        h2 = self.pool_2(h2).squeeze(-1)           # [bsz*S*B, 96]
+        h2 = self.second_conv(x_base)              # [bsz*S*B, 32, T2]
+        h2 = self.stage2_blocks(h2)                 # [bsz*S*B, 96, T2']
+        h2 = self.pool_2(h2).squeeze(-1)            # [bsz*S*B, 96]
         out_conf_class = self.conf_class_predictor(h2)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
         
@@ -294,68 +281,39 @@ class WidebandYoloModel(nn.Module):
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
 
+    # _filter_raw and _downconvert_multiple remain unchanged.
     def _filter_raw(self, x_flat, freq_flat):
-        """
-        x_flat:   [N, 2, T] - raw IQ data for each bounding box.
-        freq_flat: [N]      - predicted center frequencies (in Hz) for each sample.
-        
-        Returns:
-          x_filt:   [N, 2, T] - bandpass-filtered IQ data.
-        """
-        N, _, T = x_flat.shape  # N samples, 2 channels, T time steps
+        N, _, T = x_flat.shape
         M = NUMTAPS
         alpha = (M - 1) / 2.0
-        
-        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha  # [M]
-        
-        h_lp = build_lowpass_filter(
-            cutoff_hz=BAND_MARGIN,
-            fs=SAMPLING_FREQUENCY,
-            num_taps=NUMTAPS,
-            window="kaiser"
-        )  # [M]
-        h_lp = h_lp.unsqueeze(0)  # [1, M]
-        
-        f0 = freq_flat.view(N, 1)  # [N, 1]
+        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha
+        h_lp = build_lowpass_filter(cutoff_hz=BAND_MARGIN, fs=SAMPLING_FREQUENCY, num_taps=NUMTAPS, window="kaiser")
+        h_lp = h_lp.unsqueeze(0)
+        f0 = freq_flat.view(N, 1)
         cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
-        h_bp_all = h_lp * cos_factor  # [N, M]
-        
-        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)  # [N, 2, M]
-        
-        x_reshaped = x_flat.reshape(N * 2, 1, T)  # [N*2, 1, T]
-        weight = h_bp_all_expanded.reshape(N * 2, 1, M)  # [N*2, 1, M]
-        
+        h_bp_all = h_lp * cos_factor
+        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)
+        x_reshaped = x_flat.reshape(N * 2, 1, T)
+        weight = h_bp_all_expanded.reshape(N * 2, 1, M)
         pad_left = M // 2
         pad_right = M - 1 - pad_left
-        
-        y = conv1d_batch(x_reshaped, weight, pad_left, pad_right)  # [N*2, 1, T]
+        y = conv1d_batch(x_reshaped, weight, pad_left, pad_right)
         y = y.reshape(N, 2, T)
         return y
 
     def _downconvert_multiple(self, x_flat, freq_flat):
-        """
-        x_flat:   [batch*S*B, 2, T]
-        freq_flat: [batch*S*B] - predicted frequencies in Hz for each sample.
-        Returns:
-          x_base:   [batch*S*B, 2, T] - downconverted IQ data.
-        """
         device = x_flat.device
         dtype = x_flat.dtype
         _, _, T = x_flat.shape
-
-        t = torch.arange(T, device=device, dtype=dtype).unsqueeze(0) / SAMPLING_FREQUENCY  # [1, T]
-        freq_flat = freq_flat.unsqueeze(-1)  # [batch*S*B, 1]
-
-        angle = -2.0 * math.pi * freq_flat * t  # [batch*S*B, T]
+        t = torch.arange(T, device=device, dtype=dtype).unsqueeze(0) / SAMPLING_FREQUENCY
+        freq_flat = freq_flat.unsqueeze(-1)
+        angle = -2.0 * math.pi * freq_flat * t
         shift_real = torch.cos(angle)
         shift_imag = torch.sin(angle)
-
         x_real = x_flat[:, 0, :]
         x_imag = x_flat[:, 1, :]
-
         y_real = x_real * shift_real - x_imag * shift_imag
         y_imag = x_real * shift_imag + x_imag * shift_real
-
         x_base = torch.stack([y_real, y_imag], dim=1)
         return x_base
 

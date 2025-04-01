@@ -124,12 +124,13 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
-    for iq_tensor, label_tensor, _ in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
-        iq_tensor   = iq_tensor.to(device)
-        label_tensor= label_tensor.to(device)
+    for time_data, freq_data, label_tensor, _ in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
+        time_data = time_data.to(device)
+        freq_data = freq_data.to(device)
+        label_tensor = label_tensor.to(device)
 
         optimizer.zero_grad()
-        pred = model(iq_tensor)
+        pred = model(time_data, freq_data)
         loss = criterion(pred, label_tensor)
         loss.backward()
         optimizer.step()
@@ -139,7 +140,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         bsize = pred.shape[0]
         pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
         x_pred     = pred_reshape[..., 0]
-        conf_pred  = pred_reshape[..., 1]
         class_pred = pred_reshape[..., 2:]
 
         x_tgt      = label_tensor[..., 0]
@@ -182,11 +182,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_frames = []
 
     with torch.no_grad():
-        for iq_tensor, label_tensor, _ in tqdm(val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"):
-            iq_tensor   = iq_tensor.to(device)
-            label_tensor= label_tensor.to(device)
+        for time_data, freq_data, label_tensor, _ in tqdm(val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"):
+            time_data = time_data.to(device)
+            freq_data = freq_data.to(device)
+            label_tensor = label_tensor.to(device)
 
-            pred = model(iq_tensor)
+            pred = model(time_data, freq_data)
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
 
@@ -278,12 +279,11 @@ def test_model(model, test_loader, device):
     snr_freq_err = {}
 
     with torch.no_grad():
-        for (iq_tensor, label_tensor, snr_tensor) in tqdm(test_loader, desc=f"Testing on test set"):
-            iq_tensor   = iq_tensor.to(device)
-            label_tensor= label_tensor.to(device)
-
-            # forward
-            pred = model(iq_tensor)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
+        for time_data, freq_data, label_tensor, _ in tqdm(test_loader, desc=f"Testing on test set"):
+            time_data = time_data.to(device)
+            freq_data = freq_data.to(device)
+            label_tensor = label_tensor.to(device)
+            pred = model(time_data, freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
 
             # reshape
             bsize = pred.shape[0]
@@ -292,7 +292,6 @@ def test_model(model, test_loader, device):
             pred_reshape = pred.view(bsize, Sdim, -1,  (1+1+NUM_CLASSES))
 
             x_pred     = pred_reshape[..., 0]  # [bsize, S, B]
-            conf_pred  = pred_reshape[..., 1]
             class_pred = pred_reshape[..., 2:]
 
             x_tgt      = label_tensor[..., 0]

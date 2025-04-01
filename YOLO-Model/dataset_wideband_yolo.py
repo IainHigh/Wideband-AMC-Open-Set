@@ -17,19 +17,18 @@ class WidebandYoloDataset(Dataset):
     """
     Reads wideband .sigmf-data files from a directory.
     For each file, it:
-      1) Bandpass filter around [min_center_freq - margin, max_center_freq + margin]
-      2) Downconvert that filtered chunk so the middle is baseband
-      3) Builds a YOLO label [S, B, (1+1+NUM_CLASSES)] with x_offset in [0,1], etc.
-
-    If multiple signals exist, we find min and max of 'center_frequencies' (plus margin).
+      1) Bandpass filters and downconverts the signal (later in the model)
+      2) Builds a YOLO label [S, B, (1+1+NUM_CLASSES)] with normalized frequency offsets.
+      
+    This version additionally computes the Fourier transform (using np.fft.rfft)
+    of the IQ data so that a frequency–domain representation is available for the model.
     """
-
     def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
         self.transform = transform
 
-        # Gather all .sigmf-data files in this directory
+        # Gather all .sigmf-data files in this directory.
         self.files = [
             fname.replace(".sigmf-data", "")
             for fname in os.listdir(directory)
@@ -39,11 +38,11 @@ class WidebandYoloDataset(Dataset):
         if len(self.files) == 0:
             raise RuntimeError(f"No .sigmf-data files found in {directory}!")
 
-        # Build a label -> index mapping for classes
+        # Build a label -> index mapping for classes.
         self.class_list = self._discover_mod_classes()
         self.class_to_idx = {c: i for i, c in enumerate(self.class_list)}
 
-        # Determine num_samples from the first file
+        # Determine num_samples from the first file.
         self.num_samples = self._find_num_samples(self.files[0])
 
     def _discover_mod_classes(self):
@@ -67,7 +66,7 @@ class WidebandYoloDataset(Dataset):
         data_path = os.path.join(self.directory, base + ".sigmf-data")
         with open(data_path, "rb") as f:
             iq_data = np.load(f)
-        return len(iq_data)//2
+        return len(iq_data) // 2
 
     def get_num_samples(self):
         return self.num_samples
@@ -80,65 +79,60 @@ class WidebandYoloDataset(Dataset):
         data_path = os.path.join(self.directory, base + ".sigmf-data")
         meta_path = os.path.join(self.directory, base + ".sigmf-meta")
 
-        # Load IQ
+        # Load IQ data (time domain)
         with open(data_path, "rb") as f:
             iq_data = np.load(f)
         I = iq_data[0::2]
         Q = iq_data[1::2]
-        x_complex = I + 1j*Q
+        x_complex = I + 1j * Q
 
-        # Load metadata
+        # Compute Fourier transform (using rfft to return nonnegative frequencies)
+        x_fft = np.fft.rfft(x_complex)  # shape: (N_rfft,)
+        # Stack real and imaginary parts (resulting shape: (2, N_rfft))
+        x_freq = np.stack([x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0)
+
+        # Load metadata.
         with open(meta_path, "r") as f:
             meta = json.load(f)
         ann = meta["annotations"]
-        
         snr_value = ann[1]["channel"]["snr"]
         center_freqs = ann[0]["center_frequencies"]
         mod_list = ann[0]["rfml_labels"]["modclass"]
         if isinstance(mod_list, str):
             mod_list = [mod_list]
-        if isinstance(center_freqs, (float,int)):
+        if isinstance(center_freqs, (float, int)):
             center_freqs = [center_freqs]
             
-        # convert to real 2xN
+        # Convert to real time-domain IQ: shape (2, N)
         x_real = x_complex.real.astype(np.float32)
         x_imag = x_complex.imag.astype(np.float32)
-        
         x_wide = np.stack([x_real, x_imag], axis=0)  # shape (2, N)
 
-        # optional transform
         if self.transform:
             x_wide = self.transform(x_wide)
+            # Optionally transform x_freq as well, if needed.
 
-        # 4) Build YOLO label => shape [S, B, 1+1+NUM_CLASSES]
-        #   But now we treat freq offsets relative to c_mid
+        # Build YOLO label: shape [S, B, 1+1+NUM_CLASSES]
         label_tensor = np.zeros((S, B, 1 + 1 + NUM_CLASSES), dtype=np.float32)
-
         for c_freq, m_str in zip(center_freqs, mod_list):
-            # 1) Normalize frequency
-            freq_norm = c_freq / (SAMPLING_FREQUENCY / 2) # in [0, 1] if your c_freq <= FREQ_MAX. Assuming Nyquist: Fmax <= Sampling_Freq / 2.
-
-            # 2) find which cell
+            # Normalize frequency.
+            freq_norm = c_freq / (SAMPLING_FREQUENCY / 2)  # in [0, 1]
             cell_idx = int(freq_norm * S)
             if cell_idx >= S:
-                cell_idx = S - 1  # clamp
-
-            # 3) offset in [0,1]
+                cell_idx = S - 1
             x_offset = (freq_norm * S) - cell_idx
-            if x_offset < 0: 
-                x_offset = 0.0
-            if x_offset > 1: 
-                x_offset = 1.0
-
-            # 4) fill YOLO label at (cell_idx, b)
+            x_offset = np.clip(x_offset, 0.0, 1.0)
             for b_i in range(B):
-                # if no object assigned yet
                 if label_tensor[cell_idx, b_i, 1] == 0.0:
-                    label_tensor[cell_idx, b_i, 0] = x_offset  # store offset 
-                    label_tensor[cell_idx, b_i, 1] = 1.0       # confidence=1
+                    label_tensor[cell_idx, b_i, 0] = x_offset
+                    label_tensor[cell_idx, b_i, 1] = 1.0
                     class_idx = self.class_to_idx.get(m_str, None)
                     if class_idx is not None:
                         label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0
                     break
 
-        return torch.tensor(x_wide), torch.tensor(label_tensor), torch.tensor(snr_value, dtype=torch.float32)
+        # Return time-domain IQ, frequency-domain representation, label, and SNR.
+        return (torch.tensor(x_wide),
+                torch.tensor(x_freq),
+                torch.tensor(label_tensor),
+                torch.tensor(snr_value, dtype=torch.float32))
