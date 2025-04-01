@@ -45,7 +45,7 @@ NUMTAPS = 101 # Number of taps for the filter - Higher number of taps means bett
 #####################
 # Model Parameters
 #####################
-S = 4               # Number of grid cells
+S = 8               # Number of grid cells
 B = 2                # Boxes per cell
 NUM_CLASSES = 9      # Number of classes
 
@@ -59,8 +59,8 @@ LEARNING_RATE = 0.001
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 15.0       # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 1.0       # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 5.0       # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 0.5       # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0       # Weight for classification loss
     
 
