@@ -356,5 +356,5 @@ class WidebandYoloLoss(nn.Module):
         class_diff = (class_pred - class_tgt)**2
         class_loss = LAMBDA_CLASS * torch.sum(obj_mask.unsqueeze(-1) * class_diff)
 
-        total_loss = coord_loss + conf_loss_obj + conf_loss_noobj + class_loss
+        total_loss = coord_loss # + conf_loss_obj + conf_loss_noobj + class_loss
         return total_loss / batch_size
