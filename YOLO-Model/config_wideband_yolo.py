@@ -52,9 +52,9 @@ NUM_CLASSES = 9      # Number of classes
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 16
-EPOCHS = 20
-LEARNING_RATE = 0.0001
+BATCH_SIZE = 64
+EPOCHS = 50
+LEARNING_RATE = 0.0005
 
 ########################
 # Loss Function Weights

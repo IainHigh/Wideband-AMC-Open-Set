@@ -288,6 +288,7 @@ class WidebandYoloModel(nn.Module):
         alpha = (M - 1) / 2.0
         n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha
         h_lp = build_lowpass_filter(cutoff_hz=BAND_MARGIN, fs=SAMPLING_FREQUENCY, num_taps=NUMTAPS, window="kaiser")
+        h_lp = h_lp.to(x_flat.device)
         h_lp = h_lp.unsqueeze(0)
         f0 = freq_flat.view(N, 1)
         cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
