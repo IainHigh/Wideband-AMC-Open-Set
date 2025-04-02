@@ -279,7 +279,7 @@ def test_model(model, test_loader, device):
     snr_freq_err = {}
 
     with torch.no_grad():
-        for time_data, freq_data, label_tensor, _ in tqdm(test_loader, desc=f"Testing on test set"):
+        for time_data, freq_data, label_tensor, snr_tensor in tqdm(test_loader, desc=f"Testing on test set"):
             time_data = time_data.to(device)
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)

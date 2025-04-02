@@ -1,6 +1,6 @@
 # TODO:
 
-- Try asking ChatGPT for methods to increase the accuracy and decrease the loss of the model.
+- Get the center_frequency prediction working better, comment out other parts of the loss function and only use the center_frequency loss. This should be a simple fix, just need to comment out the other parts of the loss function. This is required for accurate detection of the class.
 
 1. Get it functional - Ensure that the loss and frequency_err are both decreasing and the classification accuracy is increasing. Should be aiming for a classification accuracy of at least 60% across all SNR values.
 1. Try it with more realistic data generation - see frequencies used for long wave RF communication and use them.
