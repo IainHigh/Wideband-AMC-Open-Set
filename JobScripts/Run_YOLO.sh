@@ -28,5 +28,18 @@ module load anaconda
 # Activate the anaconda environment
 source activate mypython
 
+if true ; then
+    # Remove the old dataset
+    rm -rf /exports/eddie/scratch/s2062378/data/*
+    rmdir /exports/eddie/scratch/s2062378/data/training
+    rmdir /exports/eddie/scratch/s2062378/data/validation
+    rmdir /exports/eddie/scratch/s2062378/data/testing
+
+    # Create a new dataset
+    python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/configs/training_set.json 2025
+    python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/configs/validation_set.json 2026
+    python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/configs/testing_set.json 2027
+fi
+
 # Run the program
 python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/YOLO-Model/main.py
