@@ -23,6 +23,8 @@ from config_wideband_yolo import (
     EPOCHS,
     LEARNING_RATE,
     VAL_PRINT_SAMPLES,
+    SAMPLING_FREQUENCY,
+    S,
     PRINT_CONFIG_FILE,
     print_config_file,
 )
@@ -226,7 +228,9 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
-                        x_p   = x_pred[i, s_idx, b_idx].item()   # raw freq
+                        x_p = x_pred[i, s_idx, b_idx].item()   # x_offset [0,1]
+                        x_p = (s_idx * SAMPLING_FREQUENCY / S) + x_p * (SAMPLING_FREQUENCY / S) # raw frequency value.
+                        
                         conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
@@ -235,6 +239,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
+                            x_g = (s_idx * SAMPLING_FREQUENCY / S) + x_g * (SAMPLING_FREQUENCY / S) # raw frequency value.
                             cls_g= true_class_idx[i, s_idx, b_idx].item()
                             gt_list.append((x_g, cls_g))
 
