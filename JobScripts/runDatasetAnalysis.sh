@@ -25,10 +25,10 @@ module load anaconda
 source activate mypython
 
 # Run the dataset generation program
-python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py ./configs/testing_set.json
+# python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py ./configs/testing_set.json
 
 # Run the dataset analysis program
 python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/tests/plot_dataset.py
 
 # Remove the default dataset generated
-rm -rf "/exports/eddie/scratch/s2062378/data"
+# rm -rf "/exports/eddie/scratch/s2062378/data"
