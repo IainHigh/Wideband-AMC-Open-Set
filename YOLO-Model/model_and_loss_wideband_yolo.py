@@ -162,17 +162,17 @@ class WidebandYoloModel(nn.Module):
         # New Time–Frequency branch: now takes precomputed frequency data.
         # The dataset returns x_freq of shape (batch, 2, N_rfft). We compute the magnitude.
         self.tf_branch = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=(3, 1), stride=1, padding=(1,0)),  # change kernel size to (3,1)
+            nn.Conv2d(1, 8, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.BatchNorm2d(8),
             nn.ReLU(),
-            nn.MaxPool2d((2, 1)),  # pool only along frequency axis
-            nn.Conv2d(8, 16, kernel_size=(3, 1), stride=1, padding=(1,0)),  # change kernel size to (3,1)
+            nn.MaxPool2d((2, 1)),  # pool along frequency axis; keeps the time dimension intact
+            nn.Conv2d(8, 16, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.BatchNorm2d(16),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1))
+            nn.AdaptiveAvgPool2d((4, 1))  # preserve 4 frequency bins instead of collapsing completely
         )
-        # Project the TF branch output to a feature vector of size 32.
-        self.tf_fc = nn.Linear(16, 32)
+        # Update the linear projection to reflect the increased flattened size (16 channels * 4 bins = 64)
+        self.tf_fc = nn.Linear(16 * 4, 32)
         
         # Combine time-domain (96) and TF branch (32) features = 128.
         self.freq_predictor = nn.Linear(128, S * B)
@@ -228,13 +228,14 @@ class WidebandYoloModel(nn.Module):
         # x_freq is [bsz, 2, N_rfft]; compute magnitude and reshape to (bsz, 1, N_rfft, 1)
         spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
         spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
-        tf_features = self.tf_branch(spec)        # [bsz, 16, 1, 1]
-        tf_features = tf_features.view(bsz, -1)    # [bsz, 16]
+        tf_features = self.tf_branch(spec)         # [bsz, 16, 4, 1]
+        tf_features = tf_features.view(bsz, -1)     # [bsz, 16*4 = 64]
         tf_features = self.tf_fc(tf_features)       # [bsz, 32]
         
         # Combine features from both branches.
-        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
+        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 96+32 = 128]
         coarse_freq_pred_unnorm = self.freq_predictor(combined_features)  # [bsz, S*B]
+
         coarse_freq_pred = torch.sigmoid(coarse_freq_pred_unnorm)         # in [0,1]
         coarse_freq_pred = coarse_freq_pred.view(bsz, S, B)                # [bsz, S, B]
         
@@ -356,5 +357,5 @@ class WidebandYoloLoss(nn.Module):
         class_diff = (class_pred - class_tgt)**2
         class_loss = LAMBDA_CLASS * torch.sum(obj_mask.unsqueeze(-1) * class_diff)
 
-        total_loss =  conf_loss_noobj + class_loss # coord_loss + conf_loss_obj +
+        total_loss =  coord_loss + conf_loss_obj + conf_loss_noobj + class_loss
         return total_loss / batch_size
