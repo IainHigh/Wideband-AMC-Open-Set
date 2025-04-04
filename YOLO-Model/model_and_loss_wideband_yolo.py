@@ -169,6 +169,12 @@ class WidebandYoloModel(nn.Module):
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         
