@@ -118,17 +118,6 @@ class ResidualBlock(nn.Module):
 # WidebandYoloModel
 ################################################################################
 class WidebandYoloModel(nn.Module):
-    """
-    Two-stage YOLO approach:
-      Stage-1: Predict S*B frequency offsets in [0,1] using a dual-branch network.
-               One branch processes time-domain features; the new branch uses the precomputed
-               frequency–domain representation for enhanced frequency localization.
-               A refinement branch further corrects the coarse predictions.
-      Stage-2: For each predicted box, downconvert the input signal and extract features
-               for confidence and classification.
-               
-    The final YOLO output is [batch, S, B*(1+1+NUM_CLASSES)].
-    """
     def __init__(self, num_samples):
         super().__init__()
         self.num_samples = num_samples
@@ -159,25 +148,32 @@ class WidebandYoloModel(nn.Module):
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         
-        # New Time–Frequency branch: now takes precomputed frequency data.
-        # The dataset returns x_freq of shape (batch, 2, N_rfft). We compute the magnitude.
+        # Time–Frequency branch (unchanged from your updated version)
         self.tf_branch = nn.Sequential(
             nn.Conv2d(1, 8, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.BatchNorm2d(8),
             nn.ReLU(),
-            nn.MaxPool2d((2, 1)),  # pool along frequency axis; keeps the time dimension intact
+            nn.MaxPool2d((2, 1)),
             nn.Conv2d(8, 16, kernel_size=(3, 1), stride=1, padding=(1, 0)),
             nn.BatchNorm2d(16),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((4, 1))  # preserve 4 frequency bins instead of collapsing completely
+            nn.AdaptiveAvgPool2d((4, 1))
         )
-        # Update the linear projection to reflect the increased flattened size (16 channels * 4 bins = 64)
         self.tf_fc = nn.Linear(16 * 4, 32)
         
-        # Combine time-domain (96) and TF branch (32) features = 128.
+        # -----------------------
+        # Dynamic Anchor Setup
+        # Instead of predicting the coarse frequency directly in [0,1],
+        # we define a learnable anchor for each grid cell and box.
+        # Here, we initialize anchors uniformly within the cell (e.g. between 0.25 and 0.75).
+        self.anchor_offsets = nn.Parameter(
+            torch.linspace(0.25, 0.75, steps=B).unsqueeze(0).repeat(S, 1)
+        )  # shape: [S, B]
+        
+        # Frequency predictor now predicts a delta relative to the anchor.
         self.freq_predictor = nn.Linear(128, S * B)
         
-        # Refinement branch for frequency correction.
+        # Refinement branch (unchanged structure)
         self.refinement_branch = nn.Sequential(
             nn.Conv1d(2, 16, kernel_size=5, stride=2, padding=2),
             nn.ReLU(),
@@ -208,46 +204,42 @@ class WidebandYoloModel(nn.Module):
         self.conf_class_predictor = nn.Linear(96, 1 + NUM_CLASSES)
 
     def forward(self, x_time, x_freq):
-        """
-        x_time: [batch, 2, num_samples] (time-domain IQ)
-        x_freq: [batch, 2, N_rfft] (frequency-domain representation, e.g. from np.fft.rfft)
-        
-        Returns final YOLO output: [batch, S, B*(1+1+NUM_CLASSES)]
-        """
         bsz = x_time.size(0)
         # -----------------------
         # Stage-1: Coarse Frequency Prediction
         # -----------------------
-        # Time-domain branch.
-        h1 = self.first_conv(x_time)          # [bsz, 32, T1]
-        h1 = self.stage1_blocks(h1)             # [bsz, 96, T1']
-        h1 = self.pool_1(h1).squeeze(-1)        # [bsz, 96]
+        # Process time-domain branch.
+        h1 = self.first_conv(x_time)
+        h1 = self.stage1_blocks(h1)
+        h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
         
-        # Time–Frequency branch: use provided frequency data.
-        # Compute the magnitude spectrum.
-        # x_freq is [bsz, 2, N_rfft]; compute magnitude and reshape to (bsz, 1, N_rfft, 1)
+        # Process time–frequency branch.
         spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
         spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
         tf_features = self.tf_branch(spec)         # [bsz, 16, 4, 1]
-        tf_features = tf_features.view(bsz, -1)     # [bsz, 16*4 = 64]
+        tf_features = tf_features.view(bsz, -1)     # [bsz, 64]
         tf_features = self.tf_fc(tf_features)       # [bsz, 32]
         
-        # Combine features from both branches.
-        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 96+32 = 128]
-        coarse_freq_pred_unnorm = self.freq_predictor(combined_features)  # [bsz, S*B]
-
-        coarse_freq_pred = torch.sigmoid(coarse_freq_pred_unnorm)         # in [0,1]
-        coarse_freq_pred = coarse_freq_pred.view(bsz, S, B)                # [bsz, S, B]
+        # Combine features.
+        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
         
-        # Refinement branch: compute correction delta from raw IQ.
-        refine_feat = self.refinement_branch(x_time)  # [bsz, 32, 1]
-        refine_feat = refine_feat.squeeze(-1)         # [bsz, 32]
-        delta = self.refine_fc(refine_feat)             # [bsz, S*B]
-        delta = 0.1 * torch.tanh(delta)                 # constrain correction to [-0.1, 0.1]
-        delta = delta.view(bsz, S, B)
+        # Predict delta relative to the anchor.
+        raw_delta = self.freq_predictor(combined_features)  # [bsz, S*B]
+        raw_delta = raw_delta.view(bsz, S, B)
+        # Constrain the predicted delta to a reasonable range.
+        delta_coarse = 0.5 * torch.tanh(raw_delta)  # now in [-0.5, 0.5]
+        # Add the learned anchor offsets (expanded to the batch dimension).
+        coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
+        
+        # Refinement branch.
+        refine_feat = self.refinement_branch(x_time)
+        refine_feat = refine_feat.squeeze(-1)
+        refine_delta = self.refine_fc(refine_feat)
+        refine_delta = 0.1 * torch.tanh(refine_delta)
+        refine_delta = refine_delta.view(bsz, S, B)
         
         # Final frequency prediction.
-        freq_pred = torch.clamp(coarse_freq_pred + delta, 0.0, 1.0)  # [bsz, S, B]
+        freq_pred = torch.clamp(coarse_freq_pred + refine_delta, 0.0, 1.0)  # [bsz, S, B]
         
         # Convert normalized offsets to raw frequencies for downconversion.
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
@@ -255,25 +247,20 @@ class WidebandYoloModel(nn.Module):
         freq_pred_flat = freq_pred_raw.view(bsz * S * B)
         
         # -----------------------
-        # Stage-2: Downconversion and Classification (uses time-domain signal only)
+        # Stage-2: Downconversion and Classification (unchanged)
         # -----------------------
-        # Replicate x_time for each bounding box.
         x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
         
-        # Apply the fixed lowpass filter.
         x_filt = self._filter_raw(x_rep, freq_pred_flat)
-        # Downconvert using the raw frequency predictions.
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
         
-        # Extract features for confidence and classification.
-        h2 = self.second_conv(x_base)              # [bsz*S*B, 32, T2]
-        h2 = self.stage2_blocks(h2)                 # [bsz*S*B, 96, T2']
-        h2 = self.pool_2(h2).squeeze(-1)            # [bsz*S*B, 96]
-        out_conf_class = self.conf_class_predictor(h2)  # [bsz*S*B, 1+NUM_CLASSES]
+        h2 = self.second_conv(x_base)
+        h2 = self.stage2_blocks(h2)
+        h2 = self.pool_2(h2).squeeze(-1)
+        out_conf_class = self.conf_class_predictor(h2)
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
         
-        # Merge frequency prediction with confidence and class outputs.
         final_out = torch.zeros(bsz, S, B, (1 + 1 + NUM_CLASSES),
                                   dtype=out_conf_class.dtype,
                                   device=out_conf_class.device)
