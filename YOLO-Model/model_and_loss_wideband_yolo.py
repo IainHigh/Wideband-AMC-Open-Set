@@ -137,6 +137,32 @@ class WidebandYoloModel(nn.Module):
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         
@@ -176,7 +202,7 @@ class WidebandYoloModel(nn.Module):
         self.refine_fc = nn.Linear(32, S * B)
         
         # -----------------------
-        # Stage-2: Confidence and Classification
+        # Stage-2: Confidence and Classification (unchanged)
         # -----------------------
         self.second_conv = nn.Sequential(
             nn.Conv1d(2, 32, kernel_size=8, stride=2),
@@ -186,6 +212,14 @@ class WidebandYoloModel(nn.Module):
         )
         self.stage2_blocks = nn.Sequential(
             ResidualBlock(32, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
+            ResidualBlock(96, 96),
             ResidualBlock(96, 96),
         )
         self.pool_2 = nn.AdaptiveAvgPool1d(1)
