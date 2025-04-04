@@ -165,9 +165,9 @@ class WidebandYoloModel(nn.Module):
         # Dynamic Anchor Setup
         # Instead of predicting the coarse frequency directly in [0,1],
         # we define a learnable anchor for each grid cell and box.
-        # Here, we initialize anchors uniformly within the cell (e.g. between 0.25 and 0.75).
+        # Here, we initialize anchors uniformly within the cells.
         self.anchor_offsets = nn.Parameter(
-            torch.linspace(-1.0, 2.0, steps=B).unsqueeze(0).repeat(S, 1)
+            torch.linspace(0.0, 1.0, steps=B).unsqueeze(0).repeat(S, 1)
         )  # shape: [S, B]
         
         # Frequency predictor now predicts a delta relative to the anchor.

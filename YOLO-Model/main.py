@@ -7,7 +7,6 @@ import json
 import time
 import sys
 import os
-import glob
 import random
 import torch.optim as optim
 import matplotlib.pyplot as plt
@@ -29,7 +28,7 @@ from config_wideband_yolo import (
     print_config_file,
 )
 
-MIN_CONFIDENCE = 0.25
+
 
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
@@ -115,7 +114,7 @@ def main():
         print("")
 
     print("Training complete.")
-    
+
     # 4) Test the model
     test_model(model, test_loader, device)
 
@@ -124,11 +123,9 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     total_train_loss = 0.0
 
     # For metrics:
-    tp_count = 0    # true positives (both prediction and ground truth > threshold)
-    fp_count = 0    # false positives (predicted > threshold but no object in ground truth)
-    fn_count = 0    # false negatives (object in ground truth but predicted <= threshold)
-    sum_freq_err_tp = 0.0  # frequency error for true positives
-    correct_cls_tp = 0     # classification correct count for true positives
+    train_obj_count = 0
+    train_correct_cls = 0
+    train_sum_freq_err = 0.0
 
     for time_data, freq_data, label_tensor, _ in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
         time_data = time_data.to(device)
@@ -142,51 +139,38 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         optimizer.step()
         total_train_loss += loss.item()
 
-        # Reshape prediction.
+        # Additional training metrics
         bsize = pred.shape[0]
         pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
-        x_pred     = pred_reshape[..., 0]  # predicted frequency (normalized)
-        conf_pred  = pred_reshape[..., 1]  # predicted confidence
+        x_pred     = pred_reshape[..., 0]
         class_pred = pred_reshape[..., 2:]
 
-        x_tgt    = label_tensor[..., 0]    # ground truth frequency (normalized)
-        conf_tgt = label_tensor[..., 1]    # ground truth confidence (0 or 1 typically)
-        class_tgt= label_tensor[..., 2:]
+        x_tgt      = label_tensor[..., 0]
+        conf_tgt   = label_tensor[..., 1]
+        class_tgt  = label_tensor[..., 2:]
 
-        # Define masks for evaluation:
-        # TP: both predicted and gt confidence above MIN_CONFIDENCE.
-        # FP: predicted above threshold, but gt not (i.e. false alarm).
-        # FN: ground truth above threshold but prediction is below threshold.
-        tp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-        fp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt <= MIN_CONFIDENCE)
-        fn_mask = (conf_pred <= MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-
-        # Count the number of objects for each.
-        tp_batch = tp_mask.sum().item()
-        fp_batch = fp_mask.sum().item()
-        fn_batch = fn_mask.sum().item()
-
-        tp_count += tp_batch
-        fp_count += fp_batch
-        fn_count += fn_batch
-
-        # Frequency error only for true positives.
+        obj_mask = (conf_tgt > 0)
         freq_err = torch.abs(x_pred - x_tgt)
-        sum_freq_err_tp += freq_err[tp_mask].sum().item()
 
-        # For classification: only count the ones that are TP.
         pred_class_idx = torch.argmax(class_pred, dim=-1)
         true_class_idx = torch.argmax(class_tgt, dim=-1)
-        correct_tp = ((pred_class_idx == true_class_idx) & tp_mask).sum().item()
-        correct_cls_tp += correct_tp
+
+        batch_obj_count   = obj_mask.sum().item()
+        batch_sum_freq_err= freq_err[obj_mask].sum().item()
+        correct_cls_mask  = (pred_class_idx == true_class_idx)
+        batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+
+        train_obj_count     += batch_obj_count
+        train_sum_freq_err  += batch_sum_freq_err
+        train_correct_cls   += batch_correct_cls
 
     avg_train_loss = total_train_loss / len(train_loader)
-    train_mean_freq_err = (sum_freq_err_tp / tp_count) if tp_count > 0 else 0.0
-    train_cls_accuracy = 100.0 * (correct_cls_tp / tp_count) if tp_count > 0 else 0.0
-    fp_percentage = 100.0 * (fp_count / (tp_count + fp_count)) if (tp_count + fp_count) > 0 else 0.0
-    fn_percentage = 100.0 * (fn_count / (tp_count + fn_count)) if (tp_count + fn_count) > 0 else 0.0
-
-    print(f"Train TP count: {tp_count}, FP count: {fp_count} ({fp_percentage:.2f}%), FN count: {fn_count} ({fn_percentage:.2f}%)")
+    if train_obj_count > 0:
+        train_mean_freq_err = train_sum_freq_err / train_obj_count
+        train_cls_accuracy  = 100.0 * (train_correct_cls / train_obj_count)
+    else:
+        train_mean_freq_err = 0.0
+        train_cls_accuracy  = 0.0
 
     return model, avg_train_loss, train_mean_freq_err, train_cls_accuracy
 
@@ -194,11 +178,9 @@ def validate_model(model, val_loader, device, criterion, epoch):
     model.eval()
     total_val_loss = 0.0
 
-    tp_count = 0
-    fp_count = 0
-    fn_count = 0
-    sum_freq_err_tp = 0.0
-    correct_cls_tp = 0
+    val_obj_count = 0
+    val_correct_cls = 0
+    val_sum_freq_err = 0.0
 
     val_frames = []
 
@@ -214,78 +196,90 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             bsize = pred.shape[0]
             pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
+
             x_pred     = pred_reshape[..., 0]
             conf_pred  = pred_reshape[..., 1]
             class_pred = pred_reshape[..., 2:]
 
-            x_tgt    = label_tensor[..., 0]
-            conf_tgt = label_tensor[..., 1]
-            class_tgt= label_tensor[..., 2:]
+            x_tgt      = label_tensor[..., 0]
+            conf_tgt   = label_tensor[..., 1]
+            class_tgt  = label_tensor[..., 2:]
 
-            tp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-            fp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt <= MIN_CONFIDENCE)
-            fn_mask = (conf_pred <= MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-
-            tp_batch = tp_mask.sum().item()
-            fp_batch = fp_mask.sum().item()
-            fn_batch = fn_mask.sum().item()
-
-            tp_count += tp_batch
-            fp_count += fp_batch
-            fn_count += fn_batch
-
+            obj_mask = (conf_tgt > 0)
             freq_err = torch.abs(x_pred - x_tgt)
-            sum_freq_err_tp += freq_err[tp_mask].sum().item()
 
             pred_class_idx = torch.argmax(class_pred, dim=-1)
             true_class_idx = torch.argmax(class_tgt, dim=-1)
-            correct_tp = ((pred_class_idx == true_class_idx) & tp_mask).sum().item()
-            correct_cls_tp += correct_tp
 
-            # For printing frames (only include boxes with predicted conf > MIN_CONFIDENCE)
+            # For metric sums
+            batch_obj_count   = obj_mask.sum().item()
+            batch_sum_freq_err= freq_err[obj_mask].sum().item()
+            correct_cls_mask  = (pred_class_idx == true_class_idx)
+            batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+
+            val_obj_count     += batch_obj_count
+            val_sum_freq_err  += batch_sum_freq_err
+            val_correct_cls   += batch_correct_cls
+
+            # For printing the results in a "frame" manner:
+            # We group each sample in this batch separately.
             for i in range(bsize):
                 pred_list = []
                 gt_list   = []
+
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
-                        x_p = x_pred[i, s_idx, b_idx].item()
-                        # convert normalized offset to raw frequency value.
-                        x_p = (s_idx * SAMPLING_FREQUENCY / S) + x_p * (SAMPLING_FREQUENCY / S)
-                        conf_val = conf_pred[i, s_idx, b_idx].item()
+                        x_p = x_pred[i, s_idx, b_idx].item()   # x_offset [0,1]
+                        x_p = (s_idx * SAMPLING_FREQUENCY / S) + x_p * (SAMPLING_FREQUENCY / S) # raw frequency value.
+
+                        conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
-                        if conf_val > MIN_CONFIDENCE:
-                            pred_list.append((x_p, cls_p, conf_val))
+                        if conf > 0.2:
+                            pred_list.append((x_p, cls_p, conf))
+
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
-                            x_g = (s_idx * SAMPLING_FREQUENCY / S) + x_g * (SAMPLING_FREQUENCY / S)
-                            cls_g = true_class_idx[i, s_idx, b_idx].item()
+                            x_g = (s_idx * SAMPLING_FREQUENCY / S) + x_g * (SAMPLING_FREQUENCY / S) # raw frequency value.
+                            cls_g= true_class_idx[i, s_idx, b_idx].item()
                             gt_list.append((x_g, cls_g))
+
+                # sort by conf desc
                 pred_list.sort(key=lambda tup: tup[2], reverse=True)
-                frame_dict = {"pred_list": pred_list, "gt_list": gt_list}
+
+                frame_dict = {
+                    "pred_list": pred_list,
+                    "gt_list":   gt_list
+                }
                 val_frames.append(frame_dict)
 
     avg_val_loss = total_val_loss / len(val_loader)
-    val_mean_freq_err = (sum_freq_err_tp / tp_count) if tp_count > 0 else 0.0
-    val_cls_accuracy  = 100.0 * (correct_cls_tp / tp_count) if tp_count > 0 else 0.0
-    fp_percentage = 100.0 * (fp_count / (tp_count + fp_count)) if (tp_count + fp_count) > 0 else 0.0
-    fn_percentage = 100.0 * (fn_count / (tp_count + fn_count)) if (tp_count + fn_count) > 0 else 0.0
-
-    print(f"Val TP count: {tp_count}, FP count: {fp_count} ({fp_percentage:.2f}%), FN count: {fn_count} ({fn_percentage:.2f}%)")
+    if val_obj_count > 0:
+        val_mean_freq_err = val_sum_freq_err / val_obj_count
+        val_cls_accuracy  = 100.0 * (val_correct_cls / val_obj_count)
+    else:
+        val_mean_freq_err = 0.0
+        val_cls_accuracy  = 0.0
 
     return avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames
 
 def test_model(model, test_loader, device):
-    model.eval()
-    total_tp = 0
-    total_fp = 0
-    total_fn = 0
-    total_freq_err_tp = 0.0
-    total_correct_cls = 0
+    """
+    1) Test the model on the test set, gather classification accuracy, freq error, etc.
+    2) Also compute these metrics per SNR
+    3) Plot confusion matrix of classification
+    """
 
+    model.eval()
+    total_obj_count = 0
+    total_correct_cls = 0
+    total_freq_err = 0.0
+
+    # For confusion matrix
     overall_true_classes = []
     overall_pred_classes = []
 
+    # For per-SNR stats
     snr_obj_count = {}
     snr_correct_cls = {}
     snr_freq_err = {}
@@ -295,87 +289,98 @@ def test_model(model, test_loader, device):
             time_data = time_data.to(device)
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)
-            pred = model(time_data, freq_data)
+            pred = model(time_data, freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
 
+            # reshape
             bsize = pred.shape[0]
-            Sdim = pred.shape[1]
-            pred_reshape = pred.view(bsize, Sdim, -1, (1+1+NUM_CLASSES))
-            x_pred     = pred_reshape[..., 0]
-            conf_pred  = pred_reshape[..., 1]
+            Sdim = pred.shape[1]  # should be S
+            # interpret bounding boxes
+            pred_reshape = pred.view(bsize, Sdim, -1,  (1+1+NUM_CLASSES))
+
+            x_pred     = pred_reshape[..., 0]  # [bsize, S, B]
             class_pred = pred_reshape[..., 2:]
 
             x_tgt      = label_tensor[..., 0]
             conf_tgt   = label_tensor[..., 1]
             class_tgt  = label_tensor[..., 2:]
 
-            tp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-            fp_mask = (conf_pred > MIN_CONFIDENCE) & (conf_tgt <= MIN_CONFIDENCE)
-            fn_mask = (conf_pred <= MIN_CONFIDENCE) & (conf_tgt > MIN_CONFIDENCE)
-
-            tp_batch = tp_mask.sum().item()
-            fp_batch = fp_mask.sum().item()
-            fn_batch = fn_mask.sum().item()
-
-            total_tp += tp_batch
-            total_fp += fp_batch
-            total_fn += fn_batch
-
+            # object mask
+            obj_mask = (conf_tgt > 0)
             freq_err = torch.abs(x_pred - x_tgt)
-            total_freq_err_tp += freq_err[tp_mask].sum().item()
 
-            pred_class_idx = torch.argmax(class_pred, dim=-1)
+            # predicted vs. true class => argmax
+            pred_class_idx = torch.argmax(class_pred, dim=-1)  # [bsize, S, B]
             true_class_idx = torch.argmax(class_tgt, dim=-1)
-            correct_tp = ((pred_class_idx == true_class_idx) & tp_mask).sum().item()
-            total_correct_cls += correct_tp
 
-            # Confusion matrix collection (only for boxes above threshold)
-            pred_class_flat = pred_class_idx[tp_mask].cpu().numpy()
-            true_class_flat = true_class_idx[tp_mask].cpu().numpy()
+            # Now we accumulate stats for each bounding box with obj_mask=1
+            batch_obj_count = obj_mask.sum().item()
+            batch_sum_freq_err = freq_err[obj_mask].sum().item()
+            correct_cls_mask = (pred_class_idx == true_class_idx)
+            batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+
+            total_obj_count    += batch_obj_count
+            total_freq_err     += batch_sum_freq_err
+            total_correct_cls  += batch_correct_cls
+
+            # For confusion matrix, we flatten the bounding boxes => 
+            # we only consider those bounding boxes with obj_mask=1
+            # then we gather pred_class_idx[obj_mask] and true_class_idx[obj_mask]
+            # convert to CPU
+            pred_class_flat = pred_class_idx[obj_mask].cpu().numpy()
+            true_class_flat = true_class_idx[obj_mask].cpu().numpy()
             overall_true_classes.extend(true_class_flat.tolist())
             overall_pred_classes.extend(pred_class_flat.tolist())
 
-            # Per-SNR evaluation.
-            snrs = snr_tensor.numpy()
+            # Now do per-SNR
+            # We have a single snr per "sample" => shape [bsize]
+            # but we have multiple bounding boxes => we can count them all with that same SNR
+            snrs = snr_tensor.numpy()  # shape [bsize]
             for i in range(bsize):
                 sample_snr = snrs[i]
-                sample_mask = tp_mask[i]  # using only TP for classification metrics
-                sample_tp = sample_mask.sum().item()
-                if sample_tp > 0:
-                    sample_freq_err = freq_err[i][sample_mask].sum().item()
-                    sample_correct = ((pred_class_idx[i] == true_class_idx[i]) & sample_mask).sum().item()
+                # bounding boxes belonging to sample i => obj_mask[i]
+                # gather # of obj_mask=1 in that sample
+                sample_obj_mask = obj_mask[i]  # shape [S, B]
+                sample_obj_count = sample_obj_mask.sum().item()
+                if sample_obj_count > 0:
+                    sample_freq_err = freq_err[i][sample_obj_mask].sum().item()
+                    sample_correct_cls = correct_cls_mask[i][sample_obj_mask].sum().item()
+
                     if sample_snr not in snr_obj_count:
                         snr_obj_count[sample_snr] = 0
                         snr_correct_cls[sample_snr] = 0
                         snr_freq_err[sample_snr] = 0.0
-                    snr_obj_count[sample_snr] += sample_tp
-                    snr_correct_cls[sample_snr] += sample_correct
-                    snr_freq_err[sample_snr] += sample_freq_err
 
-    overall_cls_acc = 100.0 * (total_correct_cls / total_tp) if total_tp > 0 else 0.0
-    overall_freq_err = total_freq_err_tp / total_tp if total_tp > 0 else 0.0
-    fp_percentage = 100.0 * (total_fp / (total_tp + total_fp)) if (total_tp + total_fp) > 0 else 0.0
-    fn_percentage = 100.0 * (total_fn / (total_tp + total_fn)) if (total_tp + total_fn) > 0 else 0.0
+                    snr_obj_count[sample_snr]   += sample_obj_count
+                    snr_correct_cls[sample_snr] += sample_correct_cls
+                    snr_freq_err[sample_snr]    += sample_freq_err
+
+    # 1) Overall
+    if total_obj_count > 0:
+        overall_cls_acc = 100.0 * total_correct_cls / total_obj_count
+        overall_freq_err= total_freq_err / total_obj_count
+    else:
+        overall_cls_acc = 0.0
+        overall_freq_err= 0.0
 
     print("\n=== TEST SET RESULTS ===")
-    print(f"Overall TP count: {total_tp}")
-    print(f"Overall Classification Accuracy (TP only): {overall_cls_acc:.2f}%")
-    print(f"Overall Mean Frequency Error (TP only): {overall_freq_err:.4f}")
-    print(f"False Positives: {total_fp} ({fp_percentage:.2f}%)")
-    print(f"False Negatives: {total_fn} ({fn_percentage:.2f}%)")
+    print(f"Overall bounding boxes: {total_obj_count}")
+    print(f"Classification Accuracy (overall): {overall_cls_acc:.2f}%")
+    print(f"Mean Frequency Error (overall): {overall_freq_err:.4f}")
 
+    # 2) Per-SNR
+    # sort the SNR keys
     snr_keys_sorted = sorted(snr_obj_count.keys())
     for snr_val in snr_keys_sorted:
         if snr_obj_count[snr_val] > 0:
-            cls_acc_snr = 100.0 * snr_correct_cls[snr_val] / snr_obj_count[snr_val]
-            freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
+            cls_acc_snr = 100.0* snr_correct_cls[snr_val]/ snr_obj_count[snr_val]
+            freq_err_snr= snr_freq_err[snr_val]/ snr_obj_count[snr_val]
         else:
             cls_acc_snr = 0.0
-            freq_err_snr = 0.0
-        print(f"SNR {snr_val:.1f}: Accuracy={cls_acc_snr:.2f}%, FreqErr={freq_err_snr:.4f}")
+            freq_err_snr= 0.0
+        print(f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr:.4f}")
 
-    # Confusion Matrix
-    class_list = test_loader.dataset.class_list
-    from sklearn.metrics import confusion_matrix
+    # If dataset has "class_list" or "label_to_idx" you can define:
+    class_list = test_loader.dataset.class_list  # or however you track the modclass
     cm = confusion_matrix(overall_true_classes, overall_pred_classes, labels=range(len(class_list)))
     cm_percent = cm.astype(float)
     for i in range(cm.shape[0]):
@@ -383,20 +388,22 @@ def test_model(model, test_loader, device):
         if row_sum > 0:
             cm_percent[i] = (cm[i]/row_sum)*100.0
 
-    import matplotlib.pyplot as plt
-    import seaborn as sns
     plt.figure(figsize=(8,6))
-    sns.heatmap(cm_percent, annot=True, fmt=".2f", cmap="Blues",
-                xticklabels=class_list, yticklabels=class_list)
+    sns.heatmap(
+        cm_percent, 
+        annot=True, fmt=".2f", cmap="Blues",
+        xticklabels=class_list, yticklabels=class_list
+    )
     plt.title("Test Set Confusion Matrix (%)")
     plt.xlabel("Predicted Class")
     plt.ylabel("True Class")
     plt.tight_layout()
     plt.savefig("test_confusion_matrix.png")
     plt.close()
+
     print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
     print("=== END OF TESTING ===")
-    
+
 
 if __name__ == "__main__":
     start_time = time.time()
@@ -404,5 +411,4 @@ if __name__ == "__main__":
     time_diff = time.time() - start_time
     print(
         f"\nCode Execution took {time_diff // 3600:.0f} hours, "
-        f"{(time_diff % 3600) // 60:.0f} minutes, {time_diff % 60:.0f} seconds."
-    )
+        f"{(time_diff % 3600) // 60:.0f} minutes, {time_diff % 60:.0f} seconds.")
