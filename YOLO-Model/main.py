@@ -29,6 +29,8 @@ from config_wideband_yolo import (
     print_config_file,
 )
 
+MIN_CONFIDENCE = 0.25
+
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
 
@@ -148,7 +150,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         conf_tgt   = label_tensor[..., 1]
         class_tgt  = label_tensor[..., 2:]
 
-        obj_mask = (conf_tgt > 0)
+        obj_mask = (conf_tgt > MIN_CONFIDENCE)
         freq_err = torch.abs(x_pred - x_tgt)
 
         pred_class_idx = torch.argmax(class_pred, dim=-1)
@@ -204,7 +206,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
             conf_tgt   = label_tensor[..., 1]
             class_tgt  = label_tensor[..., 2:]
 
-            obj_mask = (conf_tgt > 0)
+            obj_mask = (conf_tgt > MIN_CONFIDENCE)
             freq_err = torch.abs(x_pred - x_tgt)
 
             pred_class_idx = torch.argmax(class_pred, dim=-1)
@@ -234,7 +236,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                         conf  = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
 
-                        if conf > 0.2:
+                        if conf > MIN_CONFIDENCE:
                             pred_list.append((x_p, cls_p, conf))
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
@@ -304,7 +306,7 @@ def test_model(model, test_loader, device):
             class_tgt  = label_tensor[..., 2:]
 
             # object mask
-            obj_mask = (conf_tgt > 0)
+            obj_mask = (conf_tgt > MIN_CONFIDENCE)
             freq_err = torch.abs(x_pred - x_tgt)
 
             # predicted vs. true class => argmax

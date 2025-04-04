@@ -145,24 +145,6 @@ class WidebandYoloModel(nn.Module):
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
         
@@ -185,7 +167,7 @@ class WidebandYoloModel(nn.Module):
         # we define a learnable anchor for each grid cell and box.
         # Here, we initialize anchors uniformly within the cell (e.g. between 0.25 and 0.75).
         self.anchor_offsets = nn.Parameter(
-            torch.linspace(0, 1, steps=B).unsqueeze(0).repeat(S, 1)
+            torch.linspace(0.333, 0.666, steps=B).unsqueeze(0).repeat(S, 1)
         )  # shape: [S, B]
         
         # Frequency predictor now predicts a delta relative to the anchor.
@@ -212,10 +194,6 @@ class WidebandYoloModel(nn.Module):
         )
         self.stage2_blocks = nn.Sequential(
             ResidualBlock(32, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
-            ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
             ResidualBlock(96, 96),
