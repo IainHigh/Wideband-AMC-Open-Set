@@ -54,7 +54,7 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 # Model Parameters
 #####################
 S = 4  # Number of grid cells
-B = 1  # Boxes per cell
+B = 4  # Anchors / Boxes per cell
 NUM_CLASSES = 9  # Number of classes
 
 #####################
