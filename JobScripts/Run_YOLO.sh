@@ -1,15 +1,15 @@
 #!/bin/sh
 #$ -N YOLO
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
-#$ -l h_rt=00:59:00
+#$ -l h_rt=04:59:00
 #$ -l h_vmem=20G
 
 #$ -q gpu
 #$ -l gpu=1
 #$ -pe sharedmem 1
 
-#$ -o /home/s2062378/OutputFiles
-#$ -e /home/s2062378/OutputFiles
+#$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
+#$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -m beas
 #$ -M "s2062378@ed.ac.uk"
 
@@ -28,7 +28,7 @@ module load anaconda
 # Activate the anaconda environment
 source activate mypython
 
-if false ; then
+if true ; then
     # Remove the old dataset
     rm -rf /exports/eddie/scratch/s2062378/data/*
     rmdir /exports/eddie/scratch/s2062378/data/training

@@ -8,8 +8,8 @@
 #$ -l gpu=1
 #$ -pe sharedmem 4
 
-#$ -o /home/s2062378/OutputFiles
-#$ -e /home/s2062378/OutputFiles
+#$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
+#$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -m beas
 #$ -M "s2062378@ed.ac.uk"
 

@@ -1,6 +1,6 @@
 {
   "n_captures": 2000,
-  "n_samps": 4096,
+  "n_samps": 16384,
   "modulation": [
     "bpsk",
     "qpsk",

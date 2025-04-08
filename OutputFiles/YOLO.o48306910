@@ -1,0 +1,198 @@
+
+
+CUDA is available.
+CUDA version: 11.7
+Available devices: 1
+Current device: 0
+Device name: NVIDIA A100 80GB PCIe
+
+
+Configuration File:
+	VAL_PRINT_SAMPLES: 2
+	BAND_MARGIN: 942187.4998952262
+	NUMTAPS: 101
+	S: 4
+	B: 1
+	NUM_CLASSES: 9
+	BATCH_SIZE: 64
+	EPOCHS: 10
+	LEARNING_RATE: 0.0005
+	LAMBDA_COORD: 20.0
+	LAMBDA_NOOBJ: 1.0
+	LAMBDA_CLASS: 1.0
+
+Epoch [1/10]
+  Train: Loss=4.2406,  MeanFreqErr=0.3271,  ClsAcc=12.22%
+  Valid: Loss=3.2376,  MeanFreqErr=0.2770,  ClsAcc=12.40%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => []
+      GroundTruth=> [(13023372.888565063, 6)]
+    Frame 2:
+      Predicted => [(18169646.188616753, 6, 0.4833040237426758), (27141578.34649086, 4, 0.31674817204475403), (11916810.57214737, 2, 0.31158748269081116)]
+      GroundTruth=> [(14581727.83255577, 0)]
+
+Epoch [2/10]
+  Train: Loss=2.9650,  MeanFreqErr=0.2623,  ClsAcc=15.10%
+  Valid: Loss=3.1124,  MeanFreqErr=0.2682,  ClsAcc=14.65%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => []
+      GroundTruth=> [(14849520.027637482, 6)]
+    Frame 2:
+      Predicted => []
+      GroundTruth=> [(28884927.481412888, 0)]
+
+Epoch [3/10]
+  Train: Loss=3.0011,  MeanFreqErr=0.2636,  ClsAcc=17.07%
+  Valid: Loss=3.0614,  MeanFreqErr=0.2668,  ClsAcc=17.05%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(26616488.099098206, 1, 0.2697369158267975)]
+      GroundTruth=> [(23241807.93017149, 6)]
+    Frame 2:
+      Predicted => [(18647042.959928513, 2, 0.22583210468292236)]
+      GroundTruth=> [(15442644.115537405, 0)]
+
+Epoch [4/10]
+  Train: Loss=2.8865,  MeanFreqErr=0.2576,  ClsAcc=18.77%
+  Valid: Loss=2.8014,  MeanFreqErr=0.2517,  ClsAcc=18.45%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(26671607.494354248, 4, 0.8158026933670044)]
+      GroundTruth=> [(25750462.263822556, 4)]
+    Frame 2:
+      Predicted => [(26596338.897943497, 4, 0.94021075963974)]
+      GroundTruth=> [(26362029.165029526, 4)]
+
+Epoch [5/10]
+  Train: Loss=2.7793,  MeanFreqErr=0.2513,  ClsAcc=20.80%
+  Valid: Loss=2.7581,  MeanFreqErr=0.2487,  ClsAcc=21.65%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(11590712.070465088, 6, 0.6873993277549744)]
+      GroundTruth=> [(13697787.97030449, 4)]
+    Frame 2:
+      Predicted => [(11501121.371984482, 6, 0.6860979199409485)]
+      GroundTruth=> [(8933363.556861877, 3)]
+
+Epoch [6/10]
+  Train: Loss=2.6103,  MeanFreqErr=0.2423,  ClsAcc=22.17%
+  Valid: Loss=2.5038,  MeanFreqErr=0.2356,  ClsAcc=21.80%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => []
+      GroundTruth=> [(21897951.364517212, 3)]
+    Frame 2:
+      Predicted => [(19435568.60089302, 2, 0.630915641784668)]
+      GroundTruth=> [(18298187.92641163, 0)]
+
+Epoch [7/10]
+  Train: Loss=2.5181,  MeanFreqErr=0.2368,  ClsAcc=23.39%
+  Valid: Loss=2.4054,  MeanFreqErr=0.2283,  ClsAcc=24.85%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(11271479.576826096, 4, 0.3197609782218933)]
+      GroundTruth=> [(14064881.354570389, 5)]
+    Frame 2:
+      Predicted => [(5417945.981025696, 5, 0.3099498748779297), (22500000.0, 8, 0.24510514736175537), (11961555.182933807, 8, 0.20806336402893066)]
+      GroundTruth=> [(24470904.171466827, 0)]
+
+Epoch [8/10]
+  Train: Loss=2.4380,  MeanFreqErr=0.2311,  ClsAcc=25.55%
+  Valid: Loss=2.2988,  MeanFreqErr=0.2220,  ClsAcc=26.55%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(19104178.100824356, 4, 0.4766327440738678)]
+      GroundTruth=> [(16572006.046772003, 2)]
+    Frame 2:
+      Predicted => [(10257149.487733841, 2, 0.7886733412742615)]
+      GroundTruth=> [(11975875.049829483, 4)]
+
+Epoch [9/10]
+  Train: Loss=2.2621,  MeanFreqErr=0.2198,  ClsAcc=27.00%
+  Valid: Loss=2.1685,  MeanFreqErr=0.2112,  ClsAcc=26.70%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(26599054.18753624, 7, 0.8199991583824158)]
+      GroundTruth=> [(27928282.32049942, 8)]
+    Frame 2:
+      Predicted => [(11535895.317792892, 7, 0.651531994342804)]
+      GroundTruth=> [(14173416.048288345, 1)]
+
+Epoch [10/10]
+  Train: Loss=2.2667,  MeanFreqErr=0.2150,  ClsAcc=28.43%
+  Valid: Loss=2.1878,  MeanFreqErr=0.2122,  ClsAcc=31.95%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(22500000.0, 7, 0.8072114586830139), (19091785.40110588, 3, 0.5249061584472656)]
+      GroundTruth=> [(22188468.5754776, 7)]
+    Frame 2:
+      Predicted => [(27115821.540355682, 8, 0.6302303671836853), (19345308.244228363, 2, 0.2730870246887207)]
+      GroundTruth=> [(6518109.440803528, 8)]
+
+Training complete.
+
+Coordinate loss lambda = 10, everything else 1. improvement will be kept.
+
+=== TEST SET RESULTS ===
+Overall bounding boxes: 2000
+Classification Accuracy (overall): 31.95%
+Mean Frequency Error (overall): 0.2098
+SNR -20.0:  Accuracy=11.11%,  FreqErr=0.2101
+SNR -18.0:  Accuracy=9.64%,  FreqErr=0.2198
+SNR -16.0:  Accuracy=6.58%,  FreqErr=0.2398
+SNR -14.0:  Accuracy=10.10%,  FreqErr=0.2409
+SNR -12.0:  Accuracy=17.43%,  FreqErr=0.2201
+SNR -10.0:  Accuracy=11.88%,  FreqErr=0.2333
+SNR -8.0:  Accuracy=20.62%,  FreqErr=0.2338
+SNR -6.0:  Accuracy=23.76%,  FreqErr=0.2492
+SNR -4.0:  Accuracy=26.60%,  FreqErr=0.2236
+SNR -2.0:  Accuracy=34.31%,  FreqErr=0.2116
+SNR 0.0:  Accuracy=35.71%,  FreqErr=0.2217
+SNR 2.0:  Accuracy=38.37%,  FreqErr=0.1988
+SNR 4.0:  Accuracy=45.76%,  FreqErr=0.2006
+SNR 6.0:  Accuracy=40.57%,  FreqErr=0.2016
+SNR 8.0:  Accuracy=46.43%,  FreqErr=0.1943
+SNR 10.0:  Accuracy=48.24%,  FreqErr=0.1972
+SNR 12.0:  Accuracy=43.48%,  FreqErr=0.1778
+SNR 14.0:  Accuracy=47.06%,  FreqErr=0.1888
+SNR 16.0:  Accuracy=44.68%,  FreqErr=0.2045
+SNR 18.0:  Accuracy=46.39%,  FreqErr=0.1696
+SNR 20.0:  Accuracy=57.30%,  FreqErr=0.1677
+
+Test confusion matrix saved to test_confusion_matrix.png.
+
+=== END OF TESTING ===
+
+Code Execution took 0 hours, 

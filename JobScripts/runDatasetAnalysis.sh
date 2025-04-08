@@ -4,8 +4,8 @@
 #$ -l h_rt=00:59:00 
 #$ -l h_vmem=10G
 
-#$ -o /home/s2062378/OutputFiles
-#$ -e /home/s2062378/OutputFiles
+#$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
+#$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -m beas
 #$ -M "s2062378@ed.ac.uk"
 
