@@ -232,11 +232,18 @@ class WidebandYoloModel(nn.Module):
         
         combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
         
-        freq_pred = self.freq_predictor(combined_features)
-        freq_pred = freq_pred.view(bsz, S, B)
-        delta_coarse = 0.5 * torch.tanh(freq_pred)
-        freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
-        freq_pred = torch.clamp(freq_pred, 0.0, 1.0)  # [bsz, S, B]
+        raw_delta = self.freq_predictor(combined_features)
+        raw_delta = raw_delta.view(bsz, S, B)
+        delta_coarse = 0.5 * torch.tanh(raw_delta)
+        coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
+
+        refine_feat = self.refinement_branch(x_time)
+        refine_feat = refine_feat.squeeze(-1)
+        refine_delta = self.refine_fc(refine_feat)
+        refine_delta = 0.1 * torch.tanh(refine_delta)
+        refine_delta = refine_delta.view(bsz, S, B)
+
+        freq_pred = torch.clamp(coarse_freq_pred + refine_delta, 0.0, 1.0)  # [bsz, S, B]
 
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
         freq_pred_raw = (cell_indices + freq_pred) * (SAMPLING_FREQUENCY / 2) / S
