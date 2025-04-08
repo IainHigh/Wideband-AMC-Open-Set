@@ -4,23 +4,17 @@ rmdir: failed to remove '/exports/eddie/scratch/s2062378/data/training': No such
 rmdir: failed to remove '/exports/eddie/scratch/s2062378/data/validation': No such file or directory
 rmdir: failed to remove '/exports/eddie/scratch/s2062378/data/testing': No such file or directory
 Traceback (most recent call last):
-  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 11, in <module>
-    from utils import *
-  File "/exports/eddie3_homes_local/s2062378/Synthetic-Radio-Frequency-Data-Generator/utils/__init__.py", line 9, in <module>
-    from .rand_utils import rand_choice, rand_int, rand_float
-ModuleNotFoundError: No module named 'utils.rand_utils'
+  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 325, in <module>
+    config = map_config(config, defaults, dataset_directory)
+NameError: name 'map_config' is not defined
 Traceback (most recent call last):
-  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 11, in <module>
-    from utils import *
-  File "/exports/eddie3_homes_local/s2062378/Synthetic-Radio-Frequency-Data-Generator/utils/__init__.py", line 9, in <module>
-    from .rand_utils import rand_choice, rand_int, rand_float
-ModuleNotFoundError: No module named 'utils.rand_utils'
+  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 325, in <module>
+    config = map_config(config, defaults, dataset_directory)
+NameError: name 'map_config' is not defined
 Traceback (most recent call last):
-  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 11, in <module>
-    from utils import *
-  File "/exports/eddie3_homes_local/s2062378/Synthetic-Radio-Frequency-Data-Generator/utils/__init__.py", line 9, in <module>
-    from .rand_utils import rand_choice, rand_int, rand_float
-ModuleNotFoundError: No module named 'utils.rand_utils'
+  File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py", line 325, in <module>
+    config = map_config(config, defaults, dataset_directory)
+NameError: name 'map_config' is not defined
 Traceback (most recent call last):
   File "/home/s2062378/Synthetic-Radio-Frequency-Data-Generator/YOLO-Model/main.py", line 17, in <module>
     from dataset_wideband_yolo import WidebandYoloDataset
