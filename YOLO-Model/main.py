@@ -127,12 +127,13 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
-    for freq_data, label_tensor, _ in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
+    for time_data, freq_data, label_tensor, _ in tqdm(train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"):
+        time_data = time_data.to(device)
         freq_data = freq_data.to(device)
         label_tensor = label_tensor.to(device)
 
         optimizer.zero_grad()
-        pred = model(freq_data)
+        pred = model(time_data, freq_data)
         loss = criterion(pred, label_tensor)
         loss.backward()
         optimizer.step()
@@ -184,11 +185,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_frames = []
 
     with torch.no_grad():
-        for freq_data, label_tensor, _ in tqdm(val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"):
+        for time_data, freq_data, label_tensor, _ in tqdm(val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"):
+            time_data = time_data.to(device)
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)
 
-            pred = model(freq_data)
+            pred = model(time_data, freq_data)
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
 
@@ -283,10 +285,11 @@ def test_model(model, test_loader, device):
     snr_freq_err = {}
 
     with torch.no_grad():
-        for freq_data, label_tensor, snr_tensor in tqdm(test_loader, desc=f"Testing on test set"):
+        for time_data, freq_data, label_tensor, snr_tensor in tqdm(test_loader, desc=f"Testing on test set"):
+            time_data = time_data.to(device)
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)
-            pred = model(freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
+            pred = model(time_data, freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
 
             # reshape
             bsize = pred.shape[0]
@@ -406,6 +409,4 @@ if __name__ == "__main__":
     start_time = time.time()
     main()
     time_diff = time.time() - start_time
-    print(
-        f"\nCode Execution took {time_diff // 3600:.0f} hours, "
-        f"{(time_diff % 3600) // 60:.0f} minutes, {time_diff % 60:.0f} seconds.")
+    print(f"\nCode Execution took {time_diff // 3600:.0f} hours, ")

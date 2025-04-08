@@ -153,7 +153,7 @@ class WidebandYoloModel(nn.Module):
     def __init__(self, num_samples):
         super().__init__()
         self.num_samples = num_samples
-        
+
         # -----------------------
         # Stage-1: Frequency Prediction
         # -----------------------
@@ -177,7 +177,7 @@ class WidebandYoloModel(nn.Module):
             ResidualBlock(96, 96),
         )
         self.pool_1 = nn.AdaptiveAvgPool1d(1)
-        
+
         # Time–Frequency branch.
         self.tf_branch = nn.Sequential(
             nn.Conv2d(1, 8, kernel_size=(3, 1), stride=1, padding=(1, 0)),
@@ -190,15 +190,15 @@ class WidebandYoloModel(nn.Module):
             nn.AdaptiveAvgPool2d((4, 1))
         )
         self.tf_fc = nn.Linear(16 * 4, 32)
-        
+
         # -----------------------
         # Dynamic Anchor Setup for Frequency Prediction
         # -----------------------
         self.anchor_offsets = nn.Parameter(
-            torch.linspace(0.0, 1.0, steps=B).unsqueeze(0).repeat(S, 1)
+            torch.linspace(-1.0, 2.0, steps=B).unsqueeze(0).repeat(S, 1)
         )  # shape: [S, B]
-        self.freq_predictor = nn.Linear(96, S * B)
-        
+        self.freq_predictor = nn.Linear(128, S * B)
+
         # Refinement branch.
         self.refinement_branch = nn.Sequential(
             nn.Conv1d(2, 16, kernel_size=5, stride=2, padding=2),
@@ -208,63 +208,67 @@ class WidebandYoloModel(nn.Module):
             nn.AdaptiveAvgPool1d(1),
         )
         self.refine_fc = nn.Linear(32, S * B)
-        
+
         # -----------------------
         # Stage-2: Confidence and Classification using the new classifier.
         # -----------------------
         # This classifier follows the narrowband architecture (adapted for 1+NUM_CLASSES outputs)
         self.classifier = WidebandClassifier(num_out=1 + NUM_CLASSES)
 
-    def forward(self, x_freq):
-        bsz = x_freq.shape[0]
-
+    def forward(self, x_time, x_freq):
+        bsz = x_time.size(0)
         # -----------------------
         # Stage-1: Coarse Frequency Prediction
         # -----------------------
-        h1 = self.first_conv(x_freq)
+        h1 = self.first_conv(x_time)
         h1 = self.stage1_blocks(h1)
         h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
+
+        spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
+        spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
+        tf_features = self.tf_branch(spec)
+        tf_features = tf_features.view(bsz, -1)     # [bsz, 64]
+        tf_features = self.tf_fc(tf_features)       # [bsz, 32]
         
-        raw_delta = self.freq_predictor(h1)
+        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
+        
+        raw_delta = self.freq_predictor(combined_features)
         raw_delta = raw_delta.view(bsz, S, B)
         delta_coarse = 0.5 * torch.tanh(raw_delta)
         coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
-        
-        refine_feat = self.refinement_branch(x_freq)
+
+        refine_feat = self.refinement_branch(x_time)
         refine_feat = refine_feat.squeeze(-1)
         refine_delta = self.refine_fc(refine_feat)
         refine_delta = 0.1 * torch.tanh(refine_delta)
         refine_delta = refine_delta.view(bsz, S, B)
-        
-        freq_pred = torch.clamp(coarse_freq_pred + refine_delta, 0.0, 1.0)  # [bsz, S, B]
-        
+
+        freq_pred = torch.clamp(coarse_freq_pred + refine_delta, -1.0, 2.0)  # [bsz, S, B]
+
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
         freq_pred_raw = (cell_indices + freq_pred) * (SAMPLING_FREQUENCY / 2) / S
         freq_pred_flat = freq_pred_raw.view(bsz * S * B)
-        
+
         # -----------------------
         # Stage-2: Downconversion and Classification
         # -----------------------
-        x_rep = x_freq.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
-        # Use frequency domain length from x_freq (not self.num_samples)
-        n_freq = x_freq.shape[-1]
-        x_rep = x_rep.contiguous().view(bsz * S * B, 2, n_freq)
-        
+        x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
+        x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
+
         x_filt = self._filter_raw(x_rep, freq_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
-        
-        # Now use the classifier for confidence and class prediction.
+
+        # Now use the new classifier for confidence and class prediction.
         out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
-        
+
         final_out = torch.zeros(bsz, S, B, (1 + 1 + NUM_CLASSES),
-                                dtype=out_conf_class.dtype,
-                                device=out_conf_class.device)
+                                  dtype=out_conf_class.dtype,
+                                  device=out_conf_class.device)
         final_out[..., 0] = freq_pred   # normalized frequency offset
         final_out[..., 1:] = out_conf_class
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
-
 
     def _filter_raw(self, x_flat, freq_flat):
         N, _, T = x_flat.shape

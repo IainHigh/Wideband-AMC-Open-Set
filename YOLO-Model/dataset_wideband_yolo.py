@@ -102,7 +102,7 @@ class WidebandYoloDataset(Dataset):
             mod_list = [mod_list]
         if isinstance(center_freqs, (float, int)):
             center_freqs = [center_freqs]
-            
+
         # Convert to real time-domain IQ: shape (2, N)
         x_real = x_complex.real.astype(np.float32)
         x_imag = x_complex.imag.astype(np.float32)
@@ -132,6 +132,7 @@ class WidebandYoloDataset(Dataset):
                     break
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
-        return (torch.tensor(x_freq),
+        return (torch.tensor(x_wide),
+                torch.tensor(x_freq),
                 torch.tensor(label_tensor),
                 torch.tensor(snr_value, dtype=torch.float32))
