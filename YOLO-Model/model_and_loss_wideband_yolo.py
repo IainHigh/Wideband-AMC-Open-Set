@@ -207,13 +207,6 @@ class WidebandYoloModel(nn.Module):
             nn.AdaptiveAvgPool2d((4, 1)),
         )
         self.tf_fc = nn.Linear(16 * 4, 32)
-
-        # -----------------------
-        # Dynamic Anchor Setup for Frequency Prediction
-        # -----------------------
-        self.anchor_offsets = nn.Parameter(
-            torch.linspace(0.0, 1.0, steps=B).unsqueeze(0).repeat(S, 1)
-        )  # shape: [S, B]
         self.freq_predictor = nn.Linear(128, S * B)
 
         # Refinement branch.
@@ -249,12 +242,14 @@ class WidebandYoloModel(nn.Module):
 
         combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
 
+        # Generate random anchors for each cell and each box per cell:
+        random_anchors = torch.rand(S, B, device=combined_features.device, dtype=combined_features.dtype)
+
         raw_delta = self.freq_predictor(combined_features)
         raw_delta = raw_delta.view(bsz, S, B)
         delta_coarse = 0.5 * torch.tanh(raw_delta)
-        coarse_freq_pred = (
-            self.anchor_offsets.unsqueeze(0) + delta_coarse
-        )  # [bsz, S, B]
+        # Use random anchors (unsqueezed to include batch dimension) plus the network’s predicted delta.
+        coarse_freq_pred = random_anchors.unsqueeze(0) + delta_coarse  # [bsz, S, B]
 
         refine_feat = self.refinement_branch(x_time)
         refine_feat = refine_feat.squeeze(-1)
@@ -262,9 +257,8 @@ class WidebandYoloModel(nn.Module):
         refine_delta = 0.1 * torch.tanh(refine_delta)
         refine_delta = refine_delta.view(bsz, S, B)
 
-        freq_pred = torch.clamp(
-            coarse_freq_pred + refine_delta, 0.0, 1.0
-        )  # [bsz, S, B]
+        # Final predicted normalized offset is the sum of coarse prediction and refinement.
+        freq_pred = torch.clamp(coarse_freq_pred + refine_delta, 0.0, 1.0)  # [bsz, S, B]
 
         cell_indices = torch.arange(
             S, device=freq_pred.device, dtype=freq_pred.dtype
@@ -281,7 +275,7 @@ class WidebandYoloModel(nn.Module):
         x_filt = self._filter_raw(x_rep, freq_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
 
-        # Now use the new classifier for confidence and class prediction.
+        # Use the new classifier for confidence and class prediction.
         out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
 
