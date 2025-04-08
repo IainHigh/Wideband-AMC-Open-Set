@@ -215,7 +215,7 @@ class WidebandYoloModel(nn.Module):
         # This classifier follows the narrowband architecture (adapted for 1+NUM_CLASSES outputs)
         self.classifier = WidebandClassifier(num_out=1 + NUM_CLASSES)
 
-    def forward(self, x_time, x_freq):
+    def forward(self, x_time):
         bsz = x_time.size(0)
         # -----------------------
         # Stage-1: Coarse Frequency Prediction
@@ -224,15 +224,7 @@ class WidebandYoloModel(nn.Module):
         h1 = self.stage1_blocks(h1)
         h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
         
-        spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
-        spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
-        tf_features = self.tf_branch(spec)
-        tf_features = tf_features.view(bsz, -1)     # [bsz, 64]
-        tf_features = self.tf_fc(tf_features)       # [bsz, 32]
-        
-        combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
-        
-        raw_delta = self.freq_predictor(combined_features)
+        raw_delta = self.freq_predictor(h1)
         raw_delta = raw_delta.view(bsz, S, B)
         delta_coarse = 0.5 * torch.tanh(raw_delta)
         coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
