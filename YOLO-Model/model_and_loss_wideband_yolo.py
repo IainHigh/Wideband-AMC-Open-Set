@@ -61,7 +61,7 @@ def conv1d_batch(x, weight, pad_left, pad_right):
 
 
 ###############################################################################
-# Residual block (used in Stage-1)
+# Residual block
 ###############################################################################
 class ResidualBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -98,7 +98,7 @@ class ResidualBlock(nn.Module):
 
 
 ###############################################################################
-# New WidebandClassifier (Stage-2: Confidence and Classification)
+# WidebandClassifier
 ###############################################################################
 class WidebandClassifier(nn.Module):
     def __init__(self, num_out):

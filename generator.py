@@ -16,13 +16,11 @@ buf = 4096
 halfbuf = 2048
 
 # Read the configs/system_parameters.json file.
-with open("./configs/system_parameters.json") as f:
+with open("./configs/system_parameters.json", mode="rt") as f:
     system_parameters = json.load(f)
-
-working_directory = system_parameters["Working_Directory"]
-sys.path.append(working_directory)
-
-dataset_directory = system_parameters["Dataset_Directory"]
+    working_directory = system_parameters["Working_Directory"]
+    sys.path.append(working_directory)
+    dataset_directory = system_parameters["Dataset_Directory"]
 
 ## load c modules
 clinear = ctypes.CDLL(os.path.abspath("./cmodules/linear_modulate"))
@@ -32,29 +30,8 @@ cfsk = ctypes.CDLL(os.path.abspath("./cmodules/fsk_modulate"))
 ctx = ctypes.CDLL(os.path.abspath("./cmodules/rrc_tx"))
 cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
 
-import numpy as np
-
 
 def calculate_ber_BPSK(xI, yI, sps, trim):
-    """
-    Calculate the Bit Error Rate (BER) for BPSK.
-
-    Parameters
-    ----------
-    xI, xQ : array_like
-        Transmitted (baseband) in-phase and quadrature components.
-    yI, yQ : array_like
-        Received in-phase and quadrature components (after channel, frequency shift, etc.).
-    sps : int
-        Samples per symbol.
-    trim : int
-        Number of samples to trim from beginning and end.
-
-    Returns
-    -------
-    ber : float
-        Bit error rate.
-    """
     # Convert inputs to numpy arrays
     xI = np.array(xI)
     yI = np.array(yI)
@@ -75,8 +52,7 @@ def calculate_ber_BPSK(xI, yI, sps, trim):
 
     # # Calculate bit errors and BER.
     bit_errors = min(np.sum(tx_bits != rx_bits), np.sum(tx_bits != rx_bits_inversed))
-    total_bits = len(tx_bits)
-    ber = bit_errors / total_bits
+    ber = bit_errors / len(tx_bits)
 
     return ber
 

@@ -25,6 +25,7 @@ from config_wideband_yolo import (
     SAMPLING_FREQUENCY,
     S,
     PRINT_CONFIG_FILE,
+    GENERATE_CONFUSION_MATRIX,
     print_config_file,
 )
 
@@ -280,12 +281,6 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
 
 def test_model(model, test_loader, device):
-    """
-    1) Test the model on the test set, gather classification accuracy, freq error, etc.
-    2) Also compute these metrics per SNR
-    3) Plot confusion matrix of classification
-    """
-
     model.eval()
     total_obj_count = 0
     total_correct_cls = 0
@@ -402,33 +397,34 @@ def test_model(model, test_loader, device):
         )
 
     # If dataset has "class_list" or "label_to_idx" you can define:
-    class_list = test_loader.dataset.class_list  # or however you track the modclass
-    cm = confusion_matrix(
-        overall_true_classes, overall_pred_classes, labels=range(len(class_list))
-    )
-    cm_percent = cm.astype(float)
-    for i in range(cm.shape[0]):
-        row_sum = cm[i].sum()
-        if row_sum > 0:
-            cm_percent[i] = (cm[i] / row_sum) * 100.0
+    if GENERATE_CONFUSION_MATRIX:
+        class_list = test_loader.dataset.class_list
+        cm = confusion_matrix(
+            overall_true_classes, overall_pred_classes, labels=range(len(class_list))
+        )
+        cm_percent = cm.astype(float)
+        for i in range(cm.shape[0]):
+            row_sum = cm[i].sum()
+            if row_sum > 0:
+                cm_percent[i] = (cm[i] / row_sum) * 100.0
 
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(
-        cm_percent,
-        annot=True,
-        fmt=".2f",
-        cmap="Blues",
-        xticklabels=class_list,
-        yticklabels=class_list,
-    )
-    plt.title("Test Set Confusion Matrix (%)")
-    plt.xlabel("Predicted Class")
-    plt.ylabel("True Class")
-    plt.tight_layout()
-    plt.savefig("test_confusion_matrix.png")
-    plt.close()
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(
+            cm_percent,
+            annot=True,
+            fmt=".2f",
+            cmap="Blues",
+            xticklabels=class_list,
+            yticklabels=class_list,
+        )
+        plt.title("Test Set Confusion Matrix (%)")
+        plt.xlabel("Predicted Class")
+        plt.ylabel("True Class")
+        plt.tight_layout()
+        plt.savefig("test_confusion_matrix.png")
+        plt.close()
 
-    print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
+        print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
     print("=== END OF TESTING ===")
 
 

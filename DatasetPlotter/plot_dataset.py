@@ -3,8 +3,8 @@
 import os
 import json
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
 import numpy as np
+from scipy.stats import gaussian_kde
 from scipy.signal import butter, filtfilt, firwin
 import sys
 
