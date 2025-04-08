@@ -10,7 +10,8 @@ from config_wideband_yolo import (
     S,      # number of grid cells
     B,      # boxes per cell
     NUM_CLASSES,
-    SAMPLING_FREQUENCY
+    SAMPLING_FREQUENCY,
+    get_anchors
 )
 
 class WidebandYoloDataset(Dataset):
@@ -122,14 +123,18 @@ class WidebandYoloDataset(Dataset):
                 cell_idx = S - 1
             x_offset = (freq_norm * S) - cell_idx
             x_offset = np.clip(x_offset, 0.0, 1.0)
-            for b_i in range(B):
-                if label_tensor[cell_idx, b_i, 1] == 0.0:
-                    label_tensor[cell_idx, b_i, 0] = x_offset
-                    label_tensor[cell_idx, b_i, 1] = 1.0
-                    class_idx = self.class_to_idx.get(m_str, None)
-                    if class_idx is not None:
-                        label_tensor[cell_idx, b_i, 2 + class_idx] = 1.0
-                    break
+            
+            # Obtain anchor values using linspace as defined in the config file.
+            anchor_values = get_anchors()  # e.g., for B=4: [0.2, 0.4, 0.6, 0.8]
+            # Find the anchor index that is closest to the computed offset.
+            anchor_idx = int(np.argmin(np.abs(anchor_values - x_offset)))
+            
+            # Assign the label for the best matching anchor.
+            label_tensor[cell_idx, anchor_idx, 0] = x_offset
+            label_tensor[cell_idx, anchor_idx, 1] = 1.0
+            class_idx = self.class_to_idx.get(m_str, None)
+            if class_idx is not None:
+                label_tensor[cell_idx, anchor_idx, 2 + class_idx] = 1.0
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
         return (torch.tensor(x_wide),

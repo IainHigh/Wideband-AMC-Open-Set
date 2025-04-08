@@ -119,3 +119,17 @@ Epoch [7/20]
       Predicted => [(24456674.605607986, 5, 0.6730485558509827), (6781513.094902039, 5, 0.39881983399391174), (22500000.0, 5, 0.28869715332984924)]
       GroundTruth=> [(24470904.171466827, 0)]
 
+Epoch [8/20]
+  Train: Loss=1.8477,  MeanFreqErr=0.3374,  ClsAcc=20.67%
+  Valid: Loss=1.9658,  MeanFreqErr=0.3539,  ClsAcc=20.80%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => []
+      GroundTruth=> [(16572006.046772003, 2)]
+    Frame 2:
+      Predicted => [(13073401.004076004, 4, 0.7337449193000793)]
+      GroundTruth=> [(11975875.049829483, 4)]
+

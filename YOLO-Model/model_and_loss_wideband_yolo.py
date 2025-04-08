@@ -12,6 +12,7 @@ from config_wideband_yolo import (
     BAND_MARGIN,
     NUMTAPS,
     SAMPLING_FREQUENCY,
+    get_anchors
 )
 
 ###############################################################################
@@ -194,9 +195,9 @@ class WidebandYoloModel(nn.Module):
         # -----------------------
         # Dynamic Anchor Setup for Frequency Prediction
         # -----------------------
-        self.anchor_offsets = nn.Parameter(
-            torch.linspace(0.0, 1.0, steps=B).unsqueeze(0).repeat(S, 1)
-        )  # shape: [S, B]
+        initial_anchor_values = torch.tensor(get_anchors(), dtype=torch.float32)  # shape: [B]
+        # Create anchors for each cell by repeating the computed vector.
+        self.anchors = nn.Parameter(initial_anchor_values.unsqueeze(0).repeat(S, 1))  # shape: [S, B]
         self.freq_predictor = nn.Linear(128, S * B)
         
         # Refinement branch.
@@ -223,52 +224,55 @@ class WidebandYoloModel(nn.Module):
         h1 = self.first_conv(x_time)
         h1 = self.stage1_blocks(h1)
         h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
-        
-        spec = torch.sqrt(x_freq[:, 0, :]**2 + x_freq[:, 1, :]**2)
-        spec = spec.unsqueeze(1).unsqueeze(-1)   # [bsz, 1, N_rfft, 1]
+
+        spec = torch.sqrt(x_freq[:, 0, :] ** 2 + x_freq[:, 1, :] ** 2)
+        spec = spec.unsqueeze(1).unsqueeze(-1)  # [bsz, 1, N_rfft, 1]
         tf_features = self.tf_branch(spec)
-        tf_features = tf_features.view(bsz, -1)     # [bsz, 64]
-        tf_features = self.tf_fc(tf_features)       # [bsz, 32]
-        
+        tf_features = tf_features.view(bsz, -1)  # [bsz, 64]
+        tf_features = self.tf_fc(tf_features)  # [bsz, 32]
+
         combined_features = torch.cat([h1, tf_features], dim=1)  # [bsz, 128]
-        
-        raw_delta = self.freq_predictor(combined_features)
+
+        # Predict delta for frequency offset.
+        raw_delta = self.freq_predictor(combined_features)  # shape: [bsz, S*B]
         raw_delta = raw_delta.view(bsz, S, B)
         delta_coarse = 0.5 * torch.tanh(raw_delta)
-        coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
-        
+        # Use the learnable anchors (expanded over the batch) plus the delta.
+        coarse_freq_pred = self.anchors.unsqueeze(0) + delta_coarse  # [bsz, S, B]
+
         refine_feat = self.refinement_branch(x_time)
         refine_feat = refine_feat.squeeze(-1)
         refine_delta = self.refine_fc(refine_feat)
         refine_delta = 0.1 * torch.tanh(refine_delta)
         refine_delta = refine_delta.view(bsz, S, B)
-        
+
+        # Final predicted normalized offset.
         freq_pred = torch.clamp(coarse_freq_pred + refine_delta, 0.0, 1.0)  # [bsz, S, B]
-        
+
         cell_indices = torch.arange(S, device=freq_pred.device, dtype=freq_pred.dtype).view(1, S, 1)
         freq_pred_raw = (cell_indices + freq_pred) * (SAMPLING_FREQUENCY / 2) / S
         freq_pred_flat = freq_pred_raw.view(bsz * S * B)
-        
+
         # -----------------------
         # Stage-2: Downconversion and Classification
         # -----------------------
         x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
-        
+
         x_filt = self._filter_raw(x_rep, freq_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
-        
-        # Now use the new classifier for confidence and class prediction.
+
         out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
-        
+
         final_out = torch.zeros(bsz, S, B, (1 + 1 + NUM_CLASSES),
-                                  dtype=out_conf_class.dtype,
-                                  device=out_conf_class.device)
-        final_out[..., 0] = freq_pred   # normalized frequency offset
+                                dtype=out_conf_class.dtype,
+                                device=out_conf_class.device)
+        final_out[..., 0] = freq_pred  # normalized frequency offset
         final_out[..., 1:] = out_conf_class
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
+
 
     def _filter_raw(self, x_flat, freq_flat):
         N, _, T = x_flat.shape

@@ -21,3 +21,17 @@ Configuration File:
 	LAMBDA_NOOBJ: 0.5
 	LAMBDA_CLASS: 1.0
 
+Epoch [1/20]
+  Train: Loss=2.6219,  MeanFreqErr=0.4488,  ClsAcc=11.52%
+  Valid: Loss=2.3375,  MeanFreqErr=0.3967,  ClsAcc=12.20%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (freq_offset [0,1], class, conf)
+  GroundTruth format: (freq_offset [0,1], class)
+    Frame 1:
+      Predicted => [(12757392.078638077, 5, 0.24001094698905945)]
+      GroundTruth=> [(13023372.888565063, 6)]
+    Frame 2:
+      Predicted => [(26861146.688461304, 6, 0.3141605854034424)]
+      GroundTruth=> [(14581727.83255577, 0)]
+
