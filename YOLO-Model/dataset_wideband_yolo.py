@@ -7,11 +7,12 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 from config_wideband_yolo import (
-    S,      # number of grid cells
-    B,      # boxes per cell
+    S,  # number of grid cells
+    B,  # boxes per cell
     NUM_CLASSES,
-    SAMPLING_FREQUENCY
+    SAMPLING_FREQUENCY,
 )
+
 
 class WidebandYoloDataset(Dataset):
     """
@@ -19,10 +20,11 @@ class WidebandYoloDataset(Dataset):
     For each file, it:
       1) Bandpass filters and downconverts the signal (later in the model)
       2) Builds a YOLO label [S, B, (1+1+NUM_CLASSES)] with normalized frequency offsets.
-      
+
     This version additionally computes the Fourier transform (using np.fft.rfft)
     of the IQ data so that a frequency–domain representation is available for the model.
     """
+
     def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
@@ -89,7 +91,9 @@ class WidebandYoloDataset(Dataset):
         # Compute Fourier transform (using rfft to return nonnegative frequencies)
         x_fft = np.fft.rfft(x_complex)  # shape: (N_rfft,)
         # Stack real and imaginary parts (resulting shape: (2, N_rfft))
-        x_freq = np.stack([x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0)
+        x_freq = np.stack(
+            [x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0
+        )
 
         # Load metadata.
         with open(meta_path, "r") as f:
@@ -132,7 +136,9 @@ class WidebandYoloDataset(Dataset):
                     break
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
-        return (torch.tensor(x_wide),
-                torch.tensor(x_freq),
-                torch.tensor(label_tensor),
-                torch.tensor(snr_value, dtype=torch.float32))
+        return (
+            torch.tensor(x_wide),
+            torch.tensor(x_freq),
+            torch.tensor(label_tensor),
+            torch.tensor(snr_value, dtype=torch.float32),
+        )

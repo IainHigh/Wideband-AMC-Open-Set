@@ -1,15 +1,9 @@
 ## python imports
 import numpy as np
 from datetime import datetime
-import sys
 import os
 import tarfile
-
-## internal imports
-# from sigmf import *
 import sigmf
-from .maps import mod_int2type, mod_int2modem, mod_int2class
-from .maps import mod_int2symbolvariant, am_variants, fm_variants
 
 
 def archive_sigmf(savepath):
@@ -42,12 +36,6 @@ def save_sigmf(i, q, config, idx):
     iq[1::2] = q
     with open(data_name, "wb") as f:
         np.save(f, iq)
-
-    ## create SigMFFile object w/ appropriate metadata
-    if sys.byteorder == "little":
-        datatype = "cf32_le"
-    else:
-        datatype = "cf32_be"
 
     _global = {
         "core:datatype": "cf32_le",

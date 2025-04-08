@@ -108,7 +108,7 @@ def generate_linear(config, rng_seed):
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
         if config["center_frequencies_random"]:
             lower_bound, upper_bound, n_max = config["center_frequencies"]
-            n = np.random.randint(1, n_max+1)
+            n = np.random.randint(1, n_max + 1)
             center_frequencies = np.random.uniform(lower_bound, upper_bound, n)
             # Convert from ndarray to list
             center_frequencies = center_frequencies.tolist()
@@ -278,12 +278,6 @@ def generate_linear(config, rng_seed):
             # Sum to create the wideband signal
             I_total += I_shifted
             Q_total += Q_shifted
-
-        # Normalize final signal
-        # max_amp = max(np.max(np.abs(I_total)), np.max(np.abs(Q_total)))
-        # if max_amp > 0:
-        #    I_total /= max_amp
-        #    Q_total /= max_amp
 
         # Metadata
         metadata = {
