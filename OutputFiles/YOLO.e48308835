@@ -1,5 +1,0 @@
-WARNING: If you use conda to create environments, your home directory may fill up. Please see our documentation at 
- https://www.wiki.ed.ac.uk/display/ResearchServices/Anaconda for advice.
-Training epoch 1/20:   0%|          | 0/313 [00:00<?, ?it/s]/exports/eddie/scratch/s2062378/anaconda/envs/mypython/lib/python3.7/site-packages/numpy/fft/_pocketfft.py:70: ComplexWarning: Casting complex values to real discards the imaginary part
-  r = pfi.execute(a, is_real, is_forward, fct)
-Training epoch 1/20:   0%|          | 1/313 [00:01<10:05,  1.94s/it]
