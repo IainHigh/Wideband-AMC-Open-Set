@@ -86,6 +86,11 @@ class WidebandYoloDataset(Dataset):
         Q = iq_data[1::2]
         x_complex = I + 1j * Q
 
+        # Compute Fourier transform (using rfft to return nonnegative frequencies)
+        x_fft = np.fft.rfft(x_complex)  # shape: (N_rfft,)
+        # Stack real and imaginary parts (resulting shape: (2, N_rfft))
+        x_freq = np.stack([x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0)
+
         # Load metadata.
         with open(meta_path, "r") as f:
             meta = json.load(f)
@@ -127,6 +132,6 @@ class WidebandYoloDataset(Dataset):
                     break
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
-        return (torch.tensor(x_wide),
+        return (torch.tensor(x_freq),
                 torch.tensor(label_tensor),
                 torch.tensor(snr_value, dtype=torch.float32))

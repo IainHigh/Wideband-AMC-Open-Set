@@ -197,7 +197,7 @@ class WidebandYoloModel(nn.Module):
         self.anchor_offsets = nn.Parameter(
             torch.linspace(0.0, 1.0, steps=B).unsqueeze(0).repeat(S, 1)
         )  # shape: [S, B]
-        self.freq_predictor = nn.Linear(128, S * B)
+        self.freq_predictor = nn.Linear(96, S * B)
         
         # Refinement branch.
         self.refinement_branch = nn.Sequential(
@@ -215,12 +215,13 @@ class WidebandYoloModel(nn.Module):
         # This classifier follows the narrowband architecture (adapted for 1+NUM_CLASSES outputs)
         self.classifier = WidebandClassifier(num_out=1 + NUM_CLASSES)
 
-    def forward(self, x_time):
-        bsz = x_time.size(0)
+    def forward(self, x_freq):
+        bsz = x_freq.shape[0]
+
         # -----------------------
         # Stage-1: Coarse Frequency Prediction
         # -----------------------
-        h1 = self.first_conv(x_time)
+        h1 = self.first_conv(x_freq)
         h1 = self.stage1_blocks(h1)
         h1 = self.pool_1(h1).squeeze(-1)  # [bsz, 96]
         
@@ -229,7 +230,7 @@ class WidebandYoloModel(nn.Module):
         delta_coarse = 0.5 * torch.tanh(raw_delta)
         coarse_freq_pred = self.anchor_offsets.unsqueeze(0) + delta_coarse  # [bsz, S, B]
         
-        refine_feat = self.refinement_branch(x_time)
+        refine_feat = self.refinement_branch(x_freq)
         refine_feat = refine_feat.squeeze(-1)
         refine_delta = self.refine_fc(refine_feat)
         refine_delta = 0.1 * torch.tanh(refine_delta)
@@ -244,23 +245,26 @@ class WidebandYoloModel(nn.Module):
         # -----------------------
         # Stage-2: Downconversion and Classification
         # -----------------------
-        x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
-        x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
+        x_rep = x_freq.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
+        # Use frequency domain length from x_freq (not self.num_samples)
+        n_freq = x_freq.shape[-1]
+        x_rep = x_rep.contiguous().view(bsz * S * B, 2, n_freq)
         
         x_filt = self._filter_raw(x_rep, freq_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
         
-        # Now use the new classifier for confidence and class prediction.
+        # Now use the classifier for confidence and class prediction.
         out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
         
         final_out = torch.zeros(bsz, S, B, (1 + 1 + NUM_CLASSES),
-                                  dtype=out_conf_class.dtype,
-                                  device=out_conf_class.device)
+                                dtype=out_conf_class.dtype,
+                                device=out_conf_class.device)
         final_out[..., 0] = freq_pred   # normalized frequency offset
         final_out[..., 1:] = out_conf_class
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         return final_out
+
 
     def _filter_raw(self, x_flat, freq_flat):
         N, _, T = x_flat.shape
