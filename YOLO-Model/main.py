@@ -26,8 +26,10 @@ from config_wideband_yolo import (
     S,
     PRINT_CONFIG_FILE,
     print_config_file,
+    MULTIPLE_JOBS_PER_TRAINING
 )
 
+SAVE_MODEL_NAME = "yolo_model"
 
 
 with open("./configs/system_parameters.json") as f:
@@ -79,8 +81,20 @@ def main():
     criterion = WidebandYoloLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
+    start_epoch = 0
+    # If the model is already partially trained, load the model and get the epoch from which to continue training.
+    if MULTIPLE_JOBS_PER_TRAINING:
+        for i in range(EPOCHS):
+            if MULTIPLE_JOBS_PER_TRAINING:
+                # Load the model from the previous job
+                model = WidebandYoloModel(train_dataset.get_num_samples()).to(device)
+                model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"))
+                start_epoch = i+1
+                print(f"Loaded model from epoch {i+1}")
+
+
     # 3) Training loop
-    for epoch in range(EPOCHS):
+    for epoch in range(start_epoch, EPOCHS):
         # Training
         model, avg_train_loss, train_mean_freq_err, train_cls_accuracy = train_model(
             model, train_loader, device, optimizer, criterion, epoch)
@@ -112,11 +126,19 @@ def main():
             print(f"      Predicted => {pred_list}")
             print(f"      GroundTruth=> {gt_list}")
         print("")
+        
+        if MULTIPLE_JOBS_PER_TRAINING:
+            # Save model every epoch
+            torch.save(model.state_dict(), f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
 
     print("Training complete.")
 
     # 4) Test the model
     test_model(model, test_loader, device)
+    
+    # Delete the saved model
+    if MULTIPLE_JOBS_PER_TRAINING:
+        os.remove(f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
 
 def train_model(model, train_loader, device, optimizer, criterion, epoch):
     model.train()

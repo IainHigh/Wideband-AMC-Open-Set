@@ -1,6 +1,9 @@
 # TODO:
 
 1. Get the center_frequency prediction working. This will hopefully increase the accuracy substantially.
+
+- If predictions are close to each other they are probably predicting the same object - look into this.
+
 2. Try it with more realistic data generation - see frequencies used for long wave RF communication and use them.
 
 ## Later:

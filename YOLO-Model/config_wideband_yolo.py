@@ -50,6 +50,7 @@ PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the co
 GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
+MULTIPLE_JOBS_PER_TRAINING = True # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 
 #####################
 # Dataset Filtering Parameters
