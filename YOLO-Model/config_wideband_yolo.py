@@ -10,14 +10,16 @@ Configuration file for the wideband YOLO-style AMC system.
 All modifiable parameters are grouped here.
 """
 
+
 def get_anchors():
     """
     Compute evenly spaced anchor values inside (0,1) based on the number of boxes per cell (B).
     For example, for B=4 this returns [0.2, 0.4, 0.6, 0.8].
     """
     from config_wideband_yolo import B  # ensure B is imported from config
+
     # Compute B evenly spaced points between 1/(B+1) and B/(B+1)
-    return np.linspace(1/(B+1), B/(B+1), B)
+    return np.linspace(1 / (B + 1), B / (B + 1), B)
 
 
 def calculate_band_margin():
@@ -50,7 +52,7 @@ PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the co
 GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
-MULTIPLE_JOBS_PER_TRAINING = True # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 
 #####################
 # Dataset Filtering Parameters

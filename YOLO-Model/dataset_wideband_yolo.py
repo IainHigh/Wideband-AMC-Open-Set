@@ -7,12 +7,13 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 from config_wideband_yolo import (
-    S,      # number of grid cells
-    B,      # boxes per cell
+    S,  # number of grid cells
+    B,  # boxes per cell
     NUM_CLASSES,
     SAMPLING_FREQUENCY,
-    get_anchors
+    get_anchors,
 )
+
 
 class WidebandYoloDataset(Dataset):
     """
@@ -20,10 +21,11 @@ class WidebandYoloDataset(Dataset):
     For each file, it:
       1) Bandpass filters and downconverts the signal (later in the model)
       2) Builds a YOLO label [S, B, (1+1+NUM_CLASSES)] with normalized frequency offsets.
-      
+
     This version additionally computes the Fourier transform (using np.fft.rfft)
     of the IQ data so that a frequency–domain representation is available for the model.
     """
+
     def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
@@ -90,7 +92,9 @@ class WidebandYoloDataset(Dataset):
         # Compute Fourier transform (using rfft to return nonnegative frequencies)
         x_fft = np.fft.rfft(x_complex)  # shape: (N_rfft,)
         # Stack real and imaginary parts (resulting shape: (2, N_rfft))
-        x_freq = np.stack([x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0)
+        x_freq = np.stack(
+            [x_fft.real.astype(np.float32), x_fft.imag.astype(np.float32)], axis=0
+        )
 
         # Load metadata.
         with open(meta_path, "r") as f:
@@ -103,7 +107,7 @@ class WidebandYoloDataset(Dataset):
             mod_list = [mod_list]
         if isinstance(center_freqs, (float, int)):
             center_freqs = [center_freqs]
-            
+
         # Convert to real time-domain IQ: shape (2, N)
         x_real = x_complex.real.astype(np.float32)
         x_imag = x_complex.imag.astype(np.float32)
@@ -123,12 +127,12 @@ class WidebandYoloDataset(Dataset):
                 cell_idx = S - 1
             x_offset = (freq_norm * S) - cell_idx
             x_offset = np.clip(x_offset, 0.0, 1.0)
-            
+
             # Obtain anchor values using linspace as defined in the config file.
             anchor_values = get_anchors()  # e.g., for B=4: [0.2, 0.4, 0.6, 0.8]
             # Find the anchor index that is closest to the computed offset.
             anchor_idx = int(np.argmin(np.abs(anchor_values - x_offset)))
-            
+
             # Assign the label for the best matching anchor.
             label_tensor[cell_idx, anchor_idx, 0] = x_offset
             label_tensor[cell_idx, anchor_idx, 1] = 1.0
@@ -137,7 +141,9 @@ class WidebandYoloDataset(Dataset):
                 label_tensor[cell_idx, anchor_idx, 2 + class_idx] = 1.0
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
-        return (torch.tensor(x_wide),
-                torch.tensor(x_freq),
-                torch.tensor(label_tensor),
-                torch.tensor(snr_value, dtype=torch.float32))
+        return (
+            torch.tensor(x_wide),
+            torch.tensor(x_freq),
+            torch.tensor(label_tensor),
+            torch.tensor(snr_value, dtype=torch.float32),
+        )
