@@ -86,7 +86,7 @@ def main():
     # If the model is already partially trained, load the model and get the epoch from which to continue training.
     if MULTIPLE_JOBS_PER_TRAINING:
         for i in range(EPOCHS):
-            if MULTIPLE_JOBS_PER_TRAINING:
+            if os.path.exists(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"):
                 # Load the model from the previous job
                 model = WidebandYoloModel(train_dataset.get_num_samples()).to(device)
                 model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"))
