@@ -91,8 +91,12 @@ def main():
                 model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"))
                 start_epoch = i+1
                 print(f"Loaded model from epoch {i+1}")
-
-
+                break
+    
+    if start_epoch == EPOCHS:
+        print("Model training complete. No more epochs to train.")
+        return        
+    
     # 3) Training loop
     for epoch in range(start_epoch, EPOCHS):
         # Training
@@ -135,10 +139,6 @@ def main():
 
     # 4) Test the model
     test_model(model, test_loader, device)
-    
-    # Delete the saved model
-    if MULTIPLE_JOBS_PER_TRAINING:
-        os.remove(f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
 
 def train_model(model, train_loader, device, optimizer, criterion, epoch):
     model.train()
