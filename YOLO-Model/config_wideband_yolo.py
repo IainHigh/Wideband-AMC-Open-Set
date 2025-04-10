@@ -61,7 +61,7 @@ MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each va
 BAND_MARGIN, SAMPLING_FREQUENCY = (
     calculate_band_margin()
 )  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-BAND_MARGIN = BAND_MARGIN * 0.5  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
+BAND_MARGIN = BAND_MARGIN * 2  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
