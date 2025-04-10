@@ -92,7 +92,6 @@ def main():
                 model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"))
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
-                break
 
     if start_epoch == EPOCHS:
         print("Model training complete. No more epochs to train.")
@@ -143,6 +142,10 @@ def main():
         if MULTIPLE_JOBS_PER_TRAINING:
             # Save model every epoch
             torch.save(model.state_dict(), f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
+            
+            # Delete the previous model epoch to save space
+            if epoch > 0:
+                os.remove(f"{SAVE_MODEL_NAME}_epoch_{epoch}.pth")
 
     print("Training complete.")
 
