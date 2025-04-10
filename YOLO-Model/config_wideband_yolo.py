@@ -47,10 +47,10 @@ def calculate_band_margin():
 # Miscellaneous Parameters
 #####################
 
-VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
+VAL_PRINT_SAMPLES = 4  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 GENERATE_CONFUSION_MATRIX = (
-    True  # If True, will generate a confusion matrix after training.
+    False  # If True, will generate a confusion matrix after training.
 )
 MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 
@@ -76,7 +76,8 @@ NUM_CLASSES = 9  # Number of classes
 #####################
 BATCH_SIZE = 64
 EPOCHS = 20
-LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.0005 # Initial learning rate
+FINAL_LR_MULTIPLE = 0.1 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights

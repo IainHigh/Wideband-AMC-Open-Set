@@ -21,6 +21,7 @@ from config_wideband_yolo import (
     BATCH_SIZE,
     EPOCHS,
     LEARNING_RATE,
+    FINAL_LR_MULTIPLE,
     VAL_PRINT_SAMPLES,
     SAMPLING_FREQUENCY,
     S,
@@ -89,7 +90,7 @@ def main():
     for epoch in range(start_epoch, EPOCHS):
         
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
-        learn_rate = LEARNING_RATE * (0.1 ** (epoch // EPOCHS))
+        learn_rate = LEARNING_RATE * (FINAL_LR_MULTIPLE ** (epoch // EPOCHS))
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
         
         # Training
