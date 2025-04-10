@@ -47,6 +47,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 
+def convert_to_readable(frequency, modclass, class_list):
+    # Convert frequency to MHz and modclass to string
+    size_map = {1 : "Hz", 1000 : "KHz", 1000000 : "MHz", 1000000000 : "GHz", 1000000000000 : "THz"}
+    for size in size_map.keys():
+        if frequency < size:
+            frequency /= (size / 1000)
+            break
+    frequency = round(frequency, 4)
+    frequency_string = f"{frequency} {size_map[size / 1000]}"
+    modclass_str = class_list[modclass]
+    return frequency_string, modclass_str
+
 def main():
     # Print the configuration file
     if PRINT_CONFIG_FILE:
@@ -215,6 +227,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_sum_freq_err = 0.0
 
     val_frames = []
+    class_list = val_loader.dataset.class_list
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
@@ -270,7 +283,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         conf = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
-
+                        x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
+                        
                         if conf > 0.2:
                             pred_list.append((x_p, cls_p, conf))
 
@@ -279,7 +293,9 @@ def validate_model(model, val_loader, device, criterion, epoch):
                             x_g = (s_idx * SAMPLING_FREQUENCY / S) + x_g * (
                                 SAMPLING_FREQUENCY / S
                             )  # raw frequency value.
+                            
                             cls_g = true_class_idx[i, s_idx, b_idx].item()
+                            x_g, cls_g = convert_to_readable(x_g, cls_g, class_list)
                             gt_list.append((x_g, cls_g))
 
                 # sort by conf desc

@@ -47,7 +47,7 @@ def calculate_band_margin():
 # Miscellaneous Parameters
 #####################
 
-VAL_PRINT_SAMPLES = 4  # The number of samples to print during validation. Helps to see how the model is doing.
+VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 GENERATE_CONFUSION_MATRIX = (
     False  # If True, will generate a confusion matrix after training.
@@ -68,7 +68,7 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 # Model Parameters
 #####################
 S = 4  # Number of grid cells
-B = 2  # Anchors / Boxes per cell
+B = 4  # Anchors / Boxes per cell
 NUM_CLASSES = 9  # Number of classes
 
 #####################
