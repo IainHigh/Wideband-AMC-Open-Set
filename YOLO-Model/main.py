@@ -49,13 +49,18 @@ random.seed(rng_seed)
 
 def convert_to_readable(frequency, modclass, class_list):
     # Convert frequency to MHz and modclass to string
-    size_map = {1 : "Hz", 1000 : "KHz", 1000000 : "MHz", 1000000000 : "GHz", 1000000000000 : "THz"}
-    for size in size_map.keys():
-        if frequency < size:
-            frequency /= (size / 1000)
-            break
-    frequency = round(frequency, 4)
-    frequency_string = f"{frequency} {size_map[size / 1000]}"
+    
+    if frequency > 1000:
+        size_map = {1 : "Hz", 1000 : "KHz", 1000000 : "MHz", 1000000000 : "GHz", 1000000000000 : "THz"}
+        for size in size_map.keys():
+            if frequency < size:
+                frequency /= (size / 1000)
+                break
+        frequency = round(frequency, 4)
+        frequency_string = f"{frequency} {size_map[size / 1000]}"
+    else:
+        frequency_string = f"{frequency} Hz"
+        
     modclass_str = class_list[modclass]
     return frequency_string, modclass_str
 
