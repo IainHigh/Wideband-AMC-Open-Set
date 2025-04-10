@@ -52,7 +52,7 @@ PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the co
 GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
-MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 
 #####################
 # Dataset Filtering Parameters
@@ -67,14 +67,14 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 # Model Parameters
 #####################
 S = 4  # Number of grid cells
-B = 8  # Anchors / Boxes per cell
+B = 4  # Anchors / Boxes per cell
 NUM_CLASSES = 9  # Number of classes
 
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 32
-EPOCHS = 50
+BATCH_SIZE = 64
+EPOCHS = 20
 LEARNING_RATE = 0.0005
 
 ########################

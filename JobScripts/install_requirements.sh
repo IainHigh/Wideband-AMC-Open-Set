@@ -36,3 +36,5 @@ pip3 install seaborn
 pip3 install torch torchvision torchaudio
 pip3 install SigMF==1.1.1
 pip3 install scikit-learn
+
+echo "Installation complete. Please check the output files for any errors."

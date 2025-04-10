@@ -46,17 +46,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 
-if torch.cuda.is_available():
-    print("\n\nCUDA is available.")
-    print(f"CUDA version: {torch.version.cuda}")
-    print(f"Available devices: {torch.cuda.device_count()}")
-    print(f"Current device: {torch.cuda.current_device()}")
-    print(f"Device name: {torch.cuda.get_device_name(0)}")
-else:
-    print("\n\nCUDA is not available. Using CPU.")
-print("\n")
-
-
 def main():
     # Print the configuration file
     if PRINT_CONFIG_FILE:
@@ -80,7 +69,6 @@ def main():
     num_samples = train_dataset.get_num_samples()
     model = WidebandYoloModel(num_samples).to(device)
     criterion = WidebandYoloLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     start_epoch = 0
     # If the model is already partially trained, load the model and get the epoch from which to continue training.
@@ -99,6 +87,11 @@ def main():
 
     # 3) Training loop
     for epoch in range(start_epoch, EPOCHS):
+        
+        # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
+        learn_rate = LEARNING_RATE * (0.1 ** (epoch // EPOCHS))
+        optimizer = optim.Adam(model.parameters(), lr=learn_rate)
+        
         # Training
         model, avg_train_loss, train_mean_freq_err, train_cls_accuracy = train_model(
             model, train_loader, device, optimizer, criterion, epoch
