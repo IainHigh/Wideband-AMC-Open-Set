@@ -1,0 +1,327 @@
+Configuration File:
+	VAL_PRINT_SAMPLES: 2
+	BAND_MARGIN: 62812499.99301508
+	NUMTAPS: 101
+	S: 4
+	B: 4
+	NUM_CLASSES: 9
+	BATCH_SIZE: 64
+	EPOCHS: 20
+	LEARNING_RATE: 0.0005
+	LAMBDA_COORD: 5.0
+	LAMBDA_NOOBJ: 0.5
+	LAMBDA_CLASS: 1.0
+
+Epoch [1/20]
+  Train: Loss=1.4936,  MeanFreqErr=0.1739,  ClsAcc=19.05%
+  Valid: Loss=1.4448,  MeanFreqErr=0.1816,  ClsAcc=29.30%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('321.8247 MHz', '8psk', 0.576803982257843), ('354.8625 MHz', '8psk', 0.5063689351081848)]
+      GroundTruth=> [('329.878 MHz', '8psk')]
+    Frame 2:
+      Predicted => []
+      GroundTruth=> [('373.0325 MHz', '16apsk')]
+
+Epoch [2/20]
+  Train: Loss=1.4520,  MeanFreqErr=0.2000,  ClsAcc=27.47%
+  Valid: Loss=1.4667,  MeanFreqErr=0.2195,  ClsAcc=36.95%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('380.1379 MHz', '8psk', 0.6750118732452393), ('348.8981 MHz', '8psk', 0.6637112498283386), ('423.1393 MHz', 'qpsk', 0.40381351113319397)]
+      GroundTruth=> [('380.4483 MHz', '8psk')]
+    Frame 2:
+      Predicted => []
+      GroundTruth=> [('769.1211 MHz', '16apsk')]
+
+Epoch [3/20]
+  Train: Loss=1.5388,  MeanFreqErr=0.2372,  ClsAcc=31.13%
+  Valid: Loss=1.4610,  MeanFreqErr=0.2258,  ClsAcc=38.30%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('633.7964 MHz', '8psk', 0.69792240858078)]
+      GroundTruth=> [('612.8501 MHz', '8psk')]
+    Frame 2:
+      Predicted => [('389.0476 MHz', '16apsk', 0.5442691445350647), ('381.5243 MHz', '16apsk', 0.5238655209541321)]
+      GroundTruth=> [('396.8732 MHz', '16apsk')]
+
+Epoch [4/20]
+  Train: Loss=1.4779,  MeanFreqErr=0.2332,  ClsAcc=35.35%
+  Valid: Loss=1.4657,  MeanFreqErr=0.2378,  ClsAcc=43.75%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('689.602 MHz', '32qam', 0.6698931455612183), ('733.1484 MHz', '32qam', 0.5232737064361572), ('736.3634 MHz', '32qam', 0.5199639797210693)]
+      GroundTruth=> [('682.3205 MHz', '32qam')]
+    Frame 2:
+      Predicted => [('693.7329 MHz', '32qam', 0.5884629487991333), ('732.8423 MHz', '32qam', 0.4862178862094879), ('733.7928 MHz', '32qam', 0.4663213789463043), ('615.8965 MHz', '32qam', 0.21623823046684265)]
+      GroundTruth=> [('699.2562 MHz', '32qam')]
+
+Epoch [5/20]
+  Train: Loss=1.2785,  MeanFreqErr=0.1858,  ClsAcc=39.72%
+  Valid: Loss=1.2264,  MeanFreqErr=0.1730,  ClsAcc=43.35%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('330.2259 MHz', '32qam', 0.6756638288497925), ('372.5933 MHz', '32qam', 0.2153904139995575)]
+      GroundTruth=> [('348.5541 MHz', '32qam')]
+    Frame 2:
+      Predicted => [('181.2064 MHz', '32apsk', 0.6382951736450195)]
+      GroundTruth=> [('216.6162 MHz', '32apsk')]
+
+Epoch [6/20]
+  Train: Loss=1.2369,  MeanFreqErr=0.1748,  ClsAcc=42.27%
+  Valid: Loss=1.1231,  MeanFreqErr=0.1549,  ClsAcc=42.95%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('543.9663 MHz', '32apsk', 0.33666813373565674), ('656.5337 MHz', '32apsk', 0.2190144807100296)]
+      GroundTruth=> [('575.6356 MHz', '32apsk')]
+    Frame 2:
+      Predicted => [('397.0266 MHz', '16apsk', 0.21530123054981232)]
+      GroundTruth=> [('475.9498 MHz', '16apsk')]
+
+Epoch [7/20]
+  Train: Loss=1.2342,  MeanFreqErr=0.1763,  ClsAcc=42.73%
+  Valid: Loss=1.1877,  MeanFreqErr=0.1683,  ClsAcc=48.30%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('339.5771 MHz', 'bpsk', 0.7311112880706787), ('331.2322 MHz', 'bpsk', 0.6949020028114319), ('278.2385 MHz', 'bpsk', 0.2752808928489685)]
+      GroundTruth=> [('358.7198 MHz', '64qam')]
+    Frame 2:
+      Predicted => []
+      GroundTruth=> [('646.8866 MHz', '16apsk')]
+
+Epoch [8/20]
+  Train: Loss=1.2073,  MeanFreqErr=0.1735,  ClsAcc=44.78%
+  Valid: Loss=1.2036,  MeanFreqErr=0.1748,  ClsAcc=46.85%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('359.7379 MHz', '8psk', 0.22888317704200745)]
+      GroundTruth=> [('428.1479 MHz', '16qam')]
+    Frame 2:
+      Predicted => [('273.3131 MHz', '32qam', 0.5997030735015869)]
+      GroundTruth=> [('300.8704 MHz', '32qam')]
+
+Epoch [9/20]
+  Train: Loss=1.2842,  MeanFreqErr=0.1912,  ClsAcc=43.54%
+  Valid: Loss=1.1104,  MeanFreqErr=0.1526,  ClsAcc=43.00%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => []
+      GroundTruth=> [('742.6294 MHz', 'qpsk')]
+    Frame 2:
+      Predicted => [('343.6739 MHz', '8psk', 0.8443521857261658), ('374.78 MHz', '8psk', 0.7084077596664429)]
+      GroundTruth=> [('361.7254 MHz', '16psk')]
+
+Epoch [10/20]
+  Train: Loss=1.0940,  MeanFreqErr=0.1462,  ClsAcc=46.73%
+  Valid: Loss=1.1346,  MeanFreqErr=0.1615,  ClsAcc=46.15%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('613.8686 MHz', 'bpsk', 0.6195858120918274), ('615.3449 MHz', 'bpsk', 0.5857840180397034)]
+      GroundTruth=> [('583.6807 MHz', 'bpsk')]
+    Frame 2:
+      Predicted => []
+      GroundTruth=> [('149.7323 MHz', 'qpsk')]
+
+Epoch [11/20]
+  Train: Loss=1.0768,  MeanFreqErr=0.1460,  ClsAcc=47.22%
+  Valid: Loss=1.0387,  MeanFreqErr=0.1421,  ClsAcc=49.45%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('622.0204 MHz', 'qpsk', 0.8798837661743164), ('652.7839 MHz', 'qpsk', 0.23579204082489014)]
+      GroundTruth=> [('604.4071 MHz', 'qpsk')]
+    Frame 2:
+      Predicted => [('81.3552 MHz', '16apsk', 0.7429531812667847), ('144.581 MHz', '16apsk', 0.3852820098400116)]
+      GroundTruth=> [('105.2376 MHz', '16qam')]
+
+Epoch [12/20]
+  Train: Loss=1.0466,  MeanFreqErr=0.1374,  ClsAcc=49.33%
+  Valid: Loss=1.0175,  MeanFreqErr=0.1368,  ClsAcc=54.55%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('200.4004 MHz', '32qam', 0.6032880544662476)]
+      GroundTruth=> [('229.4445 MHz', '64qam')]
+    Frame 2:
+      Predicted => [('198.2096 MHz', '16psk', 0.9383785724639893)]
+      GroundTruth=> [('189.8385 MHz', '16psk')]
+
+Epoch [13/20]
+  Train: Loss=1.0974,  MeanFreqErr=0.1563,  ClsAcc=49.87%
+  Valid: Loss=1.0135,  MeanFreqErr=0.1398,  ClsAcc=53.10%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('313.3133 MHz', '16qam', 0.48849549889564514)]
+      GroundTruth=> [('271.5679 MHz', '16qam')]
+    Frame 2:
+      Predicted => [('312.99 MHz', '32apsk', 0.5847528576850891)]
+      GroundTruth=> [('280.0176 MHz', '32apsk')]
+
+Epoch [14/20]
+  Train: Loss=1.0456,  MeanFreqErr=0.1422,  ClsAcc=51.10%
+  Valid: Loss=1.0522,  MeanFreqErr=0.1510,  ClsAcc=53.05%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('291.5342 MHz', '16qam', 0.40155914425849915), ('276.2006 MHz', '16qam', 0.30185672640800476), ('246.987 MHz', '32apsk', 0.23387503623962402)]
+      GroundTruth=> [('309.3705 MHz', '16apsk')]
+    Frame 2:
+      Predicted => [('240.7569 MHz', '32apsk', 0.7398641109466553), ('297.4746 MHz', 'qpsk', 0.2854549288749695)]
+      GroundTruth=> [('241.5693 MHz', 'qpsk')]
+
+Epoch [15/20]
+  Train: Loss=0.9985,  MeanFreqErr=0.1321,  ClsAcc=52.36%
+  Valid: Loss=0.9905,  MeanFreqErr=0.1371,  ClsAcc=55.75%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('380.0279 MHz', 'bpsk', 0.7096124887466431), ('365.1916 MHz', 'bpsk', 0.5047640204429626)]
+      GroundTruth=> [('393.6438 MHz', 'bpsk')]
+    Frame 2:
+      Predicted => [('663.4287 MHz', '32qam', 0.6220527291297913), ('613.4408 MHz', '32qam', 0.36128851771354675)]
+      GroundTruth=> [('637.8916 MHz', '32qam')]
+
+Epoch [16/20]
+  Train: Loss=0.9955,  MeanFreqErr=0.1392,  ClsAcc=53.69%
+  Valid: Loss=1.0087,  MeanFreqErr=0.1494,  ClsAcc=52.95%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('257.5172 MHz', '64qam', 0.5798534154891968), ('227.3862 MHz', '16psk', 0.28887826204299927)]
+      GroundTruth=> [('247.4556 MHz', '16apsk')]
+    Frame 2:
+      Predicted => [('478.3716 MHz', '32apsk', 1.067309856414795)]
+      GroundTruth=> [('468.5382 MHz', '32apsk')]
+
+Epoch [17/20]
+  Train: Loss=1.0190,  MeanFreqErr=0.1481,  ClsAcc=54.74%
+  Valid: Loss=1.0332,  MeanFreqErr=0.1524,  ClsAcc=56.55%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('768.2853 MHz', '16psk', 0.9685739874839783)]
+      GroundTruth=> [('777.3792 MHz', '16psk')]
+    Frame 2:
+      Predicted => [('79.6293 MHz', '16psk', 1.1024882793426514), ('38.3531 MHz', '32qam', 0.2966230511665344)]
+      GroundTruth=> [('83.7718 MHz', '16psk')]
+
+Epoch [18/20]
+  Train: Loss=0.9880,  MeanFreqErr=0.1376,  ClsAcc=55.01%
+  Valid: Loss=0.9743,  MeanFreqErr=0.1373,  ClsAcc=56.10%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('151.6638 MHz', '16psk', 0.7412679195404053), ('93.9084 MHz', '16psk', 0.3348730206489563)]
+      GroundTruth=> [('132.1186 MHz', '16psk')]
+    Frame 2:
+      Predicted => [('380.0757 MHz', '16psk', 0.865757942199707), ('340.7951 MHz', '16psk', 0.421575129032135)]
+      GroundTruth=> [('374.7502 MHz', '16psk')]
+
+Epoch [19/20]
+  Train: Loss=1.0332,  MeanFreqErr=0.1545,  ClsAcc=55.92%
+  Valid: Loss=1.0053,  MeanFreqErr=0.1529,  ClsAcc=54.30%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('716.917 MHz', 'bpsk', 0.5629655122756958)]
+      GroundTruth=> [('741.6905 MHz', 'bpsk')]
+    Frame 2:
+      Predicted => [('627.6612 MHz', '8psk', 0.8058163523674011)]
+      GroundTruth=> [('592.8431 MHz', '8psk')]
+
+Epoch [20/20]
+  Train: Loss=1.0801,  MeanFreqErr=0.1752,  ClsAcc=55.71%
+  Valid: Loss=1.0643,  MeanFreqErr=0.1696,  ClsAcc=53.70%
+
+  Some random frames from validation (only 2 shown):
+  Prediction format: (frequency, class, confidence)
+  GroundTruth format: (frequency, class)
+    Frame 1:
+      Predicted => [('775.701 MHz', '16qam', 0.22929918766021729), ('743.7481 MHz', '16qam', 0.2216605544090271)]
+      GroundTruth=> [('748.5118 MHz', 'qpsk')]
+    Frame 2:
+      Predicted => [('565.3155 MHz', '16apsk', 0.8832170367240906)]
+      GroundTruth=> [('529.515 MHz', '16qam')]
+
+Training complete.
+
+=== TEST SET RESULTS ===
+Overall bounding boxes: 2000
+Classification Accuracy (overall): 53.50%
+Mean Frequency Error (overall): 0.1609
+SNR -20.0:  Accuracy=6.67%,  FreqErr=0.4059
+SNR -18.0:  Accuracy=12.05%,  FreqErr=0.3714
+SNR -16.0:  Accuracy=13.16%,  FreqErr=0.3966
+SNR -14.0:  Accuracy=17.17%,  FreqErr=0.2936
+SNR -12.0:  Accuracy=10.09%,  FreqErr=0.2197
+SNR -10.0:  Accuracy=17.82%,  FreqErr=0.1633
+SNR -8.0:  Accuracy=26.80%,  FreqErr=0.1528
+SNR -6.0:  Accuracy=37.62%,  FreqErr=0.1237
+SNR -4.0:  Accuracy=39.36%,  FreqErr=0.1166
+SNR -2.0:  Accuracy=47.06%,  FreqErr=0.0955
+SNR 0.0:  Accuracy=55.95%,  FreqErr=0.1050
+SNR 2.0:  Accuracy=68.60%,  FreqErr=0.0990
+SNR 4.0:  Accuracy=70.34%,  FreqErr=0.1034
+SNR 6.0:  Accuracy=80.19%,  FreqErr=0.1103
+SNR 8.0:  Accuracy=75.89%,  FreqErr=0.0952
+SNR 10.0:  Accuracy=85.88%,  FreqErr=0.1075
+SNR 12.0:  Accuracy=91.30%,  FreqErr=0.1010
+SNR 14.0:  Accuracy=88.24%,  FreqErr=0.0844
+SNR 16.0:  Accuracy=86.17%,  FreqErr=0.1097
+SNR 18.0:  Accuracy=95.88%,  FreqErr=0.1054
+SNR 20.0:  Accuracy=94.38%,  FreqErr=0.0978
+
+Test confusion matrix saved to test_confusion_matrix.png.
+
+=== END OF TESTING ===
+
+Code Execution took 1 hours, 35 minutes, 20 seconds.
