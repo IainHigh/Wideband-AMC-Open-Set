@@ -139,8 +139,8 @@ def main():
         print(
             f"\n  Some random frames from validation (only {VAL_PRINT_SAMPLES} shown):"
         )
-        print(f"  Prediction format: (freq_offset [0,1], class, conf)")
-        print(f"  GroundTruth format: (freq_offset [0,1], class)")
+        print(f"  Prediction format: (frequency, class, confidence)")
+        print(f"  GroundTruth format: (frequency, class)")
         for idx, frame_dict in enumerate(to_print, 1):
             pred_list = frame_dict["pred_list"]
             gt_list = frame_dict["gt_list"]

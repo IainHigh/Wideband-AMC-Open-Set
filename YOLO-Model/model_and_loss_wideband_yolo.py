@@ -268,9 +268,7 @@ class WidebandYoloModel(nn.Module):
         refine_delta = refine_delta.view(bsz, S, B)
 
         # Final predicted normalized offset.
-        freq_pred = torch.clamp(
-            coarse_freq_pred + refine_delta, 0.0, 1.0
-        )  # [bsz, S, B]
+        freq_pred = coarse_freq_pred + refine_delta # [bsz, S, B]
 
         cell_indices = torch.arange(
             S, device=freq_pred.device, dtype=freq_pred.dtype
@@ -368,7 +366,6 @@ class WidebandYoloLoss(nn.Module):
         noobj_mask = 1.0 - obj_mask
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
-        iou_1d = torch.clamp(iou_1d, min=0.0, max=1.0)
         conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
         conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
         class_diff = (class_pred - class_tgt) ** 2
