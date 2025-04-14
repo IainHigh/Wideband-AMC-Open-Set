@@ -95,7 +95,7 @@ def main():
             if os.path.exists(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"):
                 # Load the model from the previous job
                 model = WidebandYoloModel(train_dataset.get_num_samples()).to(device)
-                model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"))
+                model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth", map_location=device))
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
 

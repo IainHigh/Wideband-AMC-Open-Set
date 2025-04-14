@@ -75,7 +75,7 @@ NUM_CLASSES = 7  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 60
+EPOCHS = 30
 LEARNING_RATE = 0.0005 # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
