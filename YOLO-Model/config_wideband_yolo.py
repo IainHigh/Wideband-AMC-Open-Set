@@ -50,9 +50,9 @@ def calculate_band_margin():
 VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 GENERATE_CONFUSION_MATRIX = (
-    True  # If True, will generate a confusion matrix after training.
+    False  # If True, will generate a confusion matrix after training.
 )
-MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 
 #####################
 # Dataset Filtering Parameters
@@ -75,7 +75,7 @@ NUM_CLASSES = 7  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 30
+EPOCHS = 20
 LEARNING_RATE = 0.0005 # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
@@ -93,6 +93,9 @@ def print_config_file():
     """
     print("Configuration File:")
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
+    print("\tGENERATE_CONFUSION_MATRIX:", GENERATE_CONFUSION_MATRIX)
+    print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
+    print("\tSAMPLING_FREQUENCY:", SAMPLING_FREQUENCY)
     print("\tBAND_MARGIN:", BAND_MARGIN)
     print("\tNUMTAPS:", NUMTAPS)
     print("\tS:", S)
@@ -101,6 +104,7 @@ def print_config_file():
     print("\tBATCH_SIZE:", BATCH_SIZE)
     print("\tEPOCHS:", EPOCHS)
     print("\tLEARNING_RATE:", LEARNING_RATE)
+    print("\tFINAL_LR_MULTIPLE:", FINAL_LR_MULTIPLE)
     print("\tLAMBDA_COORD:", LAMBDA_COORD)
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
