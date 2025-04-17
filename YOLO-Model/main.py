@@ -16,19 +16,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
-from config_wideband_yolo import (
-    NUM_CLASSES,
-    BATCH_SIZE,
-    EPOCHS,
-    LEARNING_RATE,
-    FINAL_LR_MULTIPLE,
-    VAL_PRINT_SAMPLES,
-    SAMPLING_FREQUENCY,
-    S,
-    PRINT_CONFIG_FILE,
-    print_config_file,
-    MULTIPLE_JOBS_PER_TRAINING,
-)
+import config_wideband_yolo as cfg
 
 SAVE_MODEL_NAME = "yolo_model"
 
@@ -66,8 +54,8 @@ def convert_to_readable(frequency, modclass, class_list):
 
 def main():
     # Print the configuration file
-    if PRINT_CONFIG_FILE:
-        print_config_file()
+    if cfg.PRINT_CONFIG_FILE:
+        cfg.print_config_file()
 
     # 1) Build dataset and loaders
     train_dataset = WidebandYoloDataset(
@@ -79,9 +67,12 @@ def main():
     test_dataset = WidebandYoloDataset(
         os.path.join(data_dir, "testing"), transform=None
     )
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    
+    cfg.MODULATION_CLASSES = train_dataset.class_list
+    
+    train_loader = DataLoader(train_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=cfg.BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=cfg.BATCH_SIZE, shuffle=False)
 
     # 2) Create model & loss
     num_samples = train_dataset.get_num_samples()
@@ -90,8 +81,8 @@ def main():
 
     start_epoch = 0
     # If the model is already partially trained, load the model and get the epoch from which to continue training.
-    if MULTIPLE_JOBS_PER_TRAINING:
-        for i in range(EPOCHS):
+    if cfg.MULTIPLE_JOBS_PER_TRAINING:
+        for i in range(cfg.EPOCHS):
             if os.path.exists(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"):
                 # Load the model from the previous job
                 model = WidebandYoloModel(train_dataset.get_num_samples()).to(device)
@@ -99,15 +90,15 @@ def main():
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
 
-    if start_epoch == EPOCHS:
+    if start_epoch == cfg.EPOCHS:
         print("Model training complete. No more epochs to train.")
         return
 
     # 3) Training loop
-    for epoch in range(start_epoch, EPOCHS):
+    for epoch in range(start_epoch, cfg.EPOCHS):
         
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
-        learn_rate = LEARNING_RATE * (FINAL_LR_MULTIPLE ** (epoch // EPOCHS))
+        learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE ** (epoch // cfg.EPOCHS))
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
         
         # Training
@@ -121,7 +112,7 @@ def main():
         )
 
         # Print metrics for this epoch
-        print(f"Epoch [{epoch+1}/{EPOCHS}]")
+        print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")
         print(
             f"  Train: Loss={avg_train_loss:.4f},"
             f"  MeanFreqErr={train_mean_freq_err:.4f},"
@@ -135,9 +126,9 @@ def main():
 
         # Print a random subset of "frames"
         random.shuffle(val_frames)
-        to_print = val_frames[:VAL_PRINT_SAMPLES]  # up to VAL_PRINT_SAMPLES frames
+        to_print = val_frames[:cfg.VAL_PRINT_SAMPLES]  # up to VAL_PRINT_SAMPLES frames
         print(
-            f"\n  Some random frames from validation (only {VAL_PRINT_SAMPLES} shown):"
+            f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
         )
         print(f"  Prediction format: (frequency, class, confidence)")
         print(f"  GroundTruth format: (frequency, class)")
@@ -150,7 +141,7 @@ def main():
             print(f"      GroundTruth=> {gt_list}")
         print("")
 
-        if MULTIPLE_JOBS_PER_TRAINING:
+        if cfg.MULTIPLE_JOBS_PER_TRAINING:
             # Save model every epoch
             torch.save(model.state_dict(), f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
             
@@ -173,8 +164,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
-    for time_data, freq_data, label_tensor, _ in tqdm(
-        train_loader, desc=f"Training epoch {epoch+1}/{EPOCHS}"
+    for time_data, freq_data, label_tensor, snr_tensor in tqdm(
+        train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
         time_data = time_data.to(device)
         freq_data = freq_data.to(device)
@@ -182,14 +173,14 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
         optimizer.zero_grad()
         pred = model(time_data, freq_data)
-        loss = criterion(pred, label_tensor)
+        loss = criterion(pred, label_tensor, current_epoch=epoch)
         loss.backward()
         optimizer.step()
         total_train_loss += loss.item()
 
         # Additional training metrics
         bsize = pred.shape[0]
-        pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
+        pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES))
         x_pred = pred_reshape[..., 0]
         class_pred = pred_reshape[..., 2:]
 
@@ -236,7 +227,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
-            val_loader, desc=f"Validation epoch {epoch+1}/{EPOCHS}"
+            val_loader, desc=f"Validation epoch {epoch+1}/{cfg.EPOCHS}"
         ):
             time_data = time_data.to(device)
             freq_data = freq_data.to(device)
@@ -247,7 +238,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
             total_val_loss += loss.item()
 
             bsize = pred.shape[0]
-            pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + NUM_CLASSES))
+            pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES))
 
             x_pred = pred_reshape[..., 0]
             conf_pred = pred_reshape[..., 1]
@@ -282,8 +273,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
                         x_p = x_pred[i, s_idx, b_idx].item()  # x_offset [0,1]
-                        x_p = (s_idx * SAMPLING_FREQUENCY / S) + x_p * (
-                            SAMPLING_FREQUENCY / S
+                        x_p = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_p * (
+                            cfg.SAMPLING_FREQUENCY / cfg.S
                         )  # raw frequency value.
 
                         conf = conf_pred[i, s_idx, b_idx].item()
@@ -295,8 +286,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
-                            x_g = (s_idx * SAMPLING_FREQUENCY / S) + x_g * (
-                                SAMPLING_FREQUENCY / S
+                            x_g = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_g * (
+                                cfg.SAMPLING_FREQUENCY / cfg.S
                             )  # raw frequency value.
                             
                             cls_g = true_class_idx[i, s_idx, b_idx].item()
@@ -354,7 +345,7 @@ def test_model(model, test_loader, device):
             bsize = pred.shape[0]
             Sdim = pred.shape[1]  # should be S
             # interpret bounding boxes
-            pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + NUM_CLASSES))
+            pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + cfg.NUM_CLASSES))
 
             x_pred = pred_reshape[..., 0]  # [bsize, S, B]
             class_pred = pred_reshape[..., 2:]
@@ -442,8 +433,7 @@ def test_model(model, test_loader, device):
             f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr:.4f}"
         )
 
-    # If dataset has "class_list" or "label_to_idx" you can define:
-    class_list = test_loader.dataset.class_list  # or however you track the modclass
+    class_list = test_loader.dataset.class_list
     cm = confusion_matrix(
         overall_true_classes, overall_pred_classes, labels=range(len(class_list))
     )
@@ -453,23 +443,24 @@ def test_model(model, test_loader, device):
         if row_sum > 0:
             cm_percent[i] = (cm[i] / row_sum) * 100.0
 
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(
-        cm_percent,
-        annot=True,
-        fmt=".2f",
-        cmap="Blues",
-        xticklabels=class_list,
-        yticklabels=class_list,
-    )
-    plt.title("Test Set Confusion Matrix (%)")
-    plt.xlabel("Predicted Class")
-    plt.ylabel("True Class")
-    plt.tight_layout()
-    plt.savefig("test_confusion_matrix.png")
-    plt.close()
+    if cfg.GENERATE_CONFUSION_MATRIX:
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(
+            cm_percent,
+            annot=True,
+            fmt=".2f",
+            cmap="Blues",
+            xticklabels=class_list,
+            yticklabels=class_list,
+        )
+        plt.title("Test Set Confusion Matrix (%)")
+        plt.xlabel("Predicted Class")
+        plt.ylabel("True Class")
+        plt.tight_layout()
+        plt.savefig("test_confusion_matrix.png")
+        plt.close()
 
-    print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
+        print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
     print("=== END OF TESTING ===")
 
 

@@ -42,7 +42,6 @@ def calculate_band_margin():
     channel_bw = symbol_rate * (1 + beta)
     return channel_bw, sampling_rate
 
-
 #####################
 # Miscellaneous Parameters
 #####################
@@ -50,9 +49,11 @@ def calculate_band_margin():
 VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 GENERATE_CONFUSION_MATRIX = (
-    False  # If True, will generate a confusion matrix after training.
+    True  # If True, will generate a confusion matrix after training.
 )
-MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MODULATION_CLASSES = [] # The modulation classes will be determined by the dataset discovery process.
+
 
 #####################
 # Dataset Filtering Parameters
@@ -75,13 +76,42 @@ NUM_CLASSES = 7  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 20
+EPOCHS = 100
 LEARNING_RATE = 0.0005 # Initial learning rate
-FINAL_LR_MULTIPLE = 0.1 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.01 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
 ########################
+USE_SIMILARITY_MATRIX = True  
+
+# Dictionary for inter-modulation similarity scores.
+# Keys are unordered tuples of modulation names (e.g., ("BPSK", "QPSK") is equivalent to ("QPSK", "BPSK")).
+# Adjust the scores as needed. Lower values imply a lower penalty for confusion.
+SIMILARITY_DICT = {
+    ("bpsk", "qpsk"): 1.5,
+    ("bpsk", "8psk"): 2.0,
+    ("bpsk", "16qam"): 3.0,
+    ("bpsk", "32qam"): 4.0,
+    ("bpsk", "16apsk"): 3.5,
+    ("bpsk", "32apsk"): 4.0,
+    ("qpsk", "8psk"): 1.6,
+    ("qpsk", "16qam"): 2.2,
+    ("qpsk", "32qam"): 3.0,
+    ("qpsk", "16apsk"): 2.8,
+    ("qpsk", "32apsk"): 3.2,
+    ("8psk", "16qam"): 1.4,
+    ("8psk", "32qam"): 2.0,
+    ("8psk", "16apsk"): 1.8,
+    ("8psk", "32apsk"): 2.2,
+    ("16qam", "32qam"): 1.2,
+    ("16qam", "16apsk"): 1.5,
+    ("16qam", "32apsk"): 1.8,
+    ("32qam", "16apsk"): 1.3,
+    ("32qam", "32apsk"): 1.1,
+    ("16apsk", "32apsk"): 1.0,
+}
+
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
@@ -92,6 +122,7 @@ def print_config_file():
     Print the configuration file to the console.
     """
     print("Configuration File:")
+    print("USE SIMILARITY MATRIX:", USE_SIMILARITY_MATRIX)
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
     print("\tGENERATE_CONFUSION_MATRIX:", GENERATE_CONFUSION_MATRIX)
     print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
