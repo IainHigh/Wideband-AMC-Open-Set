@@ -12,11 +12,10 @@ from config_wideband_yolo import (
     BAND_MARGIN,
     NUMTAPS,
     SAMPLING_FREQUENCY,
-    get_anchors,
-    EPOCHS,
     USE_SIMILARITY_MATRIX,
     MODULATION_CLASSES, 
     SIMILARITY_DICT,
+    get_anchors,
 )
 
 
@@ -357,7 +356,7 @@ class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, pred, target, current_epoch=None):
+    def forward(self, pred, target):
         batch_size = pred.shape[0]
         pred = pred.view(batch_size, pred.shape[1], B, (1 + 1 + NUM_CLASSES))
         x_pred = pred[..., 0]

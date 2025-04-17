@@ -164,7 +164,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
-    for time_data, freq_data, label_tensor, snr_tensor in tqdm(
+    for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
         time_data = time_data.to(device)
@@ -173,7 +173,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
         optimizer.zero_grad()
         pred = model(time_data, freq_data)
-        loss = criterion(pred, label_tensor, current_epoch=epoch)
+        loss = criterion(pred, label_tensor)
         loss.backward()
         optimizer.step()
         total_train_loss += loss.item()
