@@ -4,7 +4,8 @@
 
 import torch
 import json
-import time
+import shutil
+import numpy as np
 import sys
 import os
 import random
@@ -86,7 +87,9 @@ def main():
             if os.path.exists(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth"):
                 # Load the model from the previous job
                 model = WidebandYoloModel(train_dataset.get_num_samples()).to(device)
-                model.load_state_dict(torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth", map_location=device))
+                checkpoint = torch.load(f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth", map_location="cpu")
+                model.load_state_dict(checkpoint)
+                model.to(device)
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
 
@@ -223,7 +226,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_sum_freq_err = 0.0
 
     val_frames = []
-    class_list = val_loader.dataset.class_list
+    class_list = cfg.MODULATION_CLASSES
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
@@ -407,12 +410,9 @@ def test_model(model, test_loader, device):
                     snr_freq_err[sample_snr] += sample_freq_err
 
     # 1) Overall
-    if total_obj_count > 0:
-        overall_cls_acc = 100.0 * total_correct_cls / total_obj_count
-        overall_freq_err = total_freq_err / total_obj_count
-    else:
-        overall_cls_acc = 0.0
-        overall_freq_err = 0.0
+    overall_cls_acc = 100.0 * total_correct_cls / total_obj_count
+    overall_freq_err = total_freq_err / total_obj_count
+    
 
     print("\n=== TEST SET RESULTS ===")
     print(f"Overall bounding boxes: {total_obj_count}")
@@ -420,20 +420,29 @@ def test_model(model, test_loader, device):
     print(f"Mean Frequency Error (overall): {overall_freq_err:.4f}")
 
     # 2) Per-SNR
-    # sort the SNR keys
     snr_keys_sorted = sorted(snr_obj_count.keys())
     for snr_val in snr_keys_sorted:
-        if snr_obj_count[snr_val] > 0:
-            cls_acc_snr = 100.0 * snr_correct_cls[snr_val] / snr_obj_count[snr_val]
-            freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
-        else:
-            cls_acc_snr = 0.0
-            freq_err_snr = 0.0
+        cls_acc_snr = 100.0 * snr_correct_cls[snr_val] / snr_obj_count[snr_val]
+        freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
+
         print(
             f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr:.4f}"
         )
 
-    class_list = test_loader.dataset.class_list
+    # 3) Confusion matrix
+    if cfg.GENERATE_CONFUSION_MATRIX:
+        class_list = cfg.MODULATION_CLASSES
+        plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes)
+    
+    # 4) Plot frequency domain diagram of test set samples and predictions
+    if cfg.PLOT_TEST_SAMPLES:
+        plot_test_samples(model, test_loader, device)
+        
+    # 5) Write the test results to a file.
+    if cfg.WRITE_TEST_RESULTS:
+        write_test_results(model, test_loader, device)
+
+def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes):
     cm = confusion_matrix(
         overall_true_classes, overall_pred_classes, labels=range(len(class_list))
     )
@@ -443,32 +452,188 @@ def test_model(model, test_loader, device):
         if row_sum > 0:
             cm_percent[i] = (cm[i] / row_sum) * 100.0
 
-    if cfg.GENERATE_CONFUSION_MATRIX:
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(
-            cm_percent,
-            annot=True,
-            fmt=".2f",
-            cmap="Blues",
-            xticklabels=class_list,
-            yticklabels=class_list,
-        )
-        plt.title("Test Set Confusion Matrix (%)")
-        plt.xlabel("Predicted Class")
-        plt.ylabel("True Class")
-        plt.tight_layout()
-        plt.savefig("test_confusion_matrix.png")
-        plt.close()
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(
+        cm_percent,
+        annot=True,
+        fmt=".2f",
+        cmap="Blues",
+        xticklabels=class_list,
+        yticklabels=class_list,
+    )
+    plt.title("Test Set Confusion Matrix (%)")
+    plt.xlabel("Predicted Class")
+    plt.ylabel("True Class")
+    plt.tight_layout()
+    plt.savefig("test_confusion_matrix.png")
+    plt.close()
 
-        print("\nTest confusion matrix saved to test_confusion_matrix.png.\n")
-    print("=== END OF TESTING ===")
+def plot_test_samples(model, test_loader, device):
+    """
+    For each sample in the test set: compute and plot its PSD,
+    then draw vertical lines for each true center frequency (black dashed)
+    and for each prediction (red solid), with labels showing
+    predicted class, true class, and freq error below the line.
+    Figures are saved as PNGs under data_dir/test_result_plots/.
+    """
+    out_dir = os.path.join(data_dir, "test_result_plots")
+    # clear or create directory
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
 
+    # loop with progress bar
+    sample_idx = 0
+    for batch in tqdm(test_loader, desc="Plotting test samples"):
+        time_data, freq_data, label_tensor, snr_tensor = batch
+        bsz = time_data.size(0)
+        for b in range(bsz):
+            # reconstruct complex IQ
+            x_wide = time_data[b].cpu().numpy()  # shape [2, N]
+            I, Q = x_wide
+            x_complex = I + 1j * Q
+
+            # FFT + shift + PSD
+            X = np.fft.fft(x_complex)
+            X = np.fft.fftshift(X)
+            freqs = np.fft.fftshift(np.fft.fftfreq(len(x_complex), d=1/cfg.SAMPLING_FREQUENCY))
+            PSD = 10 * np.log10(np.abs(X)**2 + 1e-12)
+
+            # extend & keep pos freqs
+            freqs_ext = np.concatenate((freqs, freqs + cfg.SAMPLING_FREQUENCY))
+            PSD_ext   = np.concatenate((PSD, PSD))
+            idx_pos   = freqs_ext >= 0
+            freqs_fin = freqs_ext[idx_pos]
+            PSD_fin   = PSD_ext[idx_pos]
+
+            # run model for this one sample
+            with torch.no_grad():
+                pred = model(
+                    time_data[b:b+1].to(device),
+                    freq_data[b:b+1].to(device),
+                )
+            # reshape to [1, S, B, 1+1+NUM_CLASSES]
+            pred = pred.view(1, cfg.S, cfg.B, 1+1+cfg.NUM_CLASSES).cpu().numpy()[0]
+            gt   = label_tensor[b].view(cfg.S, cfg.B, 1+1+cfg.NUM_CLASSES).numpy()
+
+            # extract GT freqs & classes
+            gt_lines = []
+            for si in range(cfg.S):
+                for bi in range(cfg.B):
+                    if gt[si,bi,1] > 0:  # confidence>0
+                        xg = gt[si,bi,0]
+                        fg = (si + xg)*(cfg.SAMPLING_FREQUENCY/2)/cfg.S
+                        cls_g = np.argmax(gt[si,bi,2:])
+                        gt_lines.append((fg, cfg.MODULATION_CLASSES[cls_g]))
+
+            # extract preds above a threshold
+            pred_lines = []
+            for si in range(cfg.S):
+                for bi in range(cfg.B):
+                    conf_p = pred[si,bi,1]
+                    if conf_p > 0.2:
+                        xp = pred[si,bi,0]
+                        fp = (si + xp)*(cfg.SAMPLING_FREQUENCY/2)/cfg.S
+                        cls_p = np.argmax(pred[si,bi,2:])
+                        # find closest GT for error
+                        if gt_lines:
+                            errs = [abs(fp - g[0]) for g in gt_lines]
+                            err = min(errs)
+                        else:
+                            err = np.nan
+                        pred_lines.append((fp, cfg.MODULATION_CLASSES[cls_p], err))
+
+            # plotting
+            plt.figure()
+            plt.plot(freqs_fin, PSD_fin)
+            # title with SNR and count
+            snr = snr_tensor[b].item()
+            plt.title(f"SNR = {snr:.1f}; Center_freqs = {len(gt_lines)}")
+            plt.xlabel("Frequency [Hz]")
+            plt.ylabel("PSD [dB]")
+
+            # draw GT
+            for fg, cls_g in gt_lines:
+                plt.axvline(fg, linestyle="--", color="black", alpha=0.7)
+                plt.text(fg, PSD_fin.min(), f"GT:{cls_g}", rotation=90,
+                         va="bottom", ha="center")
+
+            # draw preds
+            for fp, cls_p, err in pred_lines:
+                plt.axvline(fp, linestyle="-", color="red", alpha=0.7)
+                plt.text(fp, PSD_fin.min(),
+                         f"P:{cls_p}\nErr:{err:.2f}", rotation=90,
+                         va="bottom", ha="center")
+
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.path.join(out_dir, f"sample_{sample_idx:04d}.png"))
+            plt.close()
+            sample_idx += 1
+
+
+def write_test_results(model, test_loader, device):
+    """
+    Run the model over every test sample, build readable pred/gt lists
+    and write them sorted by descending SNR to
+      data_dir/test_result_plots/test_results.txt
+    """
+    out_dir = os.path.join(data_dir, "test_result_plots")
+    # clear or create directory
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, "test_results.txt")
+
+    entries = []
+    model.eval()
+    with torch.no_grad():
+        for time_data, freq_data, label_tensor, snr_tensor in tqdm(
+            test_loader, desc="Gathering test results"
+        ):
+            bsz = time_data.size(0)
+            # run model once per batch
+            preds = model(time_data.to(device), freq_data.to(device))
+            # reshape to [batch, S, B, 1+1+NUM_CLASSES]
+            preds = preds.view(bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
+            labels = label_tensor.view(bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).numpy()
+            for i in range(bsz):
+                snr = snr_tensor[i].item()
+                pred_list = []
+                gt_list   = []
+
+                # build GT list
+                for si in range(cfg.S):
+                    for bi in range(cfg.B):
+                        if labels[i,si,bi,1] > 0:
+                            xg_norm = labels[i,si,bi,0]
+                            fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY/2)/cfg.S
+                            cls_idx = np.argmax(labels[i,si,bi,2:])
+                            freq_str, cls_str = convert_to_readable(fg, cls_idx, cfg.MODULATION_CLASSES)
+                            gt_list.append((freq_str, cls_str))
+
+                # build Pred list
+                for si in range(cfg.S):
+                    for bi in range(cfg.B):
+                        conf_p = preds[i,si,bi,1]
+                        if conf_p > 0.2:
+                            xp_norm = preds[i,si,bi,0]
+                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY/2)/cfg.S
+                            cls_idx = np.argmax(preds[i,si,bi,2:])
+                            freq_str, cls_str = convert_to_readable(fp, cls_idx, cfg.MODULATION_CLASSES)
+                            pred_list.append((freq_str, cls_str, conf_p))
+
+                entries.append((snr, len(gt_list), pred_list, gt_list))
+
+    # sort by SNR descending
+    entries.sort(key=lambda x: x[0], reverse=True)
+
+    # write to file
+    with open(out_file, "w") as f:
+        for _, (snr, ntx, pred_list, gt_list) in enumerate(entries, 1):
+            f.write(f"SNR {snr:.1f}; Center_freqs = {ntx}\n")
+            f.write(f"  Predicted => {pred_list}\n")
+            f.write(f"  GroundTruth=> {gt_list}\n\n")
 
 if __name__ == "__main__":
-    start_time = time.time()
     main()
-    time_diff = time.time() - start_time
-    print(
-        f"\nCode Execution took {time_diff // 3600:.0f} hours, "
-        f"{(time_diff % 3600) // 60:.0f} minutes, {time_diff % 60:.0f} seconds."
-    )

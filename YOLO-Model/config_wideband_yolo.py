@@ -48,12 +48,11 @@ def calculate_band_margin():
 
 VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
-GENERATE_CONFUSION_MATRIX = (
-    True  # If True, will generate a confusion matrix after training.
-)
+WRITE_TEST_RESULTS = True  # If True, will write the test results to a file.
+GENERATE_CONFUSION_MATRIX = True  # If True, will generate a confusion matrix after training.
+PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
 MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = [] # The modulation classes will be determined by the dataset discovery process.
-
 
 #####################
 # Dataset Filtering Parameters
@@ -75,10 +74,10 @@ NUM_CLASSES = 7  # Number of classes
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 64
-EPOCHS = 100
-LEARNING_RATE = 0.0005 # Initial learning rate
-FINAL_LR_MULTIPLE = 0.01 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+BATCH_SIZE = 128
+EPOCHS = 20
+LEARNING_RATE = 0.005 # Initial learning rate
+FINAL_LR_MULTIPLE = 0.1 # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
@@ -124,6 +123,8 @@ def print_config_file():
     print("Configuration File:")
     print("USE SIMILARITY MATRIX:", USE_SIMILARITY_MATRIX)
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
+    print("\tPLOT_TEST_SAMPLES:", PLOT_TEST_SAMPLES)
+    print("\tWRITE_TEST_RESULTS:", WRITE_TEST_RESULTS)
     print("\tGENERATE_CONFUSION_MATRIX:", GENERATE_CONFUSION_MATRIX)
     print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
     print("\tSAMPLING_FREQUENCY:", SAMPLING_FREQUENCY)
