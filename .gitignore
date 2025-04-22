@@ -26,8 +26,7 @@ __pycache__/
 *.pth
 
 # OutputFiles
-OutputFiles
-*.o*
-*.e*
-*.pe*
-*.po*
+OutputFiles/*.o*
+OutputFiles/*.e*
+OutputFiles/*.pe*
+OutputFiles/*.po*
