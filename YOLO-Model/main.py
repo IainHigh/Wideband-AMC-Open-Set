@@ -293,13 +293,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                         conf = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
                         x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
-<<<<<<< HEAD
-                        
                         if conf > cfg.CONFIDENCE_THRESHOLD:
-=======
-
-                        if conf > 0.2:
->>>>>>> bf69c67f74a006b73942d2c74bb1d98fdf063e37
                             pred_list.append((x_p, cls_p, conf))
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
@@ -541,19 +535,12 @@ def plot_test_samples(model, test_loader, device):
             pred_lines = []
             for si in range(cfg.S):
                 for bi in range(cfg.B):
-<<<<<<< HEAD
                     conf_p = pred[si,bi,1]
                     if conf_p > cfg.CONFIDENCE_THRESHOLD:
                         xp = pred[si,bi,0]
                         fp = (si + xp)*(cfg.SAMPLING_FREQUENCY/2)/cfg.S
                         cls_p = np.argmax(pred[si,bi,2:])
-=======
-                    conf_p = pred[si, bi, 1]
-                    if conf_p > 0.2:
-                        xp = pred[si, bi, 0]
-                        fp = (si + xp) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                        cls_p = np.argmax(pred[si, bi, 2:])
->>>>>>> bf69c67f74a006b73942d2c74bb1d98fdf063e37
+
                         # find closest GT for error
                         if gt_lines:
                             errs = [abs(fp - g[0]) for g in gt_lines]
@@ -649,23 +636,12 @@ def write_test_results(model, test_loader, device):
                 # build Pred list
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
-<<<<<<< HEAD
                         conf_p = preds[i,si,bi,1]
                         if conf_p > cfg.CONFIDENCE_THRESHOLD:
                             xp_norm = preds[i,si,bi,0]
                             fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY/2)/cfg.S
                             cls_idx = np.argmax(preds[i,si,bi,2:])
                             freq_str, cls_str = convert_to_readable(fp, cls_idx, cfg.MODULATION_CLASSES)
-=======
-                        conf_p = preds[i, si, bi, 1]
-                        if conf_p > 0.2:
-                            xp_norm = preds[i, si, bi, 0]
-                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                            cls_idx = np.argmax(preds[i, si, bi, 2:])
-                            freq_str, cls_str = convert_to_readable(
-                                fp, cls_idx, cfg.MODULATION_CLASSES
-                            )
->>>>>>> bf69c67f74a006b73942d2c74bb1d98fdf063e37
                             pred_list.append((freq_str, cls_str, conf_p))
 
                 entries.append((snr, len(gt_list), pred_list, gt_list))
