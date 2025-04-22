@@ -24,3 +24,6 @@ __pycache__/
 
 # Saved models (.pth)
 *.pth
+
+# OutputFiles
+OutputFiles/*
