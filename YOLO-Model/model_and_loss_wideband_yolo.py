@@ -13,7 +13,7 @@ from config_wideband_yolo import (
     NUMTAPS,
     SAMPLING_FREQUENCY,
     USE_SIMILARITY_MATRIX,
-    MODULATION_CLASSES, 
+    MODULATION_CLASSES,
     SIMILARITY_DICT,
     get_anchors,
 )
@@ -271,7 +271,7 @@ class WidebandYoloModel(nn.Module):
         refine_delta = refine_delta.view(bsz, S, B)
 
         # Final predicted normalized offset.
-        freq_pred = coarse_freq_pred + refine_delta # [bsz, S, B]
+        freq_pred = coarse_freq_pred + refine_delta  # [bsz, S, B]
 
         cell_indices = torch.arange(
             S, device=freq_pred.device, dtype=freq_pred.dtype
@@ -366,14 +366,18 @@ class WidebandYoloLoss(nn.Module):
         conf_tgt = target[..., 1]
         class_tgt = target[..., 2:]
         obj_mask = (conf_tgt > 0).float()
-        noobj_mask = 1.0 - obj_mask      
+        noobj_mask = 1.0 - obj_mask
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
         conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
         conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
-        
+
         if USE_SIMILARITY_MATRIX:
-            sim_matrix = torch.ones((NUM_CLASSES, NUM_CLASSES), dtype=class_pred.dtype, device=class_pred.device)
+            sim_matrix = torch.ones(
+                (NUM_CLASSES, NUM_CLASSES),
+                dtype=class_pred.dtype,
+                device=class_pred.device,
+            )
             for i, mod1 in enumerate(MODULATION_CLASSES):
                 for j, mod2 in enumerate(MODULATION_CLASSES):
                     if mod1 == mod2:
@@ -386,9 +390,13 @@ class WidebandYoloLoss(nn.Module):
                         sim_matrix[i, j] = 1.0  # default value if not defined
             true_class_idx = torch.argmax(class_tgt, dim=-1)
             weights = sim_matrix[true_class_idx]
-            class_loss = LAMBDA_CLASS * torch.sum(obj_mask.unsqueeze(-1) * weights * (class_pred - class_tgt) ** 2)
+            class_loss = LAMBDA_CLASS * torch.sum(
+                obj_mask.unsqueeze(-1) * weights * (class_pred - class_tgt) ** 2
+            )
         else:
-            class_loss = LAMBDA_CLASS * torch.sum(obj_mask.unsqueeze(-1) * (class_pred - class_tgt) ** 2)
-            
+            class_loss = LAMBDA_CLASS * torch.sum(
+                obj_mask.unsqueeze(-1) * (class_pred - class_tgt) ** 2
+            )
+
         total_loss = coord_loss + conf_loss_obj + conf_loss_noobj + class_loss
         return total_loss / batch_size
