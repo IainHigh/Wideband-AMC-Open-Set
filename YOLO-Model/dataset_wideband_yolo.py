@@ -47,7 +47,7 @@ class WidebandYoloDataset(Dataset):
 
         # Determine num_samples from the first file.
         self.num_samples = self._find_num_samples(self.files[0])
-        
+
     def _discover_mod_classes(self):
         all_mods = set()
         for base in self.files:
