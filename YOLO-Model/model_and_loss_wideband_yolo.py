@@ -9,6 +9,7 @@ from config_wideband_yolo import (
     LAMBDA_COORD,
     LAMBDA_NOOBJ,
     LAMBDA_CLASS,
+    CONFIDENCE_THRESHOLD,
     BAND_MARGIN,
     NUMTAPS,
     SAMPLING_FREQUENCY,
@@ -365,7 +366,7 @@ class WidebandYoloLoss(nn.Module):
         x_tgt = target[..., 0]
         conf_tgt = target[..., 1]
         class_tgt = target[..., 2:]
-        obj_mask = (conf_tgt > 0).float()
+        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
         noobj_mask = 1.0 - obj_mask      
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)

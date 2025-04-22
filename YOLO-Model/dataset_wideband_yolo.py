@@ -129,7 +129,7 @@ class WidebandYoloDataset(Dataset):
             x_offset = np.clip(x_offset, 0.0, 1.0)
 
             # Obtain anchor values using linspace as defined in the config file.
-            anchor_values = get_anchors()  # e.g., for B=4: [0.2, 0.4, 0.6, 0.8]
+            anchor_values = get_anchors() 
             # Find the anchor index that is closest to the computed offset.
             anchor_idx = int(np.argmin(np.abs(anchor_values - x_offset)))
 

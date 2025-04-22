@@ -21,7 +21,6 @@ import config_wideband_yolo as cfg
 
 SAVE_MODEL_NAME = "yolo_model"
 
-
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
 
@@ -207,12 +206,9 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         train_correct_cls += batch_correct_cls
 
     avg_train_loss = total_train_loss / len(train_loader)
-    if train_obj_count > 0:
-        train_mean_freq_err = train_sum_freq_err / train_obj_count
-        train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
-    else:
-        train_mean_freq_err = 0.0
-        train_cls_accuracy = 0.0
+    train_mean_freq_err = train_sum_freq_err / train_obj_count
+    train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
+
 
     return model, avg_train_loss, train_mean_freq_err, train_cls_accuracy
 
@@ -284,7 +280,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
                         x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
                         
-                        if conf > 0.2:
+                        if conf > cfg.CONFIDENCE_THRESHOLD:
                             pred_list.append((x_p, cls_p, conf))
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
@@ -297,20 +293,13 @@ def validate_model(model, val_loader, device, criterion, epoch):
                             x_g, cls_g = convert_to_readable(x_g, cls_g, class_list)
                             gt_list.append((x_g, cls_g))
 
-                # sort by conf desc
-                pred_list.sort(key=lambda tup: tup[2], reverse=True)
-
                 frame_dict = {"pred_list": pred_list, "gt_list": gt_list}
                 val_frames.append(frame_dict)
 
     avg_val_loss = total_val_loss / len(val_loader)
-    if val_obj_count > 0:
-        val_mean_freq_err = val_sum_freq_err / val_obj_count
-        val_cls_accuracy = 100.0 * (val_correct_cls / val_obj_count)
-    else:
-        val_mean_freq_err = 0.0
-        val_cls_accuracy = 0.0
-
+    val_mean_freq_err = val_sum_freq_err / val_obj_count
+    val_cls_accuracy = 100.0 * (val_correct_cls / val_obj_count)
+    
     return avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames
 
 
@@ -531,7 +520,7 @@ def plot_test_samples(model, test_loader, device):
             for si in range(cfg.S):
                 for bi in range(cfg.B):
                     conf_p = pred[si,bi,1]
-                    if conf_p > 0.2:
+                    if conf_p > cfg.CONFIDENCE_THRESHOLD:
                         xp = pred[si,bi,0]
                         fp = (si + xp)*(cfg.SAMPLING_FREQUENCY/2)/cfg.S
                         cls_p = np.argmax(pred[si,bi,2:])
@@ -616,7 +605,7 @@ def write_test_results(model, test_loader, device):
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         conf_p = preds[i,si,bi,1]
-                        if conf_p > 0.2:
+                        if conf_p > cfg.CONFIDENCE_THRESHOLD:
                             xp_norm = preds[i,si,bi,0]
                             fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY/2)/cfg.S
                             cls_idx = np.argmax(preds[i,si,bi,2:])

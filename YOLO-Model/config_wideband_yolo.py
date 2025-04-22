@@ -114,7 +114,7 @@ SIMILARITY_DICT = {
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
-
+CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
 
 def print_config_file():
     """
@@ -140,4 +140,8 @@ def print_config_file():
     print("\tLAMBDA_COORD:", LAMBDA_COORD)
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
+    print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
+    print("\tSIMILARITY_DICT:")
+    for key, value in SIMILARITY_DICT.items():
+        print("\t\t", key, ":", value)
     print("")
