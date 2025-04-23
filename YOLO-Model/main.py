@@ -60,52 +60,6 @@ def convert_to_readable(frequency, modclass, class_list):
     modclass_str = class_list[modclass]
     return frequency_string, modclass_str
 
-def merge_similar_predictions(pred_list, band_margin):
-    """
-    pred_list: list of tuples (freq, cls, conf)
-    band_margin: float (Hz)
-
-    Returns a new list where any preds within band_margin of each other
-    have been merged according to:
-      • if all same class: weighted‐average freq (weights=confidence), keep max confidence
-      • if mixed classes: pick the single pred with highest confidence
-    """
-    # sort by frequency
-    preds = sorted(pred_list, key=lambda x: x[0])
-    merged = []
-
-    while preds:
-        # seed a cluster
-        seed_freq, seed_cls, seed_conf = preds.pop(0)
-        cluster = [(seed_freq, seed_cls, seed_conf)]
-
-        # gather all others within band_margin
-        i = 0
-        while i < len(preds):
-            freq, cls, conf = preds[i]
-            if abs(freq - seed_freq) <= band_margin:
-                cluster.append((freq, cls, conf))
-                preds.pop(i)
-            else:
-                i += 1
-
-        # merge cluster
-        classes = {c for _, c, _ in cluster}
-        if len(classes) == 1:
-            # same class: weighted avg freq, keep max confidence
-            total_conf = sum(c for _, _, c in cluster)
-            freq_avg = sum(f * c for f, _, c in cluster) / total_conf
-            cls = cluster[0][1]
-            conf_max = max(c for _, _, c in cluster)
-            merged.append((freq_avg, cls, conf_max))
-        else:
-            # mixed classes: pick the one with highest confidence
-            best = max(cluster, key=lambda x: x[2])
-            merged.append(best)
-
-    return merged
-
-
 def main():
     # Print the configuration file
     if cfg.PRINT_CONFIG_FILE:
