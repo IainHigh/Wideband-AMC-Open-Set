@@ -568,7 +568,6 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     fg,
                     PSD_fin.min(),
                     f"GT:{cls_g}",
-                    rotation=90,
                     va="bottom",
                     ha="center",
                 ))
@@ -580,7 +579,6 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     fp,
                     PSD_fin.min(),
                     f"P:{cls_p}",
-                    rotation=90,
                     va="bottom",
                     ha="center",
                 ))

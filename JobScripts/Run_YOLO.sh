@@ -28,7 +28,7 @@ module load anaconda
 # Activate the anaconda environment
 source activate mypython
 
-if false ; then
+if true ; then
     # Remove the old dataset
     rm -rf /exports/eddie/scratch/s2062378/data/*
 
