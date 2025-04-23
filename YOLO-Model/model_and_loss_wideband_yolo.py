@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import math
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +17,7 @@ from config_wideband_yolo import (
     USE_SIMILARITY_MATRIX,
     MODULATION_CLASSES,
     SIMILARITY_DICT,
+    MERGE_SIMILAR_PREDICTIONS,
     get_anchors,
 )
 
@@ -303,7 +305,85 @@ class WidebandYoloModel(nn.Module):
         final_out[..., 0] = freq_pred  # normalized frequency offset
         final_out[..., 1:] = out_conf_class
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
+        if (not self.training) and MERGE_SIMILAR_PREDICTIONS:
+            all_preds = self._collect_raw_predictions(final_out)
+            merged = [ self._merge_similar_predictions(l, BAND_MARGIN)
+                       for l in all_preds ]
+            final_out = self._pack_merged_to_tensor(merged, final_out.device,
+                                                    final_out.dtype)
         return final_out
+
+    def _collect_raw_predictions(self, final_out):
+        """
+        Turn raw model output (bsz×S×(B*(1+1+NUM_CLASSES))) into per-sample
+        lists of (freq_Hz:float, class_idx:int, conf:float).
+        """
+        bsz = final_out.size(0)
+        raw = final_out.view(bsz, S, B, 1+1+NUM_CLASSES)
+        lists = []
+        for i in range(bsz):
+            preds = []
+            for si in range(S):
+                for bi in range(B):
+                    conf = raw[i,si,bi,1].item()
+                    if conf < CONFIDENCE_THRESHOLD:
+                        continue
+                    off = raw[i,si,bi,0].item()
+                    freq = (si + off) * (SAMPLING_FREQUENCY/2) / S
+                    cls = int(raw[i,si,bi,2:].argmax())
+                    preds.append((freq, cls, conf))
+            lists.append(preds)
+        return lists
+    
+    def _pack_merged_to_tensor(self, merged_lists, device, dtype):
+        """
+        merged_lists: List of length bsz of [(freq_Hz, class_idx, conf), …]
+        returns: tensor of shape (bsz, S, B, 1+1+NUM_CLASSES)
+        """
+        bsz = len(merged_lists)
+        out = torch.zeros(bsz, S, B, 1+1+NUM_CLASSES,
+                          device=device, dtype=dtype)
+
+        anchors = get_anchors()  # numpy array of length B
+        for i, preds in enumerate(merged_lists):
+            for freq, cls, conf in preds:
+                # normalized freq in [0,1]
+                freq_norm = freq / (SAMPLING_FREQUENCY/2)
+                cell = int(freq_norm * S)
+                cell = min(cell, S-1)
+                off = freq_norm*S - cell
+                off = float(np.clip(off, 0.0, 1.0))
+                # pick closest anchor index
+                aidx = int(np.argmin(np.abs(anchors - off)))
+
+                out[i, cell, aidx, 0] = off
+                out[i, cell, aidx, 1] = conf
+                out[i, cell, aidx, 2+cls] = 1.0
+
+        return out
+    
+    def _merge_similar_predictions(self, pred_list, band_margin):
+        preds = sorted(pred_list, key=lambda x: x[0])
+        merged = []
+        while preds:
+            seed_f, seed_c, seed_conf = preds.pop(0)
+            cluster = [(seed_f, seed_c, seed_conf)]
+            i = 0
+            while i < len(preds):
+                f, c, conf = preds[i]
+                if abs(f - seed_f) <= band_margin:
+                    cluster.append((f, c, conf))
+                    preds.pop(i)
+                else:
+                    i += 1
+            classes = {c for _, c, _ in cluster}
+            if len(classes) == 1:
+                tot_conf = sum(c for _,_,c in cluster)
+                f_avg = sum(f*c for f,_,c in cluster) / tot_conf
+                merged.append((f_avg, cluster[0][1], max(c for *_,c in cluster)))
+            else:
+                merged.append(max(cluster, key=lambda x: x[2]))
+        return merged
 
     def _filter_raw(self, x_flat, freq_flat):
         N, _, T = x_flat.shape

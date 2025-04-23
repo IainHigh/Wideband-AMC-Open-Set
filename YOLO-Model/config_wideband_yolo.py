@@ -69,7 +69,7 @@ BAND_MARGIN, SAMPLING_FREQUENCY = (
 BAND_MARGIN = (
     BAND_MARGIN * 2
 )  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-
+MERGE_SIMILAR_PREDICTIONS = False  # If true, will merge similar predictions into one prediction.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
