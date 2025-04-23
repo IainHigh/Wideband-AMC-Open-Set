@@ -54,7 +54,7 @@ GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
 PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
-MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = (
     []
 )  # The modulation classes will be determined by the dataset discovery process.
@@ -69,7 +69,8 @@ BAND_MARGIN, SAMPLING_FREQUENCY = (
 BAND_MARGIN = (
     BAND_MARGIN * 2
 )  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
+MERGE_SIMILAR_PREDICTIONS = False  # If true, will merge similar predictions into one prediction.
+NUMTAPS = 128  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
 # Model Parameters
@@ -119,7 +120,7 @@ SIMILARITY_DICT = {
 }
 
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
+LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
 CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
 
@@ -128,7 +129,7 @@ def print_config_file():
     Print the configuration file to the console.
     """
     print("Configuration File:")
-    print("USE SIMILARITY MATRIX:", USE_SIMILARITY_MATRIX)
+    print("\tUSE SIMILARITY MATRIX:", USE_SIMILARITY_MATRIX)
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
     print("\tPLOT_TEST_SAMPLES:", PLOT_TEST_SAMPLES)
     print("\tWRITE_TEST_RESULTS:", WRITE_TEST_RESULTS)

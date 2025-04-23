@@ -13,6 +13,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
+from adjustText import adjust_text
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from dataset_wideband_yolo import WidebandYoloDataset
@@ -58,6 +59,51 @@ def convert_to_readable(frequency, modclass, class_list):
 
     modclass_str = class_list[modclass]
     return frequency_string, modclass_str
+
+def merge_similar_predictions(pred_list, band_margin):
+    """
+    pred_list: list of tuples (freq, cls, conf)
+    band_margin: float (Hz)
+
+    Returns a new list where any preds within band_margin of each other
+    have been merged according to:
+      • if all same class: weighted‐average freq (weights=confidence), keep max confidence
+      • if mixed classes: pick the single pred with highest confidence
+    """
+    # sort by frequency
+    preds = sorted(pred_list, key=lambda x: x[0])
+    merged = []
+
+    while preds:
+        # seed a cluster
+        seed_freq, seed_cls, seed_conf = preds.pop(0)
+        cluster = [(seed_freq, seed_cls, seed_conf)]
+
+        # gather all others within band_margin
+        i = 0
+        while i < len(preds):
+            freq, cls, conf = preds[i]
+            if abs(freq - seed_freq) <= band_margin:
+                cluster.append((freq, cls, conf))
+                preds.pop(i)
+            else:
+                i += 1
+
+        # merge cluster
+        classes = {c for _, c, _ in cluster}
+        if len(classes) == 1:
+            # same class: weighted avg freq, keep max confidence
+            total_conf = sum(c for _, _, c in cluster)
+            freq_avg = sum(f * c for f, _, c in cluster) / total_conf
+            cls = cluster[0][1]
+            conf_max = max(c for _, _, c in cluster)
+            merged.append((freq_avg, cls, conf_max))
+        else:
+            # mixed classes: pick the one with highest confidence
+            best = max(cluster, key=lambda x: x[2])
+            merged.append(best)
+
+    return merged
 
 
 def main():
@@ -435,13 +481,19 @@ def test_model(model, test_loader, device):
         class_list = cfg.MODULATION_CLASSES
         plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes)
 
+    out_dir = os.path.join(data_dir, "test_result_plots")
+    # clear or create directory
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+
     # 4) Plot frequency domain diagram of test set samples and predictions
     if cfg.PLOT_TEST_SAMPLES:
-        plot_test_samples(model, test_loader, device)
+        plot_test_samples(model, test_loader, device, out_dir)
 
     # 5) Write the test results to a file.
     if cfg.WRITE_TEST_RESULTS:
-        write_test_results(model, test_loader, device)
+        write_test_results(model, test_loader, device, out_dir)
 
 
 def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes):
@@ -471,7 +523,7 @@ def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes
     plt.close()
 
 
-def plot_test_samples(model, test_loader, device):
+def plot_test_samples(model, test_loader, device, out_dir):
     """
     For each sample in the test set: compute and plot its PSD,
     then draw vertical lines for each true center frequency (black dashed)
@@ -479,11 +531,6 @@ def plot_test_samples(model, test_loader, device):
     predicted class, true class, and freq error below the line.
     Figures are saved as PNGs under data_dir/test_result_plots/.
     """
-    out_dir = os.path.join(data_dir, "test_result_plots")
-    # clear or create directory
-    if os.path.exists(out_dir):
-        shutil.rmtree(out_dir)
-    os.makedirs(out_dir, exist_ok=True)
 
     # loop with progress bar
     sample_idx = 0
@@ -558,29 +605,37 @@ def plot_test_samples(model, test_loader, device):
             plt.xlabel("Frequency [Hz]")
             plt.ylabel("PSD [dB]")
 
+            texts = []
+
             # draw GT
             for fg, cls_g in gt_lines:
                 plt.axvline(fg, linestyle="--", color="black", alpha=0.7)
-                plt.text(
+                texts.append(plt.text(
                     fg,
                     PSD_fin.min(),
                     f"GT:{cls_g}",
                     rotation=90,
                     va="bottom",
                     ha="center",
-                )
+                ))
 
             # draw preds
             for fp, cls_p, err in pred_lines:
                 plt.axvline(fp, linestyle="-", color="red", alpha=0.7)
-                plt.text(
+                texts.append(plt.text(
                     fp,
                     PSD_fin.min(),
-                    f"P:{cls_p}\nErr:{err:.2f}",
+                    f"P:{cls_p}",
                     rotation=90,
                     va="bottom",
                     ha="center",
-                )
+                ))
+
+            adjust_text(
+                texts,
+                only_move={'points':'y', 'text':'y'},
+                arrowprops=dict(arrowstyle='-', color='gray', alpha=0.5),
+            )
 
             plt.grid(True)
             plt.tight_layout()
@@ -589,18 +644,12 @@ def plot_test_samples(model, test_loader, device):
             sample_idx += 1
 
 
-def write_test_results(model, test_loader, device):
+def write_test_results(model, test_loader, device, out_dir):
     """
     Run the model over every test sample, build readable pred/gt lists
     and write them sorted by descending SNR to
       data_dir/test_result_plots/test_results.txt
     """
-    out_dir = os.path.join(data_dir, "test_result_plots")
-    # clear or create directory
-    if os.path.exists(out_dir):
-        shutil.rmtree(out_dir)
-    os.makedirs(out_dir, exist_ok=True)
-    out_file = os.path.join(out_dir, "test_results.txt")
 
     entries = []
     model.eval()
@@ -648,8 +697,9 @@ def write_test_results(model, test_loader, device):
 
     # sort by SNR descending
     entries.sort(key=lambda x: x[0], reverse=True)
-
+    
     # write to file
+    out_file = os.path.join(out_dir, "test_results.txt")
     with open(out_file, "w") as f:
         for _, (snr, ntx, pred_list, gt_list) in enumerate(entries, 1):
             f.write(f"SNR {snr:.1f}; Center_freqs = {ntx}\n")
