@@ -83,11 +83,24 @@ def generate_linear(config, rng_seed):
 
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
         if config["center_frequencies_random"]:
-            lower_bound, upper_bound, n_max = config["center_frequencies"]
+            lower_bound, upper_bound, n_max, prevent_overlap = config[
+                "center_frequencies"
+            ]
+            margin = 0
+            if prevent_overlap != 0:
+                margin = 2 * (sampling_rate / sig_params[i][0]) * (1 + sig_params[i][1])
             n = np.random.randint(1, n_max + 1)
-            center_frequencies = np.random.uniform(lower_bound, upper_bound, n)
-            # Convert from ndarray to list
-            center_frequencies = center_frequencies.tolist()
+
+            attempts, max_attempts = 0, 10000
+            chosen_points = []
+
+            while len(chosen_points) < n and attempts < max_attempts:
+                candidate = np.random.uniform(lower_bound, upper_bound)
+                if all(abs(candidate - p) >= margin for p in chosen_points):
+                    chosen_points.append(candidate)
+                attempts += 1
+
+            center_frequencies = chosen_points
         else:
             center_frequencies = config["center_frequencies"]
 
@@ -260,7 +273,7 @@ def generate_linear(config, rng_seed):
             "modname": mod_list,
             "order": order.value,
             "n_samps": n_samps - buf,
-            "sampling_rate": config["sampling_rate"],
+            "sampling_rate": sampling_rate,
             "center_frequencies": center_frequencies,
             "channel_type": config["channel_type"],
             "snr": snr.value,

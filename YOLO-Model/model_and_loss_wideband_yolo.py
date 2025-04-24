@@ -18,6 +18,7 @@ from config_wideband_yolo import (
     MODULATION_CLASSES,
     SIMILARITY_DICT,
     MERGE_SIMILAR_PREDICTIONS,
+    MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
     get_anchors,
 )
 
@@ -307,10 +308,13 @@ class WidebandYoloModel(nn.Module):
         final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
         if (not self.training) and MERGE_SIMILAR_PREDICTIONS:
             all_preds = self._collect_raw_predictions(final_out)
-            merged = [ self._merge_similar_predictions(l, BAND_MARGIN)
-                       for l in all_preds ]
-            final_out = self._pack_merged_to_tensor(merged, final_out.device,
-                                                    final_out.dtype)
+            merged = [
+                self._merge_similar_predictions(l, MERGE_SIMILAR_PREDICTIONS_THRESHOLD)
+                for l in all_preds
+            ]
+            final_out = self._pack_merged_to_tensor(
+                merged, final_out.device, final_out.dtype
+            )
         return final_out
 
     def _collect_raw_predictions(self, final_out):
@@ -319,50 +323,49 @@ class WidebandYoloModel(nn.Module):
         lists of (freq_Hz:float, class_idx:int, conf:float).
         """
         bsz = final_out.size(0)
-        raw = final_out.view(bsz, S, B, 1+1+NUM_CLASSES)
+        raw = final_out.view(bsz, S, B, 1 + 1 + NUM_CLASSES)
         lists = []
         for i in range(bsz):
             preds = []
             for si in range(S):
                 for bi in range(B):
-                    conf = raw[i,si,bi,1].item()
+                    conf = raw[i, si, bi, 1].item()
                     if conf < CONFIDENCE_THRESHOLD:
                         continue
-                    off = raw[i,si,bi,0].item()
-                    freq = (si + off) * (SAMPLING_FREQUENCY/2) / S
-                    cls = int(raw[i,si,bi,2:].argmax())
+                    off = raw[i, si, bi, 0].item()
+                    freq = (si + off) * (SAMPLING_FREQUENCY / 2) / S
+                    cls = int(raw[i, si, bi, 2:].argmax())
                     preds.append((freq, cls, conf))
             lists.append(preds)
         return lists
-    
+
     def _pack_merged_to_tensor(self, merged_lists, device, dtype):
         """
         merged_lists: List of length bsz of [(freq_Hz, class_idx, conf), …]
         returns: tensor of shape (bsz, S, B, 1+1+NUM_CLASSES)
         """
         bsz = len(merged_lists)
-        out = torch.zeros(bsz, S, B, 1+1+NUM_CLASSES,
-                          device=device, dtype=dtype)
+        out = torch.zeros(bsz, S, B, 1 + 1 + NUM_CLASSES, device=device, dtype=dtype)
 
         anchors = get_anchors()  # numpy array of length B
         for i, preds in enumerate(merged_lists):
             for freq, cls, conf in preds:
                 # normalized freq in [0,1]
-                freq_norm = freq / (SAMPLING_FREQUENCY/2)
+                freq_norm = freq / (SAMPLING_FREQUENCY / 2)
                 cell = int(freq_norm * S)
-                cell = min(cell, S-1)
-                off = freq_norm*S - cell
+                cell = min(cell, S - 1)
+                off = freq_norm * S - cell
                 off = float(np.clip(off, 0.0, 1.0))
                 # pick closest anchor index
                 aidx = int(np.argmin(np.abs(anchors - off)))
 
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
-                out[i, cell, aidx, 2+cls] = 1.0
+                out[i, cell, aidx, 2 + cls] = 1.0
 
         return out
-    
-    def _merge_similar_predictions(self, pred_list, band_margin):
+
+    def _merge_similar_predictions(self, pred_list, margin):
         preds = sorted(pred_list, key=lambda x: x[0])
         merged = []
         while preds:
@@ -371,16 +374,16 @@ class WidebandYoloModel(nn.Module):
             i = 0
             while i < len(preds):
                 f, c, conf = preds[i]
-                if abs(f - seed_f) <= band_margin:
+                if abs(f - seed_f) <= margin:
                     cluster.append((f, c, conf))
                     preds.pop(i)
                 else:
                     i += 1
             classes = {c for _, c, _ in cluster}
             if len(classes) == 1:
-                tot_conf = sum(c for _,_,c in cluster)
-                f_avg = sum(f*c for f,_,c in cluster) / tot_conf
-                merged.append((f_avg, cluster[0][1], max(c for *_,c in cluster)))
+                tot_conf = sum(c for _, _, c in cluster)
+                f_avg = sum(f * c for f, _, c in cluster) / tot_conf
+                merged.append((f_avg, cluster[0][1], max(c for *_, c in cluster)))
             else:
                 merged.append(max(cluster, key=lambda x: x[2]))
         return merged
@@ -447,7 +450,7 @@ class WidebandYoloLoss(nn.Module):
         conf_tgt = target[..., 1]
         class_tgt = target[..., 2:]
         obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
-        noobj_mask = 1.0 - obj_mask      
+        noobj_mask = 1.0 - obj_mask
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
         conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)

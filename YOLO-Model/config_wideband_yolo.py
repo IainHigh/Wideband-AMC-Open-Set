@@ -37,9 +37,7 @@ def calculate_band_margin():
     sampling_rate = annotation["sampling_rate"]
     sps = f_meta["annotations"][1]["filter"]["sps"]
     beta = f_meta["annotations"][1]["filter"]["rolloff"]
-
-    symbol_rate = sampling_rate / sps
-    channel_bw = symbol_rate * (1 + beta)
+    channel_bw = (sampling_rate / sps) * (1 + beta)
     return channel_bw, sampling_rate
 
 
@@ -69,7 +67,12 @@ BAND_MARGIN, SAMPLING_FREQUENCY = (
 BAND_MARGIN = (
     BAND_MARGIN * 2
 )  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-MERGE_SIMILAR_PREDICTIONS = True  # If true, will merge similar predictions into one prediction.
+MERGE_SIMILAR_PREDICTIONS = (
+    True  # If true, will merge similar predictions into one prediction.
+)
+MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
+    BAND_MARGIN / 4
+)  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
@@ -119,10 +122,11 @@ SIMILARITY_DICT = {
     ("16apsk", "32apsk"): 1.0,
 }
 
-LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 3.0  # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
 CONFIDENCE_THRESHOLD = 0.15  # Confidence threshold for filtering predictions
+
 
 def print_config_file():
     """
@@ -137,6 +141,12 @@ def print_config_file():
     print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
     print("\tSAMPLING_FREQUENCY:", SAMPLING_FREQUENCY)
     print("\tBAND_MARGIN:", BAND_MARGIN)
+    print("\tMERGE_SIMILAR_PREDICTIONS:", MERGE_SIMILAR_PREDICTIONS)
+    if MERGE_SIMILAR_PREDICTIONS:
+        print(
+            "\tMERGE_SIMILAR_PREDICTIONS_THRESHOLD:",
+            MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
+        )
     print("\tNUMTAPS:", NUMTAPS)
     print("\tS:", S)
     print("\tB:", B)

@@ -27,7 +27,7 @@ New parameters added for adapting to wideband:
 
 - `sampling_rate`:
 - `center_frequencies`:
-- `randomly_generated_center_frequencies`: Ramdomly generate center frequency carriers: [lower_bound, upper_bound, number_of_carriers]. Should not be provided when `center_frequencies` is provided.
+- `randomly_generated_center_frequencies`: Ramdomly generate center frequency carriers: [lower_bound, upper_bound, number_of_carriers, prevent_overlap]. Should not be provided when `center_frequencies` is provided. prevent_overlap is a boolean value 1 for true, 0 for false. If true the generated center frequencies will not overlap with each other. If false the generated center frequencies may overlap with each other.
 
 New channel model parameters:
 `channel`: {

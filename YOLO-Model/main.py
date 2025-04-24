@@ -60,6 +60,7 @@ def convert_to_readable(frequency, modclass, class_list):
     modclass_str = class_list[modclass]
     return frequency_string, modclass_str
 
+
 def main():
     # Print the configuration file
     if cfg.PRINT_CONFIG_FILE:
@@ -221,7 +222,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_mean_freq_err = train_sum_freq_err / train_obj_count
     train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
 
-
     return model, avg_train_loss, train_mean_freq_err, train_cls_accuracy
 
 
@@ -312,7 +312,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
     avg_val_loss = total_val_loss / len(val_loader)
     val_mean_freq_err = val_sum_freq_err / val_obj_count
     val_cls_accuracy = 100.0 * (val_correct_cls / val_obj_count)
-    
+
     return avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames
 
 
@@ -435,7 +435,7 @@ def test_model(model, test_loader, device):
         class_list = cfg.MODULATION_CLASSES
         plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes)
 
-    out_dir = os.path.join(data_dir, "test_result_plots")
+    out_dir = os.path.join(data_dir, "../test_result_plots")
     # clear or create directory
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
@@ -536,11 +536,11 @@ def plot_test_samples(model, test_loader, device, out_dir):
             pred_lines = []
             for si in range(cfg.S):
                 for bi in range(cfg.B):
-                    conf_p = pred[si,bi,1]
+                    conf_p = pred[si, bi, 1]
                     if conf_p > cfg.CONFIDENCE_THRESHOLD:
-                        xp = pred[si,bi,0]
-                        fp = (si + xp)*(cfg.SAMPLING_FREQUENCY/2)/cfg.S
-                        cls_p = np.argmax(pred[si,bi,2:])
+                        xp = pred[si, bi, 0]
+                        fp = (si + xp) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                        cls_p = np.argmax(pred[si, bi, 2:])
 
                         # find closest GT for error
                         if gt_lines:
@@ -564,28 +564,30 @@ def plot_test_samples(model, test_loader, device, out_dir):
             # draw GT
             for fg, cls_g in gt_lines:
                 plt.axvline(fg, linestyle="--", color="black", alpha=0.7)
-                texts.append(plt.text(
-                    fg,
-                    PSD_fin.min(),
-                    f"GT:{cls_g}",
-                    va="top",
-                    ha="center",
-                ))
+                texts.append(
+                    plt.text(
+                        fg,
+                        PSD_fin.min(),
+                        f"GT:{cls_g}",
+                        va="top",
+                        ha="center",
+                    )
+                )
 
             # draw preds
             for fp, cls_p, err in pred_lines:
                 plt.axvline(fp, linestyle="-", color="red", alpha=0.7)
-                texts.append(plt.text(
-                    fp,
-                    PSD_fin.min(),
-                    f"P:{cls_p}",
-                    va="bottom",
-                    ha="center",
-                ))
+                texts.append(
+                    plt.text(
+                        fp,
+                        PSD_fin.min(),
+                        f"P:{cls_p}",
+                        va="bottom",
+                        ha="center",
+                    )
+                )
 
-            adjust_text(
-                texts
-            )
+            adjust_text(texts)
 
             plt.grid(True)
             plt.tight_layout()
@@ -635,19 +637,21 @@ def write_test_results(model, test_loader, device, out_dir):
                 # build Pred list
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
-                        conf_p = preds[i,si,bi,1]
+                        conf_p = preds[i, si, bi, 1]
                         if conf_p > cfg.CONFIDENCE_THRESHOLD:
-                            xp_norm = preds[i,si,bi,0]
-                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY/2)/cfg.S
-                            cls_idx = np.argmax(preds[i,si,bi,2:])
-                            freq_str, cls_str = convert_to_readable(fp, cls_idx, cfg.MODULATION_CLASSES)
+                            xp_norm = preds[i, si, bi, 0]
+                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            cls_idx = np.argmax(preds[i, si, bi, 2:])
+                            freq_str, cls_str = convert_to_readable(
+                                fp, cls_idx, cfg.MODULATION_CLASSES
+                            )
                             pred_list.append((freq_str, cls_str, conf_p))
 
                 entries.append((snr, len(gt_list), pred_list, gt_list))
 
     # sort by SNR descending
     entries.sort(key=lambda x: x[0], reverse=True)
-    
+
     # write to file
     out_file = os.path.join(out_dir, "test_results.txt")
     with open(out_file, "w") as f:

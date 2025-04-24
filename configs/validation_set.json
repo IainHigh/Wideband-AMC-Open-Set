@@ -4,7 +4,7 @@
   "modulation": ["bpsk", "qpsk", "8psk", "16qam", "32qam", "16apsk", "32apsk"],
   "symbol_rate": 32,
   "sampling_rate": 1e9,
-  "randomly_generated_center_frequencies": [40e6, 400e6, 1],
+  "randomly_generated_center_frequencies": [40e6, 700e6, 4, 1],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },

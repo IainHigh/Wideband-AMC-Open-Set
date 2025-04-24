@@ -92,14 +92,6 @@ def map_config(config, defaults, dataset_dir):
         assert isinstance(
             config["randomly_generated_center_frequencies"], list
         ), "randomly_generated_center_frequencies must be a list."
-        assert all(
-            isinstance(f, (int, float)) and f > 0
-            for f in config["randomly_generated_center_frequencies"]
-        ), "All randomly_generated_center_frequencies must be positive numbers."
-        # Assert the length must be 3
-        assert (
-            len(config["randomly_generated_center_frequencies"]) == 3
-        ), "randomly_generated_center_frequencies must be a list of length 3. [Start, Stop, Number of Transmitted Signals]"
         mapped["center_frequencies"] = config["randomly_generated_center_frequencies"]
         mapped["center_frequencies_random"] = True
     ## Center frequencies (for wideband signals)
