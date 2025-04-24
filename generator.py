@@ -92,15 +92,14 @@ def generate_linear(config, rng_seed):
             n = np.random.randint(1, n_max + 1)
 
             attempts, max_attempts = 0, 10000
-            chosen_points = []
+            center_frequencies = []
 
-            while len(chosen_points) < n and attempts < max_attempts:
+            while len(center_frequencies) < n and attempts < max_attempts:
                 candidate = np.random.uniform(lower_bound, upper_bound)
-                if all(abs(candidate - p) >= margin for p in chosen_points):
-                    chosen_points.append(candidate)
+                if all(abs(candidate - p) >= margin for p in center_frequencies):
+                    center_frequencies.append(candidate)
                 attempts += 1
 
-            center_frequencies = chosen_points
         else:
             center_frequencies = config["center_frequencies"]
 

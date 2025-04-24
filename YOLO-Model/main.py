@@ -140,21 +140,24 @@ def main():
         )
 
         # Print a random subset of "frames"
-        random.shuffle(val_frames)
-        to_print = val_frames[: cfg.VAL_PRINT_SAMPLES]  # up to VAL_PRINT_SAMPLES frames
-        print(
-            f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
-        )
-        print(f"  Prediction format: (frequency, class, confidence)")
-        print(f"  GroundTruth format: (frequency, class)")
-        for idx, frame_dict in enumerate(to_print, 1):
-            pred_list = frame_dict["pred_list"]
-            gt_list = frame_dict["gt_list"]
+        if cfg.VAL_PRINT_SAMPLES > 0:
+            random.shuffle(val_frames)
+            to_print = val_frames[
+                : cfg.VAL_PRINT_SAMPLES
+            ]  # up to VAL_PRINT_SAMPLES frames
+            print(
+                f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
+            )
+            print(f"  Prediction format: (frequency, class, confidence)")
+            print(f"  GroundTruth format: (frequency, class)")
+            for idx, frame_dict in enumerate(to_print, 1):
+                pred_list = frame_dict["pred_list"]
+                gt_list = frame_dict["gt_list"]
 
-            print(f"    Frame {idx}:")
-            print(f"      Predicted => {pred_list}")
-            print(f"      GroundTruth=> {gt_list}")
-        print("")
+                print(f"    Frame {idx}:")
+                print(f"      Predicted => {pred_list}")
+                print(f"      GroundTruth=> {gt_list}")
+            print("")
 
         if cfg.MULTIPLE_JOBS_PER_TRAINING:
             # Save model every epoch
@@ -163,8 +166,6 @@ def main():
             # Delete the previous model epoch to save space
             if epoch > 0:
                 os.remove(f"{SAVE_MODEL_NAME}_epoch_{epoch}.pth")
-
-    print("Training complete.")
 
     # 4) Test the model
     test_model(model, test_loader, device)

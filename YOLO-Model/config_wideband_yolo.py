@@ -45,7 +45,7 @@ def calculate_band_margin():
 # Miscellaneous Parameters
 #####################
 
-VAL_PRINT_SAMPLES = 2  # The number of samples to print during validation. Helps to see how the model is doing.
+VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 WRITE_TEST_RESULTS = True  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = (
@@ -71,7 +71,7 @@ MERGE_SIMILAR_PREDICTIONS = (
     True  # If true, will merge similar predictions into one prediction.
 )
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
-    BAND_MARGIN / 4
+    BAND_MARGIN / 2
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
@@ -93,7 +93,7 @@ FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rat
 ########################
 # Loss Function Weights
 ########################
-USE_SIMILARITY_MATRIX = True
+USE_SIMILARITY_MATRIX = False
 
 # Dictionary for inter-modulation similarity scores.
 # Keys are unordered tuples of modulation names (e.g., ("BPSK", "QPSK") is equivalent to ("QPSK", "BPSK")).
@@ -122,10 +122,10 @@ SIMILARITY_DICT = {
     ("16apsk", "32apsk"): 1.0,
 }
 
-LAMBDA_COORD = 3.0  # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
-CONFIDENCE_THRESHOLD = 0.15  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.10  # Confidence threshold for filtering predictions
 
 
 def print_config_file():
