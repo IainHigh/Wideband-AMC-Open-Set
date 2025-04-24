@@ -52,7 +52,7 @@ GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
 PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
-MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = (
     []
 )  # The modulation classes will be determined by the dataset discovery process.
@@ -80,15 +80,15 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
-NUM_CLASSES = 7  # Number of classes
+NUM_CLASSES = 10  # Number of classes
 
 #####################
 # Training Parameters
 #####################
 BATCH_SIZE = 128
-EPOCHS = 20
+EPOCHS = 60
 LEARNING_RATE = 0.005  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
@@ -125,7 +125,7 @@ SIMILARITY_DICT = {
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
-CONFIDENCE_THRESHOLD = 0.10  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.125  # Confidence threshold for filtering predictions
 
 
 def print_config_file():
