@@ -568,7 +568,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     fg,
                     PSD_fin.min(),
                     f"GT:{cls_g}",
-                    va="bottom",
+                    va="top",
                     ha="center",
                 ))
 
@@ -584,9 +584,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                 ))
 
             adjust_text(
-                texts,
-                only_move={'points':'y', 'text':'y'},
-                arrowprops=dict(arrowstyle='-', color='gray', alpha=0.5),
+                texts
             )
 
             plt.grid(True)
