@@ -79,9 +79,30 @@ def main():
 
     cfg.MODULATION_CLASSES = train_dataset.class_list
 
-    train_loader = DataLoader(train_dataset, batch_size=cfg.BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=cfg.BATCH_SIZE, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=cfg.BATCH_SIZE, shuffle=False)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=cfg.BATCH_SIZE,
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True,
+        prefetch_factor=2,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=cfg.BATCH_SIZE,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+        prefetch_factor=2,
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=cfg.BATCH_SIZE,
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+        prefetch_factor=2,
+    )
 
     # 2) Create model & loss
     num_samples = train_dataset.get_num_samples()
@@ -183,9 +204,9 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
-        time_data = time_data.to(device)
-        freq_data = freq_data.to(device)
-        label_tensor = label_tensor.to(device)
+        time_data = time_data.to(device, non_blocking=True)
+        freq_data = freq_data.to(device, non_blocking=True)
+        label_tensor = label_tensor.to(device, non_blocking=True)
 
         optimizer.zero_grad()
         pred = model(time_data, freq_data)
@@ -205,19 +226,18 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         class_tgt = label_tensor[..., 2:]
 
         obj_mask = conf_tgt > 0
-        freq_err = torch.abs(x_pred - x_tgt)
+        freq_err = (x_pred - x_tgt).abs()
 
-        pred_class_idx = torch.argmax(class_pred, dim=-1)
-        true_class_idx = torch.argmax(class_tgt, dim=-1)
+        pred_class_idx = class_pred.argmax(dim=-1)
+        true_class_idx = class_tgt.argmax(dim=-1)
 
-        batch_obj_count = obj_mask.sum().item()
-        batch_sum_freq_err = freq_err[obj_mask].sum().item()
-        correct_cls_mask = pred_class_idx == true_class_idx
-        batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+        batch_obj_count = obj_mask.sum()
+        batch_sum_freq_err = freq_err[obj_mask].sum()
+        batch_correct_cls = (pred_class_idx[obj_mask] == true_class_idx[obj_mask]).sum()
 
-        train_obj_count += batch_obj_count
-        train_sum_freq_err += batch_sum_freq_err
-        train_correct_cls += batch_correct_cls
+        train_obj_count += batch_obj_count.item()
+        train_sum_freq_err += batch_sum_freq_err.item()
+        train_correct_cls += batch_correct_cls.item()
 
     avg_train_loss = total_train_loss / len(train_loader)
     train_mean_freq_err = train_sum_freq_err / train_obj_count
@@ -241,9 +261,9 @@ def validate_model(model, val_loader, device, criterion, epoch):
         for time_data, freq_data, label_tensor, _ in tqdm(
             val_loader, desc=f"Validation epoch {epoch+1}/{cfg.EPOCHS}"
         ):
-            time_data = time_data.to(device)
-            freq_data = freq_data.to(device)
-            label_tensor = label_tensor.to(device)
+            time_data = time_data.to(device, non_blocking=True)
+            freq_data = freq_data.to(device, non_blocking=True)
+            label_tensor = label_tensor.to(device, non_blocking=True)
 
             pred = model(time_data, freq_data)
             loss = criterion(pred, label_tensor)
@@ -263,20 +283,21 @@ def validate_model(model, val_loader, device, criterion, epoch):
             class_tgt = label_tensor[..., 2:]
 
             obj_mask = conf_tgt > 0
-            freq_err = torch.abs(x_pred - x_tgt)
+            freq_err = (x_pred - x_tgt).abs()
 
-            pred_class_idx = torch.argmax(class_pred, dim=-1)
-            true_class_idx = torch.argmax(class_tgt, dim=-1)
+            pred_class_idx = class_pred.argmax(dim=-1)
+            true_class_idx = class_tgt.argmax(dim=-1)
 
             # For metric sums
-            batch_obj_count = obj_mask.sum().item()
-            batch_sum_freq_err = freq_err[obj_mask].sum().item()
-            correct_cls_mask = pred_class_idx == true_class_idx
-            batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+            batch_obj_count = obj_mask.sum()
+            batch_sum_freq_err = freq_err[obj_mask].sum()
+            batch_correct_cls = (
+                pred_class_idx[obj_mask] == true_class_idx[obj_mask]
+            ).sum()
 
-            val_obj_count += batch_obj_count
-            val_sum_freq_err += batch_sum_freq_err
-            val_correct_cls += batch_correct_cls
+            val_obj_count += batch_obj_count.item()
+            val_sum_freq_err += batch_sum_freq_err.item()
+            val_correct_cls += batch_correct_cls.item()
 
             # For printing the results in a "frame" manner:
             # We group each sample in this batch separately.
@@ -362,21 +383,23 @@ def test_model(model, test_loader, device):
 
             # object mask
             obj_mask = conf_tgt > 0
-            freq_err = torch.abs(x_pred - x_tgt)
+            freq_err = (x_pred - x_tgt).abs()
 
             # predicted vs. true class => argmax
-            pred_class_idx = torch.argmax(class_pred, dim=-1)  # [bsize, S, B]
-            true_class_idx = torch.argmax(class_tgt, dim=-1)
+            pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
+            true_class_idx = class_tgt.argmax(dim=-1)
 
             # Now we accumulate stats for each bounding box with obj_mask=1
-            batch_obj_count = obj_mask.sum().item()
-            batch_sum_freq_err = freq_err[obj_mask].sum().item()
+            batch_obj_count = obj_mask.sum()
+            batch_sum_freq_err = freq_err[obj_mask].sum()
             correct_cls_mask = pred_class_idx == true_class_idx
-            batch_correct_cls = correct_cls_mask[obj_mask].sum().item()
+            batch_correct_cls = (
+                pred_class_idx[obj_mask] == true_class_idx[obj_mask]
+            ).sum()
 
-            total_obj_count += batch_obj_count
-            total_freq_err += batch_sum_freq_err
-            total_correct_cls += batch_correct_cls
+            total_obj_count += batch_obj_count.item()
+            total_freq_err += batch_sum_freq_err.item()
+            total_correct_cls += batch_correct_cls.item()
 
             # For confusion matrix, we flatten the bounding boxes =>
             # we only consider those bounding boxes with obj_mask=1

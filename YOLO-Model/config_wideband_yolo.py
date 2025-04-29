@@ -52,7 +52,7 @@ GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
 PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
-MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = (
     []
 )  # The modulation classes will be determined by the dataset discovery process.
@@ -85,7 +85,7 @@ NUM_CLASSES = 10  # Number of classes
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 EPOCHS = 10
 LEARNING_RATE = 0.005  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
