@@ -3,6 +3,8 @@
 #############################################
 
 import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
 import json
 import shutil
 import numpy as np
@@ -15,12 +17,12 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from adjustText import adjust_text
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
 import config_wideband_yolo as cfg
 
 SAVE_MODEL_NAME = "yolo_model"
+UNKNOWN_CLASS_IDX = -1
 
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
@@ -101,6 +103,10 @@ def main():
     )
 
     cfg.MODULATION_CLASSES = train_dataset.class_list
+    # reserve one more slot for “unknown”
+    cfg.MODULATION_CLASSES = cfg.MODULATION_CLASSES + ["unknown"]
+    NUM_TOTAL_CLASSES = len(cfg.MODULATION_CLASSES)
+    UNKNOWN_CLASS_IDX = NUM_TOTAL_CLASSES - 1
 
     train_loader = DataLoader(
         train_dataset,
@@ -156,7 +162,7 @@ def main():
 
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
         learn_rate = cfg.LEARNING_RATE * (
-            cfg.FINAL_LR_MULTIPLE ** (epoch // cfg.EPOCHS)
+            cfg.FINAL_LR_MULTIPLE ** (epoch + 1 // cfg.EPOCHS)
         )
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 
@@ -356,7 +362,9 @@ def validate_model(model, val_loader, device, criterion, epoch):
                         # 3) only keep if conf > objectness threshold
                         if conf > cfg.CONFIDENCE_THRESHOLD:
                             # convert to human‐readable freq
-                            freq_str, _ = convert_to_readable(freq_hz, 0, class_list)
+                            freq_str, _ = convert_to_readable(
+                                freq_hz, cls_idx, class_list
+                            )
                             pred_list.append((freq_str, cls_str, float(pmax)))
 
                         # 4) ground‐truth
@@ -427,30 +435,27 @@ def test_model(model, test_loader, device):
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            # predicted vs. true class => argmax
-            pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
-            true_class_idx = class_tgt.argmax(dim=-1)
+            # new: softmax‐threshold + “unknown” class
+            true_class_idx = class_tgt.argmax(dim=-1)  # [B,S,B]
+            for i in range(bsize):
+                for si in range(cfg.S):
+                    for bi in range(cfg.B):
+                        if not obj_mask[i, si, bi]:
+                            continue
 
-            # Now we accumulate stats for each bounding box with obj_mask=1
-            batch_obj_count = obj_mask.sum()
-            batch_sum_freq_err = freq_err[obj_mask].sum()
-            correct_cls_mask = pred_class_idx == true_class_idx
-            batch_correct_cls = (
-                pred_class_idx[obj_mask] == true_class_idx[obj_mask]
-            ).sum()
+                        # ground truth index: 0..NUM_CLASSES-1
+                        overall_true_classes.append(
+                            int(true_class_idx[i, si, bi].item())
+                        )
 
-            total_obj_count += batch_obj_count.item()
-            total_freq_err += batch_sum_freq_err.item()
-            total_correct_cls += batch_correct_cls.item()
-
-            # For confusion matrix, we flatten the bounding boxes =>
-            # we only consider those bounding boxes with obj_mask=1
-            # then we gather pred_class_idx[obj_mask] and true_class_idx[obj_mask]
-            # convert to CPU
-            pred_class_flat = pred_class_idx[obj_mask].cpu().numpy()
-            true_class_flat = true_class_idx[obj_mask].cpu().numpy()
-            overall_true_classes.extend(true_class_flat.tolist())
-            overall_pred_classes.extend(pred_class_flat.tolist())
+                        # predicted:
+                        logits = class_pred[i, si, bi]  # shape [NUM_CLASSES]
+                        probs = F.softmax(logits, dim=0)
+                        pmax, cidx = probs.max(dim=0)
+                        if pmax.item() < cfg.OPENSET_THRESHOLD:
+                            overall_pred_classes.append(UNKNOWN_CLASS_IDX)
+                        else:
+                            overall_pred_classes.append(int(cidx.item()))
 
             # Now do per-SNR
             # We have a single snr per "sample" => shape [bsize]
@@ -614,7 +619,18 @@ def plot_test_samples(model, test_loader, device, out_dir):
                             err = min(errs)
                         else:
                             err = np.nan
-                        pred_lines.append((fp, cfg.MODULATION_CLASSES[cls_p], err))
+
+                        logits_np = pred[si, bi, 2:]
+                        logits = torch.from_numpy(logits_np).float()
+                        probs = F.softmax(logits, dim=0)
+                        pmax, cidx = torch.max(probs, dim=0)
+
+                        if pmax.item() < cfg.OPENSET_THRESHOLD:
+                            cls_str = "unknown"
+                        else:
+                            cls_str = cfg.MODULATION_CLASSES[int(cidx)]
+
+                        pred_lines.append((fp, cls_str, err))
 
             # plotting
             plt.figure()
