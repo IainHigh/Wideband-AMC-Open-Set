@@ -41,6 +41,11 @@ def calculate_band_margin():
     return channel_bw, sampling_rate
 
 
+# Open-set recognition (max‐softmax) parameters
+OPENSET_ENABLE = True  # master switch
+OPENSET_COVERAGE = 0.99  # we want 99% of known anchors above threshold
+OPENSET_THRESHOLD = None  # will be filled in after calibration
+
 #####################
 # Miscellaneous Parameters
 #####################
@@ -78,16 +83,16 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 # Model Parameters
 #####################
-S = 4  # Number of grid cells
-B = 3  # Anchors / Boxes per cell
-NUM_CLASSES = 10  # Number of classes
+S = 8  # Number of grid cells
+B = 4  # Anchors / Boxes per cell
+NUM_CLASSES = 9  # Number of classes
 
 #####################
 # Training Parameters
 #####################
 BATCH_SIZE = 64
 EPOCHS = 10
-LEARNING_RATE = 0.01  # Initial learning rate
+LEARNING_RATE = 0.005  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
@@ -129,4 +134,9 @@ def print_config_file():
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
+    print("\tOPENSET_ENABLE:", OPENSET_ENABLE)
+    if OPENSET_ENABLE:
+        print("\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
+        print("\tOPENSET_THRESHOLD:", OPENSET_THRESHOLD)
+
     print("")

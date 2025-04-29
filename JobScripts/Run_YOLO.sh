@@ -29,6 +29,8 @@ module load anaconda
 source activate mypython
 
 if true ; then
+    echo "If you've changed the modulation scheme list, please remember to change NUM_CLASSES in the YOLO config file as well."
+
     # Remove the old dataset
     rm -rf /exports/eddie/scratch/s2062378/data/*
 

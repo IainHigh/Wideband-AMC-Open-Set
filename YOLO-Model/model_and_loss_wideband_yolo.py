@@ -127,10 +127,15 @@ class WidebandClassifier(nn.Module):
         # Fully Connected Layer producing (1 + NUM_CLASSES) outputs.
         self.fc = nn.Linear(96, num_out)
 
+        # Randomly initialize the weights and biases of the fully connected layer.
+        nn.init.normal_(self.fc.weight, mean=0.0, std=0.01)
+
         p = 0.01
         b = -math.log((1 - p) / p)  # ≈ -4.6
         with torch.no_grad():
-            # keep the confidence‐head bias at 0, but set every class‐head bias = b
+            # keep confidence‐head bias at 0
+            self.fc.bias[0] = 0.0
+            # set every class‐head bias to b
             self.fc.bias[1:].fill_(b)
 
     def _create_block2(self, in_channels, out_channels):
