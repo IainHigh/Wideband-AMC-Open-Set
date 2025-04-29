@@ -37,6 +37,29 @@ torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 
 
+def calibrate_open_set_threshold(model, train_loader, device):
+    model.eval()
+    all_maxprobs = []
+    with torch.no_grad():
+        for time_data, freq_data, label_tensor, _ in train_loader:
+            time_data, freq_data = time_data.to(device), freq_data.to(device)
+            pred = model(time_data, freq_data)
+            # reshape to [B, S, B_, 1+1+NUM_CLASSES]
+            Bsz = pred.shape[0]
+            pred = pred.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES)
+            # pull out only classification logits (no objectness)
+            logits = pred[..., 2:]  # shape [B, S, B_, C]
+            probs = F.softmax(logits, dim=-1)  # softmax over known classes
+            maxp, _ = probs.max(dim=-1)  # [B, S, B_]
+            # mask to only the *true* signals (anchors where target_confidence>0)
+            obj_mask = label_tensor[..., 1] > 0
+            all_maxprobs.append(maxp[obj_mask].cpu().numpy())
+    all_maxprobs = np.concatenate(all_maxprobs)
+    # find the (1-coverage) percentile
+    tau = np.percentile(all_maxprobs, (1.0 - cfg.OPENSET_COVERAGE) * 100)
+    return float(tau)
+
+
 def convert_to_readable(frequency, modclass, class_list):
     # Convert frequency to MHz and modclass to string
 
@@ -141,6 +164,11 @@ def main():
         model, avg_train_loss, train_mean_freq_err, train_cls_accuracy = train_model(
             model, train_loader, device, optimizer, criterion, epoch
         )
+
+        if cfg.OPENSET_ENABLE:
+            cfg.OPENSET_THRESHOLD = calibrate_open_set_threshold(
+                model, train_loader, device
+            )
 
         # Validation
         avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames = validate_model(
@@ -265,18 +293,19 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_data = freq_data.to(device, non_blocking=True)
             label_tensor = label_tensor.to(device, non_blocking=True)
 
+            # forward + loss
             pred = model(time_data, freq_data)
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
 
-            bsize = pred.shape[0]
-            pred_reshape = pred.view(
-                bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES)
-            )
+            # reshape into [B, S, B, 1+1+NUM_CLASSES]
+            Bsz = pred.shape[0]
+            pred = pred.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES)
 
-            x_pred = pred_reshape[..., 0]
-            conf_pred = pred_reshape[..., 1]
-            class_pred = pred_reshape[..., 2:]
+            # pull out the raw pieces
+            x_pred = pred[..., 0]
+            conf_pred = pred[..., 1]
+            class_logits = pred[..., 2:]  # raw scores
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
@@ -285,12 +314,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            pred_class_idx = class_pred.argmax(dim=-1)
-            true_class_idx = class_tgt.argmax(dim=-1)
-
-            # For metric sums
+            # for overall metrics (unmodified)
             batch_obj_count = obj_mask.sum()
             batch_sum_freq_err = freq_err[obj_mask].sum()
+            # plain argmax on logits for accuracy
+            pred_class_idx = class_logits.argmax(dim=-1)
+            true_class_idx = class_tgt.argmax(dim=-1)
             batch_correct_cls = (
                 pred_class_idx[obj_mask] == true_class_idx[obj_mask]
             ).sum()
@@ -299,37 +328,50 @@ def validate_model(model, val_loader, device, criterion, epoch):
             val_sum_freq_err += batch_sum_freq_err.item()
             val_correct_cls += batch_correct_cls.item()
 
-            # For printing the results in a "frame" manner:
-            # We group each sample in this batch separately.
-            for i in range(bsize):
+            # now build per‐sample pred_list / gt_list for printing
+            for i in range(Bsz):
                 pred_list = []
                 gt_list = []
 
-                for s_idx in range(pred_reshape.shape[1]):
-                    for b_idx in range(pred_reshape.shape[2]):
-                        x_p = x_pred[i, s_idx, b_idx].item()  # x_offset [0,1]
-                        x_p = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_p * (
+                for s_idx in range(cfg.S):
+                    for b_idx in range(cfg.B):
+                        # 1) reconstruct raw frequency in Hz
+                        off = x_pred[i, s_idx, b_idx].item()
+                        freq_hz = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + off * (
                             cfg.SAMPLING_FREQUENCY / cfg.S
-                        )  # raw frequency value.
+                        )
 
                         conf = conf_pred[i, s_idx, b_idx].item()
-                        cls_p = pred_class_idx[i, s_idx, b_idx].item()
-                        x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
+
+                        # 2) open‐set softmax check
+                        logits = class_logits[i, s_idx, b_idx, :]  # shape [NUM_CLASSES]
+                        probs = F.softmax(logits, dim=0)
+                        pmax, cls_idx = torch.max(probs, dim=0)
+
+                        if pmax.item() < cfg.OPENSET_THRESHOLD:
+                            cls_str = "unknown"
+                        else:
+                            cls_str = class_list[int(cls_idx)]
+
+                        # 3) only keep if conf > objectness threshold
                         if conf > cfg.CONFIDENCE_THRESHOLD:
-                            pred_list.append((x_p, cls_p, conf))
+                            # convert to human‐readable freq
+                            freq_str, _ = convert_to_readable(freq_hz, 0, class_list)
+                            pred_list.append((freq_str, cls_str, float(pmax)))
 
+                        # 4) ground‐truth
                         if conf_tgt[i, s_idx, b_idx] > 0:
-                            x_g = x_tgt[i, s_idx, b_idx].item()
-                            x_g = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_g * (
-                                cfg.SAMPLING_FREQUENCY / cfg.S
-                            )  # raw frequency value.
+                            off_g = x_tgt[i, s_idx, b_idx].item()
+                            freq_hz_g = (
+                                s_idx * cfg.SAMPLING_FREQUENCY / cfg.S
+                            ) + off_g * (cfg.SAMPLING_FREQUENCY / cfg.S)
+                            cls_g_idx = true_class_idx[i, s_idx, b_idx].item()
+                            freq_str_g, cls_str_g = convert_to_readable(
+                                freq_hz_g, cls_g_idx, class_list
+                            )
+                            gt_list.append((freq_str_g, cls_str_g))
 
-                            cls_g = true_class_idx[i, s_idx, b_idx].item()
-                            x_g, cls_g = convert_to_readable(x_g, cls_g, class_list)
-                            gt_list.append((x_g, cls_g))
-
-                frame_dict = {"pred_list": pred_list, "gt_list": gt_list}
-                val_frames.append(frame_dict)
+                val_frames.append({"pred_list": pred_list, "gt_list": gt_list})
 
     avg_val_loss = total_val_loss / len(val_loader)
     val_mean_freq_err = val_sum_freq_err / val_obj_count
@@ -623,9 +665,10 @@ def plot_test_samples(model, test_loader, device, out_dir):
 def write_test_results(model, test_loader, device, out_dir):
     """
     Run the model over every test sample, build readable pred/gt lists
-    and write them sorted by descending SNR to
-      data_dir/test_result_plots/test_results.txt
+    (including 'unknown' if max‐softmax < threshold) and write them
+    sorted by descending SNR to test_results.txt
     """
+    import torch.nn.functional as F
 
     entries = []
     model.eval()
@@ -633,53 +676,71 @@ def write_test_results(model, test_loader, device, out_dir):
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc="Gathering test results"
         ):
-            bsz = time_data.size(0)
-            # run model once per batch
+            Bsz = time_data.size(0)
             preds = model(time_data.to(device), freq_data.to(device))
-            # reshape to [batch, S, B, 1+1+NUM_CLASSES]
-            preds = preds.view(bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
+            # reshape
+            preds = preds.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
             labels = label_tensor.view(
-                bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES
+                Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES
             ).numpy()
-            for i in range(bsz):
+
+            for i in range(Bsz):
                 snr = snr_tensor[i].item()
                 pred_list = []
                 gt_list = []
 
-                # build GT list
+                # GROUND TRUTH
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         if labels[i, si, bi, 1] > 0:
-                            xg_norm = labels[i, si, bi, 0]
-                            fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                            cls_idx = np.argmax(labels[i, si, bi, 2:])
-                            freq_str, cls_str = convert_to_readable(
-                                fg, cls_idx, cfg.MODULATION_CLASSES
+                            off_g = labels[i, si, bi, 0]
+                            freq_hz_g = (
+                                si * cfg.SAMPLING_FREQUENCY / cfg.S
+                            ) + off_g * (cfg.SAMPLING_FREQUENCY / cfg.S)
+                            cls_idx_g = int(np.argmax(labels[i, si, bi, 2:]))
+                            freq_str_g, cls_str_g = convert_to_readable(
+                                freq_hz_g, cls_idx_g, cfg.MODULATION_CLASSES
                             )
-                            gt_list.append((freq_str, cls_str))
+                            gt_list.append((freq_str_g, cls_str_g))
 
-                # build Pred list
+                # PREDICTIONS
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         conf_p = preds[i, si, bi, 1]
-                        if conf_p > cfg.CONFIDENCE_THRESHOLD:
-                            xp_norm = preds[i, si, bi, 0]
-                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                            cls_idx = np.argmax(preds[i, si, bi, 2:])
-                            freq_str, cls_str = convert_to_readable(
-                                fp, cls_idx, cfg.MODULATION_CLASSES
-                            )
-                            pred_list.append((freq_str, cls_str, conf_p))
+                        if conf_p <= cfg.CONFIDENCE_THRESHOLD:
+                            continue
+
+                        # raw logits slice
+                        logits = torch.from_numpy(preds[i, si, bi, 2:]).float()
+                        probs = F.softmax(logits, dim=0)
+                        pmax, cls_idx = torch.max(probs, dim=0)
+
+                        # open‐set decision
+                        if pmax.item() < cfg.OPENSET_THRESHOLD:
+                            cls_str = "unknown"
+                        else:
+                            cls_str = cfg.MODULATION_CLASSES[int(cls_idx)]
+
+                        # freq back to Hz
+                        off_p = preds[i, si, bi, 0]
+                        freq_hz_p = (si * cfg.SAMPLING_FREQUENCY / cfg.S) + off_p * (
+                            cfg.SAMPLING_FREQUENCY / cfg.S
+                        )
+                        freq_str_p, _ = convert_to_readable(
+                            freq_hz_p, 0, cfg.MODULATION_CLASSES
+                        )
+
+                        pred_list.append((freq_str_p, cls_str, float(pmax)))
 
                 entries.append((snr, len(gt_list), pred_list, gt_list))
 
-    # sort by SNR descending
+    # sort by descending SNR
     entries.sort(key=lambda x: x[0], reverse=True)
 
     # write to file
     out_file = os.path.join(out_dir, "test_results.txt")
     with open(out_file, "w") as f:
-        for _, (snr, ntx, pred_list, gt_list) in enumerate(entries, 1):
+        for snr, ntx, pred_list, gt_list in entries:
             f.write(f"SNR {snr:.1f}; Center_freqs = {ntx}\n")
             f.write(f"  Predicted => {pred_list}\n")
             f.write(f"  GroundTruth=> {gt_list}\n\n")

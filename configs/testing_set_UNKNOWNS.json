@@ -1,0 +1,42 @@
+{
+  "n_captures": 2000,
+  "n_samps": 4096,
+  "modulation": [
+    "qpsk",
+    "16qam",
+    "32qam",
+    "4ask",
+    "16ask",
+    "16apsk",
+    "64apsk",
+    "2dpsk",
+    "8dpsk",
+    "128psk",
+    "256qam",
+    "2ask"
+  ],
+  "symbol_rate": 32,
+  "sampling_rate": 1e9,
+  "randomly_generated_center_frequencies": [40e6, 400e6, 3, 1],
+
+  "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
+  "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
+  "fmwb_defaults": { "modulation_factor": [0.5, 0.8, 0.1] },
+  "filter": [
+    {
+      "type": "rrc",
+      "beta": 0.005,
+      "delay": 1,
+      "dt": 0.0
+    }
+  ],
+  "channel": {
+    "type": "awgn",
+    "snr": [-20, 20, 2],
+    "fo": 0.0,
+    "po": 0.0
+  },
+  "savepath": "testing",
+  "verbose": 0,
+  "archive": false
+}
