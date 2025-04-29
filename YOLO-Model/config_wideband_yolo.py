@@ -78,8 +78,8 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 # Model Parameters
 #####################
-S = 8  # Number of grid cells
-B = 4  # Anchors / Boxes per cell
+S = 4  # Number of grid cells
+B = 3  # Anchors / Boxes per cell
 NUM_CLASSES = 10  # Number of classes
 
 #####################
@@ -87,41 +87,12 @@ NUM_CLASSES = 10  # Number of classes
 #####################
 BATCH_SIZE = 64
 EPOCHS = 10
-LEARNING_RATE = 0.005  # Initial learning rate
+LEARNING_RATE = 0.01  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
 ########################
-USE_SIMILARITY_MATRIX = False
-
-# Dictionary for inter-modulation similarity scores.
-# Keys are unordered tuples of modulation names (e.g., ("BPSK", "QPSK") is equivalent to ("QPSK", "BPSK")).
-# Adjust the scores as needed. Lower values imply a lower penalty for confusion.
-SIMILARITY_DICT = {
-    ("bpsk", "qpsk"): 1.5,
-    ("bpsk", "8psk"): 2.0,
-    ("bpsk", "16qam"): 3.0,
-    ("bpsk", "32qam"): 4.0,
-    ("bpsk", "16apsk"): 3.5,
-    ("bpsk", "32apsk"): 4.0,
-    ("qpsk", "8psk"): 1.6,
-    ("qpsk", "16qam"): 2.2,
-    ("qpsk", "32qam"): 3.0,
-    ("qpsk", "16apsk"): 2.8,
-    ("qpsk", "32apsk"): 3.2,
-    ("8psk", "16qam"): 1.4,
-    ("8psk", "32qam"): 2.0,
-    ("8psk", "16apsk"): 1.8,
-    ("8psk", "32apsk"): 2.2,
-    ("16qam", "32qam"): 1.2,
-    ("16qam", "16apsk"): 1.5,
-    ("16qam", "32apsk"): 1.8,
-    ("32qam", "16apsk"): 1.3,
-    ("32qam", "32apsk"): 1.1,
-    ("16apsk", "32apsk"): 1.0,
-}
-
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
@@ -133,7 +104,6 @@ def print_config_file():
     Print the configuration file to the console.
     """
     print("Configuration File:")
-    print("\tUSE SIMILARITY MATRIX:", USE_SIMILARITY_MATRIX)
     print("\tVAL_PRINT_SAMPLES:", VAL_PRINT_SAMPLES)
     print("\tPLOT_TEST_SAMPLES:", PLOT_TEST_SAMPLES)
     print("\tWRITE_TEST_RESULTS:", WRITE_TEST_RESULTS)
@@ -159,8 +129,4 @@ def print_config_file():
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
-    if USE_SIMILARITY_MATRIX:
-        print("\tSIMILARITY_DICT:")
-        for key, value in SIMILARITY_DICT.items():
-            print("\t\t", key, ":", value)
     print("")

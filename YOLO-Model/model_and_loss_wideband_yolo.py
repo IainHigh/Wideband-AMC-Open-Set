@@ -14,9 +14,6 @@ from config_wideband_yolo import (
     BAND_MARGIN,
     NUMTAPS,
     SAMPLING_FREQUENCY,
-    USE_SIMILARITY_MATRIX,
-    MODULATION_CLASSES,
-    SIMILARITY_DICT,
     MERGE_SIMILAR_PREDICTIONS,
     MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
     get_anchors,
@@ -130,6 +127,12 @@ class WidebandClassifier(nn.Module):
         # Fully Connected Layer producing (1 + NUM_CLASSES) outputs.
         self.fc = nn.Linear(96, num_out)
 
+        p = 0.01
+        b = -math.log((1 - p) / p)  # ≈ -4.6
+        with torch.no_grad():
+            # keep the confidence‐head bias at 0, but set every class‐head bias = b
+            self.fc.bias[1:].fill_(b)
+
     def _create_block2(self, in_channels, out_channels):
         return nn.ModuleDict(
             {
@@ -166,9 +169,8 @@ class WidebandClassifier(nn.Module):
             concatenated = torch.cat([branch1, branch2, branch3], dim=1)
             x = F.relu(concatenated + residual)
         x = self.global_avg_pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
+        x = self.global_avg_pool(x).view(x.size(0), -1)
+        return self.fc(x)
 
 
 ###############################################################################
@@ -441,46 +443,56 @@ class WidebandYoloLoss(nn.Module):
         super().__init__()
 
     def forward(self, pred, target):
+        """
+        pred:  [batch, S, B*(1+1+NUM_CLASSES)]
+        target:[batch, S, B*(1+1+NUM_CLASSES)]
+        """
         batch_size = pred.shape[0]
-        pred = pred.view(batch_size, pred.shape[1], B, (1 + 1 + NUM_CLASSES))
-        x_pred = pred[..., 0]
-        conf_pred = pred[..., 1]
-        class_pred = pred[..., 2:]
+
+        # reshape to [batch, S, B, 1+1+NUM_CLASSES]
+        pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + NUM_CLASSES)
+        x_pred = pred[..., 0]  # [batch, S, B]
+        conf_pred = pred[..., 1]  # [batch, S, B]
+        class_pred = pred[..., 2:]  # [batch, S, B, NUM_CLASSES]
+
         x_tgt = target[..., 0]
         conf_tgt = target[..., 1]
-        class_tgt = target[..., 2:]
-        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
+        class_tgt = target[..., 2:]  # one-hot
+
+        # object / no-object masks
+        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()  # [batch, S, B]
         noobj_mask = 1.0 - obj_mask
+
+        # ------------------------------------------------
+        # 1) Coordinate loss
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
+
+        # ------------------------------------------------
+        # 2) Confidence loss
+        #    use 1D "IoU" = 1 - |Δx|
         iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
         conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
-        conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
+        conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * conf_pred**2)
 
-        if USE_SIMILARITY_MATRIX:
-            sim_matrix = torch.ones(
-                (NUM_CLASSES, NUM_CLASSES),
-                dtype=class_pred.dtype,
-                device=class_pred.device,
-            )
-            for i, mod1 in enumerate(MODULATION_CLASSES):
-                for j, mod2 in enumerate(MODULATION_CLASSES):
-                    if mod1 == mod2:
-                        sim_matrix[i, j] = 1.0
-                    elif (mod1, mod2) in SIMILARITY_DICT:
-                        sim_matrix[i, j] = SIMILARITY_DICT[(mod1, mod2)]
-                    elif (mod2, mod1) in SIMILARITY_DICT:
-                        sim_matrix[i, j] = SIMILARITY_DICT[(mod2, mod1)]
-                    else:
-                        sim_matrix[i, j] = 1.0  # default value if not defined
-            true_class_idx = torch.argmax(class_tgt, dim=-1)
-            weights = sim_matrix[true_class_idx]
-            class_loss = LAMBDA_CLASS * torch.sum(
-                obj_mask.unsqueeze(-1) * weights * (class_pred - class_tgt) ** 2
-            )
+        # ------------------------------------------------
+        # 3) Classification loss via softmax + cross‐entropy
+        # flatten to [batch*S*B, NUM_CLASSES] / [batch*S*B]
+        # but only keep those where obj_mask==1
+        mask_bool = obj_mask.bool()  # boolean mask
+        # pull out logits and targets for object‐cells
+        logits = class_pred[mask_bool]  # [Nobj, NUM_CLASSES]
+        true_class_idx = torch.argmax(class_tgt, dim=-1)  # [batch, S, B]
+        targets = true_class_idx[mask_bool]  # [Nobj]
+
+        # if there are no objects in batch (unlikely) guard against zero‐dim:
+        if logits.numel() > 0:
+            # sum over all positive cells
+            cls_loss = LAMBDA_CLASS * F.cross_entropy(logits, targets, reduction="sum")
         else:
-            class_loss = LAMBDA_CLASS * torch.sum(
-                obj_mask.unsqueeze(-1) * (class_pred - class_tgt) ** 2
-            )
+            cls_loss = torch.tensor(0.0, device=pred.device, dtype=pred.dtype)
 
-        total_loss = coord_loss + conf_loss_obj + conf_loss_noobj + class_loss
+        # ------------------------------------------------
+        total_loss = coord_loss + conf_loss_obj + conf_loss_noobj + cls_loss
+
+        # normalize by batch (just like you were doing before)
         return total_loss / batch_size
