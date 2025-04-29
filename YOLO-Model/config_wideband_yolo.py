@@ -86,9 +86,9 @@ NUM_CLASSES = 10  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 128
-EPOCHS = 60
+EPOCHS = 10
 LEARNING_RATE = 0.005  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
@@ -125,7 +125,7 @@ SIMILARITY_DICT = {
 LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
-CONFIDENCE_THRESHOLD = 0.125  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.13  # Confidence threshold for filtering predictions
 
 
 def print_config_file():
@@ -159,7 +159,8 @@ def print_config_file():
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
-    print("\tSIMILARITY_DICT:")
-    for key, value in SIMILARITY_DICT.items():
-        print("\t\t", key, ":", value)
+    if USE_SIMILARITY_MATRIX:
+        print("\tSIMILARITY_DICT:")
+        for key, value in SIMILARITY_DICT.items():
+            print("\t\t", key, ":", value)
     print("")

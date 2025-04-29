@@ -1,14 +1,12 @@
 {
-  "n_captures": 500000,
+  "n_captures": 20000,
   "n_samps": 4096,
   "modulation": [
-    "bpsk",
     "qpsk",
     "16qam",
-    "64qam",
+    "32qam",
     "4ask",
     "16ask",
-    "16apsk",
     "64apsk",
     "2dpsk",
     "8dpsk"
