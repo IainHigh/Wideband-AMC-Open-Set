@@ -321,7 +321,6 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_err = (x_pred - x_tgt).abs()
 
             # for overall metrics (unmodified)
-
             batch_obj_count = obj_mask.sum()
             batch_sum_freq_err = freq_err[obj_mask].sum()
             # plain argmax on logits for accuracy
@@ -337,7 +336,6 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             # now build per‐sample pred_list / gt_list for printing
             for i in range(Bsz):
-
                 pred_list = []
                 gt_list = []
 
@@ -695,7 +693,6 @@ def write_test_results(model, test_loader, device, out_dir):
             test_loader, desc="Gathering test results"
         ):
             Bsz = time_data.size(0)
-
             preds = model(time_data.to(device), freq_data.to(device))
             # reshape
             preds = preds.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
