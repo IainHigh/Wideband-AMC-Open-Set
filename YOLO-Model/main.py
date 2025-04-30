@@ -3,8 +3,6 @@
 #############################################
 
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
 import json
 import shutil
 import numpy as np
@@ -17,12 +15,12 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from adjustText import adjust_text
 from tqdm import tqdm
+from torch.utils.data import DataLoader
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
 import config_wideband_yolo as cfg
 
 SAVE_MODEL_NAME = "yolo_model"
-UNKNOWN_CLASS_IDX = -1
 
 with open("./configs/system_parameters.json") as f:
     system_parameters = json.load(f)
@@ -37,29 +35,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 torch.manual_seed(rng_seed)
 random.seed(rng_seed)
-
-
-def calibrate_open_set_threshold(model, train_loader, device):
-    model.eval()
-    all_maxprobs = []
-    with torch.no_grad():
-        for time_data, freq_data, label_tensor, _ in train_loader:
-            time_data, freq_data = time_data.to(device), freq_data.to(device)
-            pred = model(time_data, freq_data)
-            # reshape to [B, S, B_, 1+1+NUM_CLASSES]
-            Bsz = pred.shape[0]
-            pred = pred.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES)
-            # pull out only classification logits (no objectness)
-            logits = pred[..., 2:]  # shape [B, S, B_, C]
-            probs = F.softmax(logits, dim=-1)  # softmax over known classes
-            maxp, _ = probs.max(dim=-1)  # [B, S, B_]
-            # mask to only the *true* signals (anchors where target_confidence>0)
-            obj_mask = label_tensor[..., 1] > 0
-            all_maxprobs.append(maxp[obj_mask].cpu().numpy())
-    all_maxprobs = np.concatenate(all_maxprobs)
-    # find the (1-coverage) percentile
-    tau = np.percentile(all_maxprobs, (1.0 - cfg.OPENSET_COVERAGE) * 100)
-    return float(tau)
 
 
 def convert_to_readable(frequency, modclass, class_list):
@@ -103,10 +78,6 @@ def main():
     )
 
     cfg.MODULATION_CLASSES = train_dataset.class_list
-    # reserve one more slot for “unknown”
-    cfg.MODULATION_CLASSES = cfg.MODULATION_CLASSES + ["unknown"]
-    NUM_TOTAL_CLASSES = len(cfg.MODULATION_CLASSES)
-    UNKNOWN_CLASS_IDX = NUM_TOTAL_CLASSES - 1
 
     train_loader = DataLoader(
         train_dataset,
@@ -162,7 +133,7 @@ def main():
 
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
         learn_rate = cfg.LEARNING_RATE * (
-            cfg.FINAL_LR_MULTIPLE ** (epoch + 1 // cfg.EPOCHS)
+            cfg.FINAL_LR_MULTIPLE ** (epoch // cfg.EPOCHS)
         )
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 
@@ -170,11 +141,6 @@ def main():
         model, avg_train_loss, train_mean_freq_err, train_cls_accuracy = train_model(
             model, train_loader, device, optimizer, criterion, epoch
         )
-
-        if cfg.OPENSET_ENABLE:
-            cfg.OPENSET_THRESHOLD = calibrate_open_set_threshold(
-                model, train_loader, device
-            )
 
         # Validation
         avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames = validate_model(
@@ -299,19 +265,18 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_data = freq_data.to(device, non_blocking=True)
             label_tensor = label_tensor.to(device, non_blocking=True)
 
-            # forward + loss
             pred = model(time_data, freq_data)
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
 
-            # reshape into [B, S, B, 1+1+NUM_CLASSES]
-            Bsz = pred.shape[0]
-            pred = pred.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES)
+            bsize = pred.shape[0]
+            pred_reshape = pred.view(
+                bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES)
+            )
 
-            # pull out the raw pieces
-            x_pred = pred[..., 0]
-            conf_pred = pred[..., 1]
-            class_logits = pred[..., 2:]  # raw scores
+            x_pred = pred_reshape[..., 0]
+            conf_pred = pred_reshape[..., 1]
+            class_pred = pred_reshape[..., 2:]
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
@@ -320,12 +285,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            # for overall metrics (unmodified)
+            pred_class_idx = class_pred.argmax(dim=-1)
+            true_class_idx = class_tgt.argmax(dim=-1)
+
+            # For metric sums
             batch_obj_count = obj_mask.sum()
             batch_sum_freq_err = freq_err[obj_mask].sum()
-            # plain argmax on logits for accuracy
-            pred_class_idx = class_logits.argmax(dim=-1)
-            true_class_idx = class_tgt.argmax(dim=-1)
             batch_correct_cls = (
                 pred_class_idx[obj_mask] == true_class_idx[obj_mask]
             ).sum()
@@ -334,52 +299,37 @@ def validate_model(model, val_loader, device, criterion, epoch):
             val_sum_freq_err += batch_sum_freq_err.item()
             val_correct_cls += batch_correct_cls.item()
 
-            # now build per‐sample pred_list / gt_list for printing
-            for i in range(Bsz):
+            # For printing the results in a "frame" manner:
+            # We group each sample in this batch separately.
+            for i in range(bsize):
                 pred_list = []
                 gt_list = []
 
-                for s_idx in range(cfg.S):
-                    for b_idx in range(cfg.B):
-                        # 1) reconstruct raw frequency in Hz
-                        off = x_pred[i, s_idx, b_idx].item()
-                        freq_hz = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + off * (
+                for s_idx in range(pred_reshape.shape[1]):
+                    for b_idx in range(pred_reshape.shape[2]):
+                        x_p = x_pred[i, s_idx, b_idx].item()  # x_offset [0,1]
+                        x_p = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_p * (
                             cfg.SAMPLING_FREQUENCY / cfg.S
-                        )
+                        )  # raw frequency value.
 
                         conf = conf_pred[i, s_idx, b_idx].item()
-
-                        # 2) open‐set softmax check
-                        logits = class_logits[i, s_idx, b_idx, :]  # shape [NUM_CLASSES]
-                        probs = F.softmax(logits, dim=0)
-                        pmax, cls_idx = torch.max(probs, dim=0)
-
-                        if pmax.item() < cfg.OPENSET_THRESHOLD:
-                            cls_str = "unknown"
-                        else:
-                            cls_str = class_list[int(cls_idx)]
-
-                        # 3) only keep if conf > objectness threshold
+                        cls_p = pred_class_idx[i, s_idx, b_idx].item()
+                        x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
                         if conf > cfg.CONFIDENCE_THRESHOLD:
-                            # convert to human‐readable freq
-                            freq_str, _ = convert_to_readable(
-                                freq_hz, cls_idx, class_list
-                            )
-                            pred_list.append((freq_str, cls_str, float(pmax)))
+                            pred_list.append((x_p, cls_p, conf))
 
-                        # 4) ground‐truth
                         if conf_tgt[i, s_idx, b_idx] > 0:
-                            off_g = x_tgt[i, s_idx, b_idx].item()
-                            freq_hz_g = (
-                                s_idx * cfg.SAMPLING_FREQUENCY / cfg.S
-                            ) + off_g * (cfg.SAMPLING_FREQUENCY / cfg.S)
-                            cls_g_idx = true_class_idx[i, s_idx, b_idx].item()
-                            freq_str_g, cls_str_g = convert_to_readable(
-                                freq_hz_g, cls_g_idx, class_list
-                            )
-                            gt_list.append((freq_str_g, cls_str_g))
+                            x_g = x_tgt[i, s_idx, b_idx].item()
+                            x_g = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_g * (
+                                cfg.SAMPLING_FREQUENCY / cfg.S
+                            )  # raw frequency value.
 
-                val_frames.append({"pred_list": pred_list, "gt_list": gt_list})
+                            cls_g = true_class_idx[i, s_idx, b_idx].item()
+                            x_g, cls_g = convert_to_readable(x_g, cls_g, class_list)
+                            gt_list.append((x_g, cls_g))
+
+                frame_dict = {"pred_list": pred_list, "gt_list": gt_list}
+                val_frames.append(frame_dict)
 
     avg_val_loss = total_val_loss / len(val_loader)
     val_mean_freq_err = val_sum_freq_err / val_obj_count
@@ -435,27 +385,30 @@ def test_model(model, test_loader, device):
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            # new: softmax‐threshold + “unknown” class
-            true_class_idx = class_tgt.argmax(dim=-1)  # [B,S,B]
-            for i in range(bsize):
-                for si in range(cfg.S):
-                    for bi in range(cfg.B):
-                        if not obj_mask[i, si, bi]:
-                            continue
+            # predicted vs. true class => argmax
+            pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
+            true_class_idx = class_tgt.argmax(dim=-1)
 
-                        # ground truth index: 0..NUM_CLASSES-1
-                        overall_true_classes.append(
-                            int(true_class_idx[i, si, bi].item())
-                        )
+            # Now we accumulate stats for each bounding box with obj_mask=1
+            batch_obj_count = obj_mask.sum()
+            batch_sum_freq_err = freq_err[obj_mask].sum()
+            correct_cls_mask = pred_class_idx == true_class_idx
+            batch_correct_cls = (
+                pred_class_idx[obj_mask] == true_class_idx[obj_mask]
+            ).sum()
 
-                        # predicted:
-                        logits = class_pred[i, si, bi]  # shape [NUM_CLASSES]
-                        probs = F.softmax(logits, dim=0)
-                        pmax, cidx = probs.max(dim=0)
-                        if pmax.item() < cfg.OPENSET_THRESHOLD:
-                            overall_pred_classes.append(UNKNOWN_CLASS_IDX)
-                        else:
-                            overall_pred_classes.append(int(cidx.item()))
+            total_obj_count += batch_obj_count.item()
+            total_freq_err += batch_sum_freq_err.item()
+            total_correct_cls += batch_correct_cls.item()
+
+            # For confusion matrix, we flatten the bounding boxes =>
+            # we only consider those bounding boxes with obj_mask=1
+            # then we gather pred_class_idx[obj_mask] and true_class_idx[obj_mask]
+            # convert to CPU
+            pred_class_flat = pred_class_idx[obj_mask].cpu().numpy()
+            true_class_flat = true_class_idx[obj_mask].cpu().numpy()
+            overall_true_classes.extend(true_class_flat.tolist())
+            overall_pred_classes.extend(pred_class_flat.tolist())
 
             # Now do per-SNR
             # We have a single snr per "sample" => shape [bsize]
@@ -619,18 +572,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                             err = min(errs)
                         else:
                             err = np.nan
-
-                        logits_np = pred[si, bi, 2:]
-                        logits = torch.from_numpy(logits_np).float()
-                        probs = F.softmax(logits, dim=0)
-                        pmax, cidx = torch.max(probs, dim=0)
-
-                        if pmax.item() < cfg.OPENSET_THRESHOLD:
-                            cls_str = "unknown"
-                        else:
-                            cls_str = cfg.MODULATION_CLASSES[int(cidx)]
-
-                        pred_lines.append((fp, cls_str, err))
+                        pred_lines.append((fp, cfg.MODULATION_CLASSES[cls_p], err))
 
             # plotting
             plt.figure()
@@ -681,10 +623,9 @@ def plot_test_samples(model, test_loader, device, out_dir):
 def write_test_results(model, test_loader, device, out_dir):
     """
     Run the model over every test sample, build readable pred/gt lists
-    (including 'unknown' if max‐softmax < threshold) and write them
-    sorted by descending SNR to test_results.txt
+    and write them sorted by descending SNR to
+      data_dir/test_result_plots/test_results.txt
     """
-    import torch.nn.functional as F
 
     entries = []
     model.eval()
@@ -692,71 +633,53 @@ def write_test_results(model, test_loader, device, out_dir):
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc="Gathering test results"
         ):
-            Bsz = time_data.size(0)
+            bsz = time_data.size(0)
+            # run model once per batch
             preds = model(time_data.to(device), freq_data.to(device))
-            # reshape
-            preds = preds.view(Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
+            # reshape to [batch, S, B, 1+1+NUM_CLASSES]
+            preds = preds.view(bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
             labels = label_tensor.view(
-                Bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES
+                bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES
             ).numpy()
-
-            for i in range(Bsz):
+            for i in range(bsz):
                 snr = snr_tensor[i].item()
                 pred_list = []
                 gt_list = []
 
-                # GROUND TRUTH
+                # build GT list
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         if labels[i, si, bi, 1] > 0:
-                            off_g = labels[i, si, bi, 0]
-                            freq_hz_g = (
-                                si * cfg.SAMPLING_FREQUENCY / cfg.S
-                            ) + off_g * (cfg.SAMPLING_FREQUENCY / cfg.S)
-                            cls_idx_g = int(np.argmax(labels[i, si, bi, 2:]))
-                            freq_str_g, cls_str_g = convert_to_readable(
-                                freq_hz_g, cls_idx_g, cfg.MODULATION_CLASSES
+                            xg_norm = labels[i, si, bi, 0]
+                            fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            cls_idx = np.argmax(labels[i, si, bi, 2:])
+                            freq_str, cls_str = convert_to_readable(
+                                fg, cls_idx, cfg.MODULATION_CLASSES
                             )
-                            gt_list.append((freq_str_g, cls_str_g))
+                            gt_list.append((freq_str, cls_str))
 
-                # PREDICTIONS
+                # build Pred list
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         conf_p = preds[i, si, bi, 1]
-                        if conf_p <= cfg.CONFIDENCE_THRESHOLD:
-                            continue
-
-                        # raw logits slice
-                        logits = torch.from_numpy(preds[i, si, bi, 2:]).float()
-                        probs = F.softmax(logits, dim=0)
-                        pmax, cls_idx = torch.max(probs, dim=0)
-
-                        # open‐set decision
-                        if pmax.item() < cfg.OPENSET_THRESHOLD:
-                            cls_str = "unknown"
-                        else:
-                            cls_str = cfg.MODULATION_CLASSES[int(cls_idx)]
-
-                        # freq back to Hz
-                        off_p = preds[i, si, bi, 0]
-                        freq_hz_p = (si * cfg.SAMPLING_FREQUENCY / cfg.S) + off_p * (
-                            cfg.SAMPLING_FREQUENCY / cfg.S
-                        )
-                        freq_str_p, _ = convert_to_readable(
-                            freq_hz_p, 0, cfg.MODULATION_CLASSES
-                        )
-
-                        pred_list.append((freq_str_p, cls_str, float(pmax)))
+                        if conf_p > cfg.CONFIDENCE_THRESHOLD:
+                            xp_norm = preds[i, si, bi, 0]
+                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            cls_idx = np.argmax(preds[i, si, bi, 2:])
+                            freq_str, cls_str = convert_to_readable(
+                                fp, cls_idx, cfg.MODULATION_CLASSES
+                            )
+                            pred_list.append((freq_str, cls_str, conf_p))
 
                 entries.append((snr, len(gt_list), pred_list, gt_list))
 
-    # sort by descending SNR
+    # sort by SNR descending
     entries.sort(key=lambda x: x[0], reverse=True)
 
     # write to file
     out_file = os.path.join(out_dir, "test_results.txt")
     with open(out_file, "w") as f:
-        for snr, ntx, pred_list, gt_list in entries:
+        for _, (snr, ntx, pred_list, gt_list) in enumerate(entries, 1):
             f.write(f"SNR {snr:.1f}; Center_freqs = {ntx}\n")
             f.write(f"  Predicted => {pred_list}\n")
             f.write(f"  GroundTruth=> {gt_list}\n\n")

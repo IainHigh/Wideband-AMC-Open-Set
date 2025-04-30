@@ -128,7 +128,7 @@ class WidebandClassifier(nn.Module):
         self.fc = nn.Linear(96, num_out)
 
         # Randomly initialize the weights and biases of the fully connected layer.
-        # nn.init.normal_(self.fc.weight, mean=0.0, std=0.01)
+        nn.init.normal_(self.fc.weight, mean=0.0, std=0.01)
 
         p = 0.01
         b = -math.log((1 - p) / p)  # ≈ -4.6
