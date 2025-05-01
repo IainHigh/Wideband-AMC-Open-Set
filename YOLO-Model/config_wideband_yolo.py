@@ -16,8 +16,6 @@ def get_anchors():
     Compute evenly spaced anchor values inside (0,1) based on the number of boxes per cell (B).
     For example, for B=4 this returns [0.2, 0.4, 0.6, 0.8].
     """
-    from config_wideband_yolo import B  # ensure B is imported from config
-
     # Compute B evenly spaced points between 1/(B+1) and B/(B+1)
     return np.linspace(1 / (B + 1), B / (B + 1), B)
 
@@ -43,8 +41,10 @@ def calculate_band_margin():
 
 # Open-set recognition (max‐softmax) parameters
 OPENSET_ENABLE = True  # master switch
-OPENSET_COVERAGE = 0.99  # we want 99% of known anchors above threshold
+OPENSET_COVERAGE = 0.99
 OPENSET_THRESHOLD = None  # will be filled in after calibration
+OPENSET_TEMPERATURE = 2.0
+UNKNOWN_CLASS_NAME = "UNKNOWN"
 
 #####################
 # Miscellaneous Parameters
@@ -92,14 +92,14 @@ NUM_CLASSES = 9  # Number of classes
 #####################
 BATCH_SIZE = 64
 EPOCHS = 10
-LEARNING_RATE = 0.001  # Initial learning rate
+LEARNING_RATE = 0.005  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
-LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 10.0  # Weight for coordinate (x offset) loss
+LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
 CONFIDENCE_THRESHOLD = 0.13  # Confidence threshold for filtering predictions
 
@@ -137,6 +137,5 @@ def print_config_file():
     print("\tOPENSET_ENABLE:", OPENSET_ENABLE)
     if OPENSET_ENABLE:
         print("\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
-        print("\tOPENSET_THRESHOLD:", OPENSET_THRESHOLD)
 
     print("")

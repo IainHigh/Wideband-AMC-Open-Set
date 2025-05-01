@@ -475,7 +475,7 @@ class WidebandYoloLoss(nn.Module):
         # ------------------------------------------------
         # 2) Confidence loss
         #    use 1D "IoU" = 1 - |Δx|
-        iou_1d = 1.0 - torch.abs(x_pred - x_tgt)
+        iou_1d = torch.clamp(1.0 - torch.abs(x_pred - x_tgt), 0.0, 1.0)
         conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
         conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * conf_pred**2)
 

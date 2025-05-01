@@ -1,7 +1,7 @@
 #############################################
 # main.py
 #############################################
-
+import warnings
 import torch
 import json
 import shutil
@@ -16,9 +16,23 @@ from sklearn.metrics import confusion_matrix
 from adjustText import adjust_text
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
 import config_wideband_yolo as cfg
+
+
+# Ignore warning messages that we'd expect to see
+# 1) NumPy’s “Casting complex values to real …” This is to be expected as we're converting the IQ data to real values.
+warnings.filterwarnings("ignore", category=np.ComplexWarning)
+
+# 2) PyTorch DataLoader’s “This DataLoader will create …” This is to be expected as we're using multiple workers for the DataLoader.
+warnings.filterwarnings(
+    "ignore",
+    message=r"This DataLoader will create .* worker processes",
+    category=UserWarning,
+)
+
 
 SAVE_MODEL_NAME = "yolo_model"
 
@@ -53,11 +67,15 @@ def convert_to_readable(frequency, modclass, class_list):
                 frequency /= size / 1000
                 break
         frequency = round(frequency, 4)
-        frequency_string = f"{frequency} {size_map[size / 1000]}"
+        frequency_string = f"{frequency} {size_map[int(size/1000)]}"
     else:
         frequency_string = f"{frequency} Hz"
 
-    modclass_str = class_list[modclass]
+    if modclass < len(class_list):
+        modclass_str = class_list[modclass]
+    else:
+        modclass_str = cfg.UNKNOWN_CLASS_NAME
+
     return frequency_string, modclass_str
 
 
@@ -67,17 +85,23 @@ def main():
         cfg.print_config_file()
 
     # 1) Build dataset and loaders
-    train_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "training"), transform=None
-    )
-    val_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "validation"), transform=None
-    )
-    test_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "testing"), transform=None
-    )
+    train_dataset = WidebandYoloDataset(os.path.join(data_dir, "training"))
 
     cfg.MODULATION_CLASSES = train_dataset.class_list
+
+    val_dataset = WidebandYoloDataset(
+        os.path.join(data_dir, "validation"), class_list=train_dataset.class_list
+    )
+    test_dataset = WidebandYoloDataset(
+        os.path.join(data_dir, "testing"), class_list=train_dataset.class_list
+    )
+
+    assert train_dataset.class_list == val_dataset.class_list == test_dataset.class_list
+    assert (
+        train_dataset.class_to_idx
+        == val_dataset.class_to_idx
+        == test_dataset.class_to_idx
+    )
 
     train_loader = DataLoader(
         train_dataset,
@@ -132,9 +156,9 @@ def main():
     for epoch in range(start_epoch, cfg.EPOCHS):
 
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
-        learn_rate = cfg.LEARNING_RATE * (
-            cfg.FINAL_LR_MULTIPLE ** (epoch // cfg.EPOCHS)
-        )
+        prog = epoch / (cfg.EPOCHS - 1)
+        learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
+
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 
         # Training
@@ -201,6 +225,10 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
+    # ---- (1) gather max-softmax values for τ calibration
+    gather_maxps = epoch == 0  # only during epoch-0
+    maxps = [] if gather_maxps else None
+
     for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
@@ -226,6 +254,16 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         class_tgt = label_tensor[..., 2:]
 
         obj_mask = conf_tgt > 0
+
+        if cfg.OPENSET_ENABLE and gather_maxps and obj_mask.any():
+            # exclude GT-unknown boxes
+            known_mask = (label_tensor[..., 2:].sum(dim=-1) > 0) & obj_mask
+            if known_mask.any():
+                logits = pred_reshape[..., 2:]
+                probs = F.softmax(logits / cfg.OPENSET_TEMPERATURE, dim=-1)
+                max_prob = probs.max(dim=-1)[0]
+                maxps.append(max_prob[known_mask].cpu().detach().numpy())
+
         freq_err = (x_pred - x_tgt).abs()
 
         pred_class_idx = class_pred.argmax(dim=-1)
@@ -243,6 +281,13 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_mean_freq_err = train_sum_freq_err / train_obj_count
     train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
 
+    if cfg.OPENSET_ENABLE and gather_maxps and len(maxps):
+        maxps = np.concatenate(maxps)
+        cfg.OPENSET_THRESHOLD = np.percentile(
+            maxps, (1.0 - cfg.OPENSET_COVERAGE) * 100.0
+        )
+        print(f"   →   calibrated τ = {cfg.OPENSET_THRESHOLD:.3f}")
+
     return model, avg_train_loss, train_mean_freq_err, train_cls_accuracy
 
 
@@ -256,6 +301,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
     val_frames = []
     class_list = cfg.MODULATION_CLASSES
+    if cfg.OPENSET_ENABLE and cfg.UNKNOWN_CLASS_NAME not in class_list:
+        class_list = class_list + [cfg.UNKNOWN_CLASS_NAME]
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
@@ -275,18 +322,31 @@ def validate_model(model, val_loader, device, criterion, epoch):
             )
 
             x_pred = pred_reshape[..., 0]
-            conf_pred = pred_reshape[..., 1]
-            class_pred = pred_reshape[..., 2:]
-
             x_tgt = label_tensor[..., 0]
+
             conf_tgt = label_tensor[..., 1]
             class_tgt = label_tensor[..., 2:]
 
-            obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            pred_class_idx = class_pred.argmax(dim=-1)
+            conf_pred = pred_reshape[..., 1]
+            obj_mask = conf_tgt > 0
+
+            logits = pred_reshape[..., 2:]
+            probs = torch.softmax(logits, dim=-1)
+            maxprob, pred_class_idx = probs.max(dim=-1)
+
+            # flag prediction as UNKNOWN if max-soft-max < τ
+            UNKNOWN_IDX = cfg.NUM_CLASSES  # numeric index for “unknown”
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
+                unknown_mask_pred = maxprob < cfg.OPENSET_THRESHOLD
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
             true_class_idx = class_tgt.argmax(dim=-1)
+            if cfg.OPENSET_ENABLE:
+                # any GT box whose one-hot vector is all-zeros → unknown
+                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # For metric sums
             batch_obj_count = obj_mask.sum()
@@ -308,8 +368,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
                         x_p = x_pred[i, s_idx, b_idx].item()  # x_offset [0,1]
-                        x_p = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_p * (
-                            cfg.SAMPLING_FREQUENCY / cfg.S
+                        x_p = (s_idx * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S) + x_p * (
+                            (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                         )  # raw frequency value.
 
                         conf = conf_pred[i, s_idx, b_idx].item()
@@ -320,8 +380,10 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
-                            x_g = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_g * (
-                                cfg.SAMPLING_FREQUENCY / cfg.S
+                            x_g = (
+                                s_idx * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            ) + x_g * (
+                                (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                             )  # raw frequency value.
 
                             cls_g = true_class_idx[i, s_idx, b_idx].item()
@@ -375,9 +437,8 @@ def test_model(model, test_loader, device):
             pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + cfg.NUM_CLASSES))
 
             x_pred = pred_reshape[..., 0]  # [bsize, S, B]
-            class_pred = pred_reshape[..., 2:]
-
             x_tgt = label_tensor[..., 0]
+
             conf_tgt = label_tensor[..., 1]
             class_tgt = label_tensor[..., 2:]
 
@@ -385,9 +446,21 @@ def test_model(model, test_loader, device):
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
 
-            # predicted vs. true class => argmax
-            pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
+            logits = pred_reshape[..., 2:]
+            probs = torch.softmax(logits, dim=-1)
+            maxprob, pred_class_idx = probs.max(dim=-1)
+
+            # flag prediction as UNKNOWN if max-soft-max < τ
+            UNKNOWN_IDX = cfg.NUM_CLASSES  # numeric index for “unknown”
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
+                unknown_mask_pred = maxprob < cfg.OPENSET_THRESHOLD
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
             true_class_idx = class_tgt.argmax(dim=-1)
+            if cfg.OPENSET_ENABLE:
+                # any GT box whose one-hot vector is all-zeros → unknown
+                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # Now we accumulate stats for each bounding box with obj_mask=1
             batch_obj_count = obj_mask.sum()
@@ -457,6 +530,8 @@ def test_model(model, test_loader, device):
     # 3) Confusion matrix
     if cfg.GENERATE_CONFUSION_MATRIX:
         class_list = cfg.MODULATION_CLASSES
+        if cfg.OPENSET_ENABLE and cfg.UNKNOWN_CLASS_NAME not in class_list:
+            class_list = class_list + [cfg.UNKNOWN_CLASS_NAME]
         plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes)
 
     out_dir = os.path.join(data_dir, "../test_result_plots")
