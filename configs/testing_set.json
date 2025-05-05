@@ -1,5 +1,5 @@
 {
-  "n_captures": 2000,
+  "n_captures": 20000,
   "n_samps": 4096,
   "modulation": [
     "qpsk",

@@ -9,7 +9,6 @@ from torch.utils.data import Dataset
 from config_wideband_yolo import (
     S,  # number of grid cells
     B,  # boxes per cell
-    OPENSET_ENABLE,
     NUM_CLASSES,
     SAMPLING_FREQUENCY,
     get_anchors,
@@ -27,7 +26,7 @@ class WidebandYoloDataset(Dataset):
     of the IQ data so that a frequency–domain representation is available for the model.
     """
 
-    def __init__(self, directory, transform=None, *, class_list=None):
+    def __init__(self, directory, transform=None):
         super().__init__()
         self.directory = directory
         self.transform = transform
@@ -43,7 +42,7 @@ class WidebandYoloDataset(Dataset):
             raise RuntimeError(f"No .sigmf-data files found in {directory}!")
 
         # Build a label -> index mapping for classes.
-        self.class_list = class_list or self._discover_mod_classes()
+        self.class_list = self._discover_mod_classes()
         self.class_to_idx = {c: i for i, c in enumerate(self.class_list)}
 
         # Determine num_samples from the first file.
@@ -59,9 +58,10 @@ class WidebandYoloDataset(Dataset):
             mod_list = ann["rfml_labels"]["modclass"]
             if isinstance(mod_list, str):
                 mod_list = [mod_list]
-            all_mods.update(mod_list)
-            if len(all_mods) >= NUM_CLASSES:
-                break
+            for m in mod_list:
+                all_mods.add(m)
+                if len(all_mods) == NUM_CLASSES:
+                    return sorted(all_mods)
         return sorted(all_mods)
 
     def _find_num_samples(self, base):
@@ -137,8 +137,7 @@ class WidebandYoloDataset(Dataset):
             label_tensor[cell_idx, anchor_idx, 0] = x_offset
             label_tensor[cell_idx, anchor_idx, 1] = 1.0
             class_idx = self.class_to_idx.get(m_str, None)
-            # only label “known” classes (indices 0 … NUM_CLASSES-1)
-            if class_idx is not None and class_idx < NUM_CLASSES:
+            if class_idx is not None:
                 label_tensor[cell_idx, anchor_idx, 2 + class_idx] = 1.0
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
