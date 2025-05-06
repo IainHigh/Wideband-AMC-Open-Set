@@ -1,5 +1,5 @@
 {
-  "n_captures": 20000,
+  "n_captures": 2000,
   "n_samps": 4096,
   "modulation": [
     "qpsk",
@@ -12,7 +12,9 @@
     "2dpsk",
     "8dpsk"
   ],
-  "symbol_rate": 32,
+  "symbol_rate": [
+    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+  ],
   "sampling_rate": 1e9,
   "randomly_generated_center_frequencies": [40e6, 400e6, 3, 1],
 

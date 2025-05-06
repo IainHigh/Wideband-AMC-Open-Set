@@ -1,10 +1,3 @@
-# TODO:
-
-## Later:
-
-1. Probably can't use the metadata to calculate the bandwidth of the signal as in reality, we wouldn't have access to this metadata. Better solution would be to either predict the bandwidth (in a similar way that the center_frequency is predicted) or use the YOLO style method of having set predefined bandwidths and then predicting the best one to use. See TODO in config_wideband_yolo.py - Bandwidth should be estimated by the CNN model - currently it is stated by calculating it from the sps, and sampling_rate. This should be predicted from the CNN as well as the centre_frequency. This might not be necessary - could do it without. Could also just use 4 different sizes of bandwidths, estimate the best one and then use that - similar to the YOLO model.
-2. Similar to above - Currently symbol rate (baud rate) and AWGN SNR are determined first - meaning they are consistent for all center_frequencies. Each center frequency should have it's own baud rate and its on SNR value.
-
 # Synthetic Radio Frequency Data Generator
 
 Python tool to generate synthetic radio frequency (RF) datasets.

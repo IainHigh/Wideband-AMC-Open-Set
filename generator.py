@@ -12,8 +12,8 @@ from utils import *
 
 CALCULATE_BER_SNR = False  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
 
-buf = 4096
-halfbuf = 2048
+buf = 128
+halfbuf = buf // 2
 
 # Read the configs/system_parameters.json file.
 with open("./configs/system_parameters.json", mode="rt") as f:
@@ -24,9 +24,6 @@ with open("./configs/system_parameters.json", mode="rt") as f:
 
 ## load c modules
 clinear = ctypes.CDLL(os.path.abspath("./cmodules/linear_modulate"))
-cam = ctypes.CDLL(os.path.abspath("./cmodules/am_modulate"))
-cfm = ctypes.CDLL(os.path.abspath("./cmodules/fm_modulate"))
-cfsk = ctypes.CDLL(os.path.abspath("./cmodules/fsk_modulate"))
 ctx = ctypes.CDLL(os.path.abspath("./cmodules/rrc_tx"))
 cchan = ctypes.CDLL(os.path.abspath("./cmodules/channel"))
 
@@ -81,6 +78,9 @@ def generate_linear(config, rng_seed):
 
     ber_dict = {}
 
+    max_beta = max([_beta for _sps, _beta, _delay, _dt in sig_params])
+    min_sps = min([_sps for _sps, _beta, _delay, _dt in sig_params])
+
     for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
         if config["center_frequencies_random"]:
             lower_bound, upper_bound, n_max, prevent_overlap = config[
@@ -88,10 +88,10 @@ def generate_linear(config, rng_seed):
             ]
             margin = 0
             if prevent_overlap != 0:
-                margin = 2 * (sampling_rate / sig_params[i][0]) * (1 + sig_params[i][1])
+                margin = 2 * (sampling_rate / min_sps) * (1 + max_beta)
             n = np.random.randint(1, n_max + 1)
 
-            attempts, max_attempts = 0, 10000
+            attempts, max_attempts = 0, 1000
             center_frequencies = []
 
             while len(center_frequencies) < n and attempts < max_attempts:
@@ -178,16 +178,24 @@ def generate_linear(config, rng_seed):
             else:
                 raise ValueError("Undefined channel type.")
 
+            rand_index = np.random.randint(0, len(sig_params))
             order = ctypes.c_int(mod[1])
-            sps = ctypes.c_int(sig_params[i][0])
-            beta = ctypes.c_float(sig_params[i][1])
-            delay = ctypes.c_uint(int(sig_params[i][2]))
-            dt = ctypes.c_float(sig_params[i][3])
+            sps = ctypes.c_int(sig_params[rand_index][0])
+            beta = ctypes.c_float(sig_params[rand_index][1])
+            delay = ctypes.c_uint(int(sig_params[rand_index][2]))
+            dt = ctypes.c_float(sig_params[rand_index][3])
 
-            # Adjust n_sym for chunk processing
-            n_sym = int(
-                np.ceil(n_samps / sps.value)
-            )  # Ensure the right number of symbols
+            # Adjust n_sym for chunk processing,
+            # but floor it so n_sym * sps <= n_samps and we never overflow
+            raw = int(np.ceil(n_samps / sps.value))
+            if raw * sps.value > n_samps:
+                # clamp down
+                n_sym = n_samps // sps.value
+            else:
+                n_sym = raw
+            # safety: always at least 1 symbol
+            if n_sym < 1:
+                n_sym = 1
 
             # Create return arrays
             s = (ctypes.c_uint * n_sym)(*np.zeros(n_sym, dtype=int))
