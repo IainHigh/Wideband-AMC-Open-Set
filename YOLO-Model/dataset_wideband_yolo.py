@@ -1,11 +1,12 @@
 ##########################################
 # dataset_wideband_yolo.py
 ##########################################
+import torch
+from torch.utils.data import Dataset
+
 import os
 import json
-import torch
 import numpy as np
-from torch.utils.data import Dataset
 from config_wideband_yolo import (
     S,  # number of grid cells
     B,  # boxes per cell

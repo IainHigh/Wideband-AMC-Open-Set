@@ -2,10 +2,11 @@
 # model_and_loss_wideband_yolo.py
 #############################################
 import torch
-import numpy as np
-import math
 import torch.nn as nn
 import torch.nn.functional as F
+
+import numpy as np
+from math import pi
 from config_wideband_yolo import (
     S,
     B,
@@ -307,7 +308,8 @@ class WidebandYoloModel(nn.Module):
                     off = raw[i, si, bi, 0].item()
                     freq = (si + off) * (SAMPLING_FREQUENCY / 2) / S
                     cls = int(raw[i, si, bi, 3:].argmax())
-                    preds.append((freq, cls, conf))
+                    bw = raw[i, si, bi, 2].item()
+                    preds.append((freq, cls, conf, bw))
             lists.append(preds)
         return lists
 
@@ -323,7 +325,7 @@ class WidebandYoloModel(nn.Module):
 
         anchors = get_anchors()  # numpy array of length B
         for i, preds in enumerate(merged_lists):
-            for freq, cls, conf in preds:
+            for freq, cls, conf, bw in preds:
                 # normalized freq in [0,1]
                 freq_norm = freq / (SAMPLING_FREQUENCY / 2)
                 cell = int(freq_norm * S)
@@ -335,7 +337,10 @@ class WidebandYoloModel(nn.Module):
 
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
-                out[i, cell, aidx, 3 + cls] = 1.0
+                out[i, cell, aidx, 2] = bw
+                out[i, cell, aidx, 3 + cls] = (
+                    1.0  # TODO: COULD THIS BE THE REASON WHY THRESHOLD OPEN-SET RECOGNITION WAS FAILING?
+                )
 
         return out
 
@@ -343,21 +348,23 @@ class WidebandYoloModel(nn.Module):
         preds = sorted(pred_list, key=lambda x: x[0])
         merged = []
         while preds:
-            seed_f, seed_c, seed_conf = preds.pop(0)
-            cluster = [(seed_f, seed_c, seed_conf)]
+            seed_f, seed_c, seed_conf, seed_bw = preds.pop(0)
+            cluster = [(seed_f, seed_c, seed_conf, seed_bw)]
             i = 0
             while i < len(preds):
-                f, c, conf = preds[i]
+                f, c, conf, bw = preds[i]
                 if abs(f - seed_f) <= margin:
-                    cluster.append((f, c, conf))
+                    cluster.append((f, c, conf, bw))
                     preds.pop(i)
                 else:
                     i += 1
-            classes = {c for _, c, _ in cluster}
+            classes = {t[1] for t in cluster}
             if len(classes) == 1:
-                tot_conf = sum(c for _, _, c in cluster)
-                f_avg = sum(f * c for f, _, c in cluster) / tot_conf
-                merged.append((f_avg, cluster[0][1], max(c for *_, c in cluster)))
+                tot_conf = sum(conf for *_, conf, _ in cluster)
+                f_avg = sum(f * conf for f, _, conf, _ in cluster) / tot_conf
+                bw_avg = sum(bw * conf for _, _, conf, bw in cluster) / tot_conf
+                max_conf = max(conf for *_, conf, _ in cluster)
+                merged.append((f_avg, cluster[0][1], max_conf, bw_avg))
             else:
                 merged.append(max(cluster, key=lambda x: x[2]))
         return merged
@@ -391,7 +398,7 @@ class WidebandYoloModel(nn.Module):
 
         # ---------- shift to band‑pass ----------
         f0 = freq_flat.view(N, 1)  # [N,1]
-        cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)  # [N,M]
+        cos_factor = torch.cos(2 * pi * f0 * n / SAMPLING_FREQUENCY)  # [N,M]
 
         h_bp_all = h_lp * cos_factor  # [N,M]
 
@@ -417,7 +424,7 @@ class WidebandYoloModel(nn.Module):
             / SAMPLING_FREQUENCY
         )
         freq_flat = freq_flat.unsqueeze(-1)
-        angle = -2.0 * math.pi * freq_flat * t
+        angle = -2.0 * pi * freq_flat * t
         shift_real = torch.cos(angle)
         shift_imag = torch.sin(angle)
         x_real = x_flat[:, 0, :]
@@ -441,6 +448,7 @@ class WidebandYoloLoss(nn.Module):
         super().__init__()
 
     def forward(self, pred, target):
+        # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
         batch_size = pred.shape[0]
         pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + 1 + NUM_CLASSES)
         target = target.view_as(pred)

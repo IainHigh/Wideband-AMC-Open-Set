@@ -1,9 +1,7 @@
 #############################################
 # config_wideband_yolo.py
 #############################################
-import json
-import os
-import numpy as np
+from numpy import linspace
 
 """
 Configuration file for the wideband YOLO-style AMC system.
@@ -17,7 +15,7 @@ def get_anchors():
     For example, for B=4 this returns [0.2, 0.4, 0.6, 0.8].
     """
     # Compute B evenly spaced points between 1/(B+1) and B/(B+1)
-    return np.linspace(1 / (B + 1), B / (B + 1), B)
+    return linspace(1 / (B + 1), B / (B + 1), B)
 
 
 #####################

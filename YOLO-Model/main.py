@@ -1,32 +1,33 @@
 #############################################
 # main.py
 #############################################
-import warnings
 import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+
 import json
-import shutil
 import numpy as np
 import sys
 import os
 import random
-import torch.optim as optim
 import matplotlib.pyplot as plt
-import seaborn as sns
+import config_wideband_yolo as cfg
+from shutil import rmtree
+from warnings import filterwarnings
+from seaborn import heatmap
 from sklearn.metrics import confusion_matrix
 from adjustText import adjust_text
 from tqdm import tqdm
-from torch.utils.data import DataLoader
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
-import config_wideband_yolo as cfg
 
 
 # Ignore warning messages that we'd expect to see
 # 1) NumPy’s “Casting complex values to real …” This is to be expected as we're converting the IQ data to real values.
-warnings.filterwarnings("ignore", category=np.ComplexWarning)
+filterwarnings("ignore", category=np.ComplexWarning)
 
 # 2) PyTorch DataLoader’s “This DataLoader will create …” This is to be expected as we're using multiple workers for the DataLoader.
-warnings.filterwarnings(
+filterwarnings(
     "ignore",
     message=r"This DataLoader will create .* worker processes",
     category=UserWarning,
@@ -79,6 +80,8 @@ def convert_to_readable(frequency, modclass, class_list):
 
 
 def main():
+    # TODO: Should show the bandwidth loss for training and validation as well as the centre_frequency loss.
+
     # Print the configuration file
     if cfg.PRINT_CONFIG_FILE:
         cfg.print_config_file()
@@ -149,7 +152,10 @@ def main():
     for epoch in range(start_epoch, cfg.EPOCHS):
 
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
-        prog = epoch / (cfg.EPOCHS - 1)
+        if cfg.EPOCHS > 1:
+            prog = epoch / (cfg.EPOCHS - 1)
+        else:
+            prog = 0.0
         learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
 
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
@@ -481,7 +487,7 @@ def test_model(model, test_loader, device):
     out_dir = os.path.join(data_dir, "../test_result_plots")
     # clear or create directory
     if os.path.exists(out_dir):
-        shutil.rmtree(out_dir)
+        rmtree(out_dir)
     os.makedirs(out_dir, exist_ok=True)
 
     # 4) Plot frequency domain diagram of test set samples and predictions
@@ -504,7 +510,7 @@ def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes
             cm_percent[i] = (cm[i] / row_sum) * 100.0
 
     plt.figure(figsize=(8, 6))
-    sns.heatmap(
+    heatmap(
         cm_percent,
         annot=True,
         fmt=".2f",
@@ -593,14 +599,11 @@ def plot_test_samples(model, test_loader, device, out_dir):
                         xp = pred[si, bi, 0]
                         fp = (si + xp) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                         cls_p = np.argmax(pred[si, bi, 3:])
-
-                        # find closest GT for error
-                        if gt_lines:
-                            errs = [abs(fp - g[0]) for g in gt_lines]
-                            err = min(errs)
-                        else:
-                            err = np.nan
-                        pred_lines.append((fp, cfg.MODULATION_CLASSES[cls_p], err))
+                        bandwidth = pred[si, bi, 2]
+                        bandwidth = bandwidth * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                        pred_lines.append(
+                            (fp, cfg.MODULATION_CLASSES[cls_p], bandwidth)
+                        )
 
             # plotting
             plt.figure()
@@ -615,7 +618,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
 
             # draw GT
             for fg, cls_g in gt_lines:
-                plt.axvline(fg, linestyle="--", color="black", alpha=0.7)
+                plt.axvline(fg, linestyle="--", color="black", alpha=1.0)
                 texts.append(
                     plt.text(
                         fg,
@@ -627,8 +630,22 @@ def plot_test_samples(model, test_loader, device, out_dir):
                 )
 
             # draw preds
-            for fp, cls_p, err in pred_lines:
-                plt.axvline(fp, linestyle="-", color="red", alpha=0.7)
+            for fp, cls_p, bandwidth in pred_lines:
+
+                ax = plt.gca()
+
+                # vertical line at the predicted centre
+                ax.axvline(fp, linestyle="-", color="red", alpha=1.0)
+
+                # shaded bandwidth span
+                ax.axvspan(
+                    fp - bandwidth / 2,
+                    fp + bandwidth / 2,
+                    color="red",
+                    alpha=0.30,
+                    zorder=5,
+                )
+
                 texts.append(
                     plt.text(
                         fp,
