@@ -234,13 +234,15 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
         # Additional training metrics
         bsize = pred.shape[0]
-        pred_reshape = pred.view(bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES))
+        pred_reshape = pred.view(
+            bsize, pred.shape[1], -1, (1 + 1 + 1 + cfg.NUM_CLASSES)
+        )
         x_pred = pred_reshape[..., 0]
-        class_pred = pred_reshape[..., 2:]
+        class_pred = pred_reshape[..., 3:]
 
         x_tgt = label_tensor[..., 0]
         conf_tgt = label_tensor[..., 1]
-        class_tgt = label_tensor[..., 2:]
+        class_tgt = label_tensor[..., 3:]
 
         obj_mask = conf_tgt > 0
         freq_err = (x_pred - x_tgt).abs()
@@ -288,16 +290,16 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             bsize = pred.shape[0]
             pred_reshape = pred.view(
-                bsize, pred.shape[1], -1, (1 + 1 + cfg.NUM_CLASSES)
+                bsize, pred.shape[1], -1, (1 + 1 + 1 + cfg.NUM_CLASSES)
             )
 
             x_pred = pred_reshape[..., 0]
             conf_pred = pred_reshape[..., 1]
-            class_pred = pred_reshape[..., 2:]
+            class_pred = pred_reshape[..., 3:]
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
-            class_tgt = label_tensor[..., 2:]
+            class_tgt = label_tensor[..., 3:]
 
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
@@ -389,14 +391,14 @@ def test_model(model, test_loader, device):
             bsize = pred.shape[0]
             Sdim = pred.shape[1]  # should be S
             # interpret bounding boxes
-            pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + cfg.NUM_CLASSES))
+            pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + 1 + cfg.NUM_CLASSES))
 
             x_pred = pred_reshape[..., 0]  # [bsize, S, B]
-            class_pred = pred_reshape[..., 2:]
+            class_pred = pred_reshape[..., 3:]
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
-            class_tgt = label_tensor[..., 2:]
+            class_tgt = label_tensor[..., 3:]
 
             # object mask
             obj_mask = conf_tgt > 0
@@ -567,8 +569,10 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     freq_data[b : b + 1].to(device),
                 )
             # reshape to [1, S, B, 1+1+NUM_CLASSES]
-            pred = pred.view(1, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()[0]
-            gt = label_tensor[b].view(cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).numpy()
+            pred = (
+                pred.view(1, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()[0]
+            )
+            gt = label_tensor[b].view(cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).numpy()
 
             # extract GT freqs & classes
             gt_lines = []
@@ -577,7 +581,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     if gt[si, bi, 1] > 0:  # confidence>0
                         xg = gt[si, bi, 0]
                         fg = (si + xg) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                        cls_g = np.argmax(gt[si, bi, 2:])
+                        cls_g = np.argmax(gt[si, bi, 3:])
                         gt_lines.append((fg, cfg.MODULATION_CLASSES[cls_g]))
 
             # extract preds above a threshold
@@ -588,7 +592,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     if conf_p > cfg.CONFIDENCE_THRESHOLD:
                         xp = pred[si, bi, 0]
                         fp = (si + xp) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                        cls_p = np.argmax(pred[si, bi, 2:])
+                        cls_p = np.argmax(pred[si, bi, 3:])
 
                         # find closest GT for error
                         if gt_lines:
@@ -661,9 +665,11 @@ def write_test_results(model, test_loader, device, out_dir):
             # run model once per batch
             preds = model(time_data.to(device), freq_data.to(device))
             # reshape to [batch, S, B, 1+1+NUM_CLASSES]
-            preds = preds.view(bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
+            preds = (
+                preds.view(bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
+            )
             labels = label_tensor.view(
-                bsz, cfg.S, cfg.B, 1 + 1 + cfg.NUM_CLASSES
+                bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES
             ).numpy()
             for i in range(bsz):
                 snr = snr_tensor[i].item()
@@ -676,7 +682,7 @@ def write_test_results(model, test_loader, device, out_dir):
                         if labels[i, si, bi, 1] > 0:
                             xg_norm = labels[i, si, bi, 0]
                             fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                            cls_idx = np.argmax(labels[i, si, bi, 2:])
+                            cls_idx = np.argmax(labels[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(
                                 fg, cls_idx, cfg.MODULATION_CLASSES
                             )
@@ -689,7 +695,7 @@ def write_test_results(model, test_loader, device, out_dir):
                         if conf_p > cfg.CONFIDENCE_THRESHOLD:
                             xp_norm = preds[i, si, bi, 0]
                             fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                            cls_idx = np.argmax(preds[i, si, bi, 2:])
+                            cls_idx = np.argmax(preds[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(
                                 fp, cls_idx, cfg.MODULATION_CLASSES
                             )

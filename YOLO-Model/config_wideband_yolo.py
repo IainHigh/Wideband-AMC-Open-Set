@@ -20,25 +20,6 @@ def get_anchors():
     return np.linspace(1 / (B + 1), B / (B + 1), B)
 
 
-def calculate_band_margin():
-    with open("./configs/system_parameters.json") as f:
-        system_parameters = json.load(f)
-    dataset_directory = system_parameters["Dataset_Directory"] + "/training"
-    file_name = os.listdir(os.path.abspath(dataset_directory))[0]
-    file_name = os.path.join(dataset_directory, file_name.split(".")[0])
-
-    with open(file_name + ".sigmf-meta") as _f:
-        f_meta = json.load(_f)
-
-    # Extract metadata
-    annotation = f_meta["annotations"][0]
-    sampling_rate = annotation["sampling_rate"]
-    sps = f_meta["annotations"][1]["filter"]["sps"]
-    beta = f_meta["annotations"][1]["filter"]["rolloff"]
-    channel_bw = (sampling_rate / sps) * (1 + beta)
-    return channel_bw, sampling_rate
-
-
 #####################
 # Miscellaneous Parameters
 #####################
@@ -59,17 +40,12 @@ MODULATION_CLASSES = (
 # Dataset Filtering Parameters
 #####################
 
-BAND_MARGIN, SAMPLING_FREQUENCY = (
-    calculate_band_margin()
-)  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
-BAND_MARGIN = (
-    BAND_MARGIN * 2
-)  # Band margin - determines the start frequency and end frequency from the calculated center frequency.
+SAMPLING_FREQUENCY = 1e9
 MERGE_SIMILAR_PREDICTIONS = (
     True  # If true, will merge similar predictions into one prediction.
 )
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
-    BAND_MARGIN / 2
+    SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
@@ -94,6 +70,7 @@ FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rat
 LAMBDA_COORD = 10.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 1.0  # Weight for classification loss
+LAMBDA_BW = 5.0
 CONFIDENCE_THRESHOLD = 0.13  # Confidence threshold for filtering predictions
 
 
@@ -108,7 +85,6 @@ def print_config_file():
     print("\tGENERATE_CONFUSION_MATRIX:", GENERATE_CONFUSION_MATRIX)
     print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
     print("\tSAMPLING_FREQUENCY:", SAMPLING_FREQUENCY)
-    print("\tBAND_MARGIN:", BAND_MARGIN)
     print("\tMERGE_SIMILAR_PREDICTIONS:", MERGE_SIMILAR_PREDICTIONS)
     if MERGE_SIMILAR_PREDICTIONS:
         print(
@@ -126,5 +102,6 @@ def print_config_file():
     print("\tLAMBDA_COORD:", LAMBDA_COORD)
     print("\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
+    print("\tLAMBDA_BW:", LAMBDA_BW)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
     print("")

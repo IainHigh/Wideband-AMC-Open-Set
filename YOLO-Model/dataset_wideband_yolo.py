@@ -103,10 +103,23 @@ class WidebandYoloDataset(Dataset):
         snr_value = ann[1]["channel"]["snr"]
         center_freqs = ann[0]["center_frequencies"]
         mod_list = ann[0]["rfml_labels"]["modclass"]
+
+        sampling_rate = ann[0]["sampling_rate"]  # Fs in Hz
+        sps_list = meta["annotations"][1]["filter"]["sps"]
+        beta = meta["annotations"][1]["filter"]["rolloff"]
+
         if isinstance(mod_list, str):
             mod_list = [mod_list]
         if isinstance(center_freqs, (float, int)):
             center_freqs = [center_freqs]
+        if isinstance(sps_list, (int, float)):
+            sps_list = [sps_list] * len(center_freqs)
+
+        chan_bw = [(sampling_rate / sps) * (1.0 + beta) for sps in sps_list]
+
+        # Normalise bandwidth to the width of one YOLO grid‑cell (“bin”)
+        bin_width = (SAMPLING_FREQUENCY / 2) / S
+        bw_norm = [min(bw / bin_width, 1.0) for bw in chan_bw]
 
         # Convert to real time-domain IQ: shape (2, N)
         x_real = x_complex.real.astype(np.float32)
@@ -118,8 +131,8 @@ class WidebandYoloDataset(Dataset):
             # Optionally transform x_freq as well, if needed.
 
         # Build YOLO label: shape [S, B, 1+1+NUM_CLASSES]
-        label_tensor = np.zeros((S, B, 1 + 1 + NUM_CLASSES), dtype=np.float32)
-        for c_freq, m_str in zip(center_freqs, mod_list):
+        label_tensor = np.zeros((S, B, 1 + 1 + 1 + NUM_CLASSES), dtype=np.float32)
+        for c_freq, m_str, bw_n in zip(center_freqs, mod_list, bw_norm):
             # Normalize frequency.
             freq_norm = c_freq / (SAMPLING_FREQUENCY / 2)  # in [0, 1]
             cell_idx = int(freq_norm * S)
@@ -136,9 +149,14 @@ class WidebandYoloDataset(Dataset):
             # Assign the label for the best matching anchor.
             label_tensor[cell_idx, anchor_idx, 0] = x_offset
             label_tensor[cell_idx, anchor_idx, 1] = 1.0
+            label_tensor[cell_idx, anchor_idx, 2] = bw_n  # bandwidth
             class_idx = self.class_to_idx.get(m_str, None)
             if class_idx is not None:
-                label_tensor[cell_idx, anchor_idx, 2 + class_idx] = 1.0
+                label_tensor[cell_idx, anchor_idx, 3 + class_idx] = 1.0
+
+        # Replace any NaN values in x_wide or x_freq with zeros.
+        x_wide = np.nan_to_num(x_wide, nan=0.001)
+        x_freq = np.nan_to_num(x_freq, nan=0.001)
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
         return (

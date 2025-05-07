@@ -12,7 +12,7 @@ from utils import *
 
 CALCULATE_BER_SNR = False  # Flag to determine if we should calculate the BER to SNR values for BPSK modulation scheme.
 
-buf = 128
+buf = 64
 halfbuf = buf // 2
 
 # Read the configs/system_parameters.json file.
@@ -104,6 +104,7 @@ def generate_linear(config, rng_seed):
             center_frequencies = config["center_frequencies"]
 
         mod_list = []
+        sps_list = []
 
         I_total = np.zeros(n_samps - buf, dtype=np.float32)
         Q_total = np.zeros(n_samps - buf, dtype=np.float32)
@@ -179,6 +180,7 @@ def generate_linear(config, rng_seed):
                 raise ValueError("Undefined channel type.")
 
             rand_index = np.random.randint(0, len(sig_params))
+            sps_list.append(sig_params[rand_index][0])
             order = ctypes.c_int(mod[1])
             sps = ctypes.c_int(sig_params[rand_index][0])
             beta = ctypes.c_float(sig_params[rand_index][1])
@@ -285,7 +287,7 @@ def generate_linear(config, rng_seed):
             "channel_type": config["channel_type"],
             "snr": snr.value,
             "filter_type": "rrc",
-            "sps": sps.value,
+            "sps": sps_list,
             "fo": fo.value,
             "po": po.value,
             "delay": delay.value,

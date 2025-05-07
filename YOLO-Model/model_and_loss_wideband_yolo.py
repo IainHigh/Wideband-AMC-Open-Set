@@ -13,51 +13,14 @@ from config_wideband_yolo import (
     LAMBDA_COORD,
     LAMBDA_NOOBJ,
     LAMBDA_CLASS,
+    LAMBDA_BW,
     CONFIDENCE_THRESHOLD,
-    BAND_MARGIN,
     NUMTAPS,
     SAMPLING_FREQUENCY,
     MERGE_SIMILAR_PREDICTIONS,
     MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
     get_anchors,
 )
-
-
-###############################################################################
-# Helper to build a lowpass filter kernel in PyTorch
-###############################################################################
-def build_lowpass_filter(cutoff_hz, fs, num_taps, window="hamming"):
-    M = num_taps
-    n = torch.arange(M, dtype=torch.float32)
-    alpha = (M - 1) / 2.0
-    cutoff_norm = float(cutoff_hz) / (fs / 2.0)
-    eps = 1e-9
-
-    def sinc(x):
-        return torch.where(
-            torch.abs(x) < eps,
-            torch.ones_like(x),
-            torch.sin(math.pi * x) / (math.pi * x),
-        )
-
-    h = cutoff_norm * sinc(cutoff_norm * (n - alpha))
-    if window == "hamming":
-        win = 0.54 - 0.46 * torch.cos(2.0 * math.pi * (n / (M - 1)))
-    elif window == "hanning":
-        win = 0.5 - 0.5 * torch.cos(2.0 * math.pi * (n / (M - 1)))
-    elif window == "blackman":
-        win = (
-            0.42
-            - 0.5 * torch.cos(2 * math.pi * n / (M - 1))
-            + 0.08 * torch.cos(4 * math.pi * n / (M - 1))
-        )
-    elif window == "kaiser":
-        win = torch.kaiser_window(M, beta=8.6, periodic=False)
-    else:
-        win = torch.ones(M, dtype=torch.float32)
-    h = h * win
-    h = h / torch.sum(h)
-    return h
 
 
 def conv1d_batch(x, weight, pad_left, pad_right):
@@ -229,6 +192,7 @@ class WidebandYoloModel(nn.Module):
             initial_anchor_values.unsqueeze(0).repeat(S, 1)
         )  # shape: [S, B]
         self.freq_predictor = nn.Linear(128, S * B)
+        self.band_predictor = nn.Linear(128, S * B)
 
         # Refinement branch.
         self.refinement_branch = nn.Sequential(
@@ -279,6 +243,10 @@ class WidebandYoloModel(nn.Module):
         # Final predicted normalized offset.
         freq_pred = coarse_freq_pred + refine_delta  # [bsz, S, B]
 
+        bw_raw = self.band_predictor(combined_features)  # [bsz, S*B]
+        bw_pred = torch.sigmoid(bw_raw.view(bsz, S, B))  # ∈[0,1]
+        bw_pred_flat = bw_pred.view(bsz * S * B)
+
         cell_indices = torch.arange(
             S, device=freq_pred.device, dtype=freq_pred.dtype
         ).view(1, S, 1)
@@ -291,7 +259,7 @@ class WidebandYoloModel(nn.Module):
         x_rep = x_time.unsqueeze(1).unsqueeze(1).expand(-1, S, B, -1, -1)
         x_rep = x_rep.contiguous().view(bsz * S * B, 2, self.num_samples)
 
-        x_filt = self._filter_raw(x_rep, freq_pred_flat)
+        x_filt = self._filter_raw(x_rep, freq_pred_flat, bw_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
 
         out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
@@ -301,13 +269,15 @@ class WidebandYoloModel(nn.Module):
             bsz,
             S,
             B,
-            (1 + 1 + NUM_CLASSES),
+            1 + 1 + 1 + NUM_CLASSES,
             dtype=out_conf_class.dtype,
             device=out_conf_class.device,
         )
-        final_out[..., 0] = freq_pred  # normalized frequency offset
-        final_out[..., 1:] = out_conf_class
-        final_out = final_out.view(bsz, S, B * (1 + 1 + NUM_CLASSES))
+        final_out[..., 0] = freq_pred  # offset
+        final_out[..., 1] = out_conf_class[..., 0]  # confidence
+        final_out[..., 2] = bw_pred  # bandwidth (norm.)
+        final_out[..., 3:] = out_conf_class[..., 1:]  # classes
+        final_out = final_out.view(bsz, S, B * (1 + 1 + 1 + NUM_CLASSES))
         if (not self.training) and MERGE_SIMILAR_PREDICTIONS:
             all_preds = self._collect_raw_predictions(final_out)
             merged = [
@@ -325,7 +295,7 @@ class WidebandYoloModel(nn.Module):
         lists of (freq_Hz:float, class_idx:int, conf:float).
         """
         bsz = final_out.size(0)
-        raw = final_out.view(bsz, S, B, 1 + 1 + NUM_CLASSES)
+        raw = final_out.view(bsz, S, B, 1 + 1 + 1 + NUM_CLASSES)
         lists = []
         for i in range(bsz):
             preds = []
@@ -336,7 +306,7 @@ class WidebandYoloModel(nn.Module):
                         continue
                     off = raw[i, si, bi, 0].item()
                     freq = (si + off) * (SAMPLING_FREQUENCY / 2) / S
-                    cls = int(raw[i, si, bi, 2:].argmax())
+                    cls = int(raw[i, si, bi, 3:].argmax())
                     preds.append((freq, cls, conf))
             lists.append(preds)
         return lists
@@ -347,7 +317,9 @@ class WidebandYoloModel(nn.Module):
         returns: tensor of shape (bsz, S, B, 1+1+NUM_CLASSES)
         """
         bsz = len(merged_lists)
-        out = torch.zeros(bsz, S, B, 1 + 1 + NUM_CLASSES, device=device, dtype=dtype)
+        out = torch.zeros(
+            bsz, S, B, 1 + 1 + 1 + NUM_CLASSES, device=device, dtype=dtype
+        )
 
         anchors = get_anchors()  # numpy array of length B
         for i, preds in enumerate(merged_lists):
@@ -363,7 +335,7 @@ class WidebandYoloModel(nn.Module):
 
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
-                out[i, cell, aidx, 2 + cls] = 1.0
+                out[i, cell, aidx, 3 + cls] = 1.0
 
         return out
 
@@ -390,28 +362,49 @@ class WidebandYoloModel(nn.Module):
                 merged.append(max(cluster, key=lambda x: x[2]))
         return merged
 
-    def _filter_raw(self, x_flat, freq_flat):
+    def _filter_raw(self, x_flat, freq_flat, bandwidth_flat):
+        """
+        x_flat          : [N, 2, T]
+        freq_flat       : [N]          (centre freqs in Hz)
+        bandwidth_flat  : [N]          (normalised bw in [0,1] wrt cell‑width)
+        returns         : [N, 2, T]
+        """
         N, _, T = x_flat.shape
         M = NUMTAPS
+        device, dtype = x_flat.device, x_flat.dtype
+        # ---------- low‑pass kernel ----------
         alpha = (M - 1) / 2.0
-        n = torch.arange(M, device=x_flat.device, dtype=x_flat.dtype) - alpha
-        h_lp = build_lowpass_filter(
-            cutoff_hz=BAND_MARGIN,
-            fs=SAMPLING_FREQUENCY,
-            num_taps=NUMTAPS,
-            window="kaiser",
+        n = torch.arange(M, device=device, dtype=dtype) - alpha  # [M]
+        cutoff_norm = bandwidth_flat.clamp_min(1e-4) / S  # [N]
+        x = cutoff_norm.unsqueeze(1) * n  # [N,M]
+
+        # use PyTorch’s numerically‑stable sinc
+        sinc = torch.sinc(x)  # sin(pi x)/(pi x)
+
+        h_lp = cutoff_norm.unsqueeze(1) * sinc  # [N,M]
+        h_lp = h_lp / h_lp.sum(dim=1, keepdim=True).clamp_min(1e-12)
+
+        win = torch.kaiser_window(
+            M, beta=8.6, periodic=False, dtype=dtype, device=device
         )
-        h_lp = h_lp.to(x_flat.device)
-        h_lp = h_lp.unsqueeze(0)
-        f0 = freq_flat.view(N, 1)
-        cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)
-        h_bp_all = h_lp * cos_factor
-        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)
-        x_reshaped = x_flat.reshape(N * 2, 1, T)
-        weight = h_bp_all_expanded.reshape(N * 2, 1, M)
+        h_lp = (h_lp * win) / (h_lp * win).sum(dim=1, keepdim=True)
+
+        # ---------- shift to band‑pass ----------
+        f0 = freq_flat.view(N, 1)  # [N,1]
+        cos_factor = torch.cos(2 * math.pi * f0 * n / SAMPLING_FREQUENCY)  # [N,M]
+
+        h_bp_all = h_lp * cos_factor  # [N,M]
+
+        # duplicate for I & Q channels
+        h_bp_all_expanded = h_bp_all.unsqueeze(1).repeat(1, 2, 1)  # [N,2,M]
+
+        # ---------- apply FIR by unfolding ----------
+        x_reshaped = x_flat.reshape(N * 2, 1, T)  # [N*2,1,T]
+        weight = h_bp_all_expanded.reshape(N * 2, 1, M)  # [N*2,1,M]
+
         pad_left = M // 2
         pad_right = M - 1 - pad_left
-        y = conv1d_batch(x_reshaped, weight, pad_left, pad_right)
+        y = conv1d_batch(x_reshaped, weight, pad_left, pad_right)  # [N*2,1,T]
         y = y.reshape(N, 2, T)
         return y
 
@@ -448,28 +441,33 @@ class WidebandYoloLoss(nn.Module):
         super().__init__()
 
     def forward(self, pred, target):
-
         batch_size = pred.shape[0]
-        pred = pred.view(batch_size, pred.shape[1], B, (1 + 1 + NUM_CLASSES))
-        x_pred = pred[..., 0]
+        pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + 1 + NUM_CLASSES)
+        target = target.view_as(pred)
+
+        x_pred = pred[..., 0]  # frequency offset
         conf_pred = pred[..., 1]
-        class_pred = pred[..., 2:]
+        bw_pred = pred[..., 2]  # bandwidth
+        cls_pred = pred[..., 3:]
 
         x_tgt = target[..., 0]
         conf_tgt = target[..., 1]
-        class_tgt = target[..., 2:]
-        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
+        bw_tgt = target[..., 2]
+        cls_tgt = target[..., 3:]
 
+        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
         noobj_mask = 1.0 - obj_mask
 
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
-        iou_1d = torch.clamp(1.0 - torch.abs(x_pred - x_tgt), 0.0, 1.0)
-        conf_loss_obj = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
-        conf_loss_noobj = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
+        bw_loss = LAMBDA_BW * torch.sum(obj_mask * (bw_pred - bw_tgt) ** 2)
 
-        class_loss = LAMBDA_CLASS * torch.sum(
-            obj_mask.unsqueeze(-1) * (class_pred - class_tgt) ** 2
+        iou_1d = torch.clamp(1.0 - torch.abs(x_pred - x_tgt), 0.0, 1.0)
+        conf_loss_o = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
+        conf_loss_n = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
+
+        cls_loss = LAMBDA_CLASS * torch.sum(
+            obj_mask.unsqueeze(-1) * (cls_pred - cls_tgt) ** 2
         )
 
-        total_loss = coord_loss + conf_loss_obj + conf_loss_noobj + class_loss
+        total_loss = coord_loss + bw_loss + conf_loss_o + conf_loss_n + cls_loss
         return total_loss / batch_size
