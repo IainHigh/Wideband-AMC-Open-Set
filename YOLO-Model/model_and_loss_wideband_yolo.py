@@ -245,7 +245,8 @@ class WidebandYoloModel(nn.Module):
         freq_pred = coarse_freq_pred + refine_delta  # [bsz, S, B]
 
         bw_raw = self.band_predictor(combined_features)  # [bsz, S*B]
-        bw_pred = torch.sigmoid(bw_raw.view(bsz, S, B))  # ∈[0,1]
+        MAXIMUM_BANDWIDTH = 3.0  # Maximum bandwidth in normalized units.
+        bw_pred = torch.sigmoid(bw_raw.view(bsz, S, B)) * MAXIMUM_BANDWIDTH  # ∈[0,3]
         bw_pred_flat = bw_pred.view(bsz * S * B)
 
         cell_indices = torch.arange(

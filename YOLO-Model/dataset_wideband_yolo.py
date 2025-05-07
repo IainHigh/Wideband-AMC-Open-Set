@@ -120,7 +120,7 @@ class WidebandYoloDataset(Dataset):
 
         # Normalise bandwidth to the width of one YOLO grid‑cell (“bin”)
         bin_width = (SAMPLING_FREQUENCY / 2) / S
-        bw_norm = [min(bw / bin_width, 1.0) for bw in chan_bw]
+        bw_norm = [(bw / bin_width) for bw in chan_bw]
 
         # Convert to real time-domain IQ: shape (2, N)
         x_real = x_complex.real.astype(np.float32)

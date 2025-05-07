@@ -50,7 +50,7 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 # Model Parameters[]
 #####################
-S = 6  # Number of grid cells
+S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
 NUM_CLASSES = 9  # Number of classes
 
@@ -58,16 +58,16 @@ NUM_CLASSES = 9  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 25
 LEARNING_RATE = 0.001  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_COORD = 10.0  # Weight for coordinate (x offset) loss
+LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
-LAMBDA_CLASS = 1.0  # Weight for classification loss
+LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_BW = 5.0
 CONFIDENCE_THRESHOLD = 0.13  # Confidence threshold for filtering predictions
 
