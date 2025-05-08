@@ -50,6 +50,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 
+CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
+
 
 def convert_to_readable(frequency, modclass, class_list):
     # Convert frequency to MHz and modclass to string
@@ -79,9 +81,59 @@ def convert_to_readable(frequency, modclass, class_list):
     return frequency_string, modclass_str
 
 
-def main():
-    # TODO: Should show the bandwidth loss for training and validation as well as the centre_frequency loss.
+def _hz_from_offset(off, cell):
+    """Convert a normalised offset and cell-index to an absolute frequency (Hz)."""
+    return (cell + off) * CELL_WIDTH
 
+
+def _collect_lists(x_pred, bw_pred, conf_pred, x_tgt, conf_tgt):
+    """
+    Build (pred, gt) lists **for ONE frame**.
+
+    • prediction = (centre_Hz, bandwidth_Hz) for every box whose confidence
+      exceeds `CONFIDENCE_THRESHOLD`.
+
+    • ground truth = centre_Hz for every GT box (conf_tgt>0)
+    """
+    pred, gt = [], []
+    for s in range(cfg.S):
+        for b in range(cfg.B):
+            if conf_pred[s, b] > cfg.CONFIDENCE_THRESHOLD:
+                f = _hz_from_offset(x_pred[s, b], s)
+                bw = bw_pred[s, b] * CELL_WIDTH
+                pred.append((f, bw))
+
+            if conf_tgt[s, b] > 0:
+                f = _hz_from_offset(x_tgt[s, b], s)
+                gt.append(f)
+    return pred, gt
+
+
+def _tp_fp_fn(pred, gt):
+    """
+    Greedy 1-to-1 matching based on the rule
+
+        |f_gt − f_pred| ≤ bw_pred / 2     ⇒ TP
+
+    Unmatched predictions → FP, unmatched GT → FN
+    """
+    tp = fp = 0
+    remaining = gt.copy()
+    for f_pred, bw_pred in pred:
+        matched = False
+        for i, f_gt in enumerate(remaining):
+            if abs(f_gt - f_pred) <= bw_pred / 2:
+                tp += 1
+                remaining.pop(i)
+                matched = True
+                break
+        if not matched:
+            fp += 1
+    fn = len(remaining)
+    return tp, fp, fn
+
+
+def main():
     # Print the configuration file
     if cfg.PRINT_CONFIG_FILE:
         cfg.print_config_file()
@@ -161,14 +213,26 @@ def main():
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 
         # Training
-        model, avg_train_loss, train_mean_freq_err, train_cls_accuracy = train_model(
-            model, train_loader, device, optimizer, criterion, epoch
-        )
+        (
+            model,
+            avg_train_loss,
+            train_mean_freq_err,
+            train_cls_accuracy,
+            train_prec,
+            train_rec,
+            train_f1,
+        ) = train_model(model, train_loader, device, optimizer, criterion, epoch)
 
         # Validation
-        avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames = validate_model(
-            model, val_loader, device, criterion, epoch
-        )
+        (
+            avg_val_loss,
+            val_mean_freq_err,
+            val_cls_accuracy,
+            val_prec,
+            val_rec,
+            val_f1,
+            val_frames,
+        ) = validate_model(model, val_loader, device, criterion, epoch)
 
         # Convert frequency errors to human readable format
         val_mean_freq_err = convert_to_readable(
@@ -181,14 +245,17 @@ def main():
         # Print metrics for this epoch
         print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")
         print(
-            f"  Train: Loss={avg_train_loss:.4f},"
-            f"  MeanFreqErr={train_mean_freq_err},"
-            f"  ClsAcc={train_cls_accuracy:.2f}%"
+            f"  Train: Loss={avg_train_loss:.4f}, "
+            f"MeanFreqErr={train_mean_freq_err}, "
+            f"ClsAcc={train_cls_accuracy:.2f}%, "
+            f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
         )
+
         print(
-            f"  Valid: Loss={avg_val_loss:.4f},"
-            f"  MeanFreqErr={val_mean_freq_err},"
-            f"  ClsAcc={val_cls_accuracy:.2f}%"
+            f"  Valid: Loss={avg_val_loss:.4f}, "
+            f"MeanFreqErr={val_mean_freq_err}, "
+            f"ClsAcc={val_cls_accuracy:.2f}%, "
+            f"P={val_prec:.3f}, R={val_rec:.3f}, F1={val_f1:.3f}"
         )
 
         # Print a random subset of "frames"
@@ -232,6 +299,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_correct_cls = 0
     train_sum_freq_err = 0.0
 
+    train_tp = train_fp = train_fn = 0
+
     for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
@@ -241,13 +310,32 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
         optimizer.zero_grad()
         pred = model(time_data, freq_data)
+        bsize = pred.shape[0]
         loss = criterion(pred, label_tensor)
         loss.backward()
         optimizer.step()
         total_train_loss += loss.item()
 
+        pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+        tgt_r = label_tensor.view_as(pred_r)
+
+        x_pred = pred_r[..., 0].cpu()
+        bw_pred = pred_r[..., 2].cpu()
+        conf_pr = pred_r[..., 1].cpu()
+
+        x_tgt = tgt_r[..., 0].cpu()
+        conf_tg = tgt_r[..., 1].cpu()
+
+        for i in range(bsize):
+            preds, gts = _collect_lists(
+                x_pred[i], bw_pred[i], conf_pr[i], x_tgt[i], conf_tg[i]
+            )
+            tp, fp, fn = _tp_fp_fn(preds, gts)
+            train_tp += tp
+            train_fp += fp
+            train_fn += fn
+
         # Additional training metrics
-        bsize = pred.shape[0]
         pred_reshape = pred.view(
             bsize, pred.shape[1], -1, (1 + 1 + 1 + cfg.NUM_CLASSES)
         )
@@ -278,7 +366,19 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     train_mean_freq_err = train_sum_freq_err / train_obj_count
     train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
 
-    return model, avg_train_loss, train_mean_freq_err, train_cls_accuracy
+    precision = train_tp / (train_tp + train_fp) if (train_tp + train_fp) else 0.0
+    recall = train_tp / (train_tp + train_fn) if (train_tp + train_fn) else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+    return (
+        model,
+        avg_train_loss,
+        train_mean_freq_err,
+        train_cls_accuracy,
+        precision,
+        recall,
+        f1,
+    )
 
 
 def validate_model(model, val_loader, device, criterion, epoch):
@@ -292,6 +392,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_frames = []
     class_list = cfg.MODULATION_CLASSES
 
+    val_tp = val_fp = val_fn = 0
+
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
             val_loader, desc=f"Validation epoch {epoch+1}/{cfg.EPOCHS}"
@@ -301,10 +403,29 @@ def validate_model(model, val_loader, device, criterion, epoch):
             label_tensor = label_tensor.to(device, non_blocking=True)
 
             pred = model(time_data, freq_data)
+            bsize = pred.shape[0]
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
 
-            bsize = pred.shape[0]
+            pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+            tgt_r = label_tensor.view_as(pred_r)
+
+            x_pred = pred_r[..., 0].cpu()
+            bw_pred = pred_r[..., 2].cpu()
+            conf_pr = pred_r[..., 1].cpu()
+
+            x_tgt = tgt_r[..., 0].cpu()
+            conf_tg = tgt_r[..., 1].cpu()
+
+            for i in range(bsize):
+                preds, gts = _collect_lists(
+                    x_pred[i], bw_pred[i], conf_pr[i], x_tgt[i], conf_tg[i]
+                )
+                tp, fp, fn = _tp_fp_fn(preds, gts)
+                val_tp += tp
+                val_fp += fp
+                val_fn += fn
+
             pred_reshape = pred.view(
                 bsize, pred.shape[1], -1, (1 + 1 + 1 + cfg.NUM_CLASSES)
             )
@@ -345,8 +466,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
                 for s_idx in range(pred_reshape.shape[1]):
                     for b_idx in range(pred_reshape.shape[2]):
                         x_p = x_pred[i, s_idx, b_idx].item()  # x_offset [0,1]
-                        x_p = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_p * (
-                            cfg.SAMPLING_FREQUENCY / cfg.S
+                        x_p = (s_idx * CELL_WIDTH) + x_p * (
+                            CELL_WIDTH
                         )  # raw frequency value.
 
                         conf = conf_pred[i, s_idx, b_idx].item()
@@ -357,8 +478,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         if conf_tgt[i, s_idx, b_idx] > 0:
                             x_g = x_tgt[i, s_idx, b_idx].item()
-                            x_g = (s_idx * cfg.SAMPLING_FREQUENCY / cfg.S) + x_g * (
-                                cfg.SAMPLING_FREQUENCY / cfg.S
+                            x_g = (s_idx * CELL_WIDTH) + x_g * (
+                                CELL_WIDTH
                             )  # raw frequency value.
 
                             cls_g = true_class_idx[i, s_idx, b_idx].item()
@@ -372,7 +493,19 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_mean_freq_err = val_sum_freq_err / val_obj_count
     val_cls_accuracy = 100.0 * (val_correct_cls / val_obj_count)
 
-    return avg_val_loss, val_mean_freq_err, val_cls_accuracy, val_frames
+    precision = val_tp / (val_tp + val_fp) if (val_tp + val_fp) else 0.0
+    recall = val_tp / (val_tp + val_fn) if (val_tp + val_fn) else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+    return (
+        avg_val_loss,
+        val_mean_freq_err,
+        val_cls_accuracy,
+        precision,
+        recall,
+        f1,
+        val_frames,
+    )
 
 
 def test_model(model, test_loader, device):
@@ -396,6 +529,11 @@ def test_model(model, test_loader, device):
     snr_correct_cls = {}
     snr_freq_err = {}
 
+    overall_tp = overall_fp = overall_fn = 0
+    snr_tp = {}
+    snr_fp = {}
+    snr_fn = {}
+
     with torch.no_grad():
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc=f"Testing on test set"
@@ -404,14 +542,14 @@ def test_model(model, test_loader, device):
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)
             pred = model(time_data, freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
-
-            # reshape
             bsize = pred.shape[0]
             Sdim = pred.shape[1]  # should be S
             # interpret bounding boxes
             pred_reshape = pred.view(bsize, Sdim, -1, (1 + 1 + 1 + cfg.NUM_CLASSES))
 
             x_pred = pred_reshape[..., 0]  # [bsize, S, B]
+            conf_pred = pred_reshape[..., 1]  # [bsize, S, B]
+            bw_pred = pred_reshape[..., 2]  # [bsize, S, B]
             class_pred = pred_reshape[..., 3:]
 
             x_tgt = label_tensor[..., 0]
@@ -474,6 +612,26 @@ def test_model(model, test_loader, device):
                     snr_correct_cls[sample_snr] += sample_correct_cls
                     snr_freq_err[sample_snr] += sample_freq_err
 
+            preds, gts = _collect_lists(
+                x_pred[i].cpu(),
+                bw_pred[i].cpu(),
+                conf_pred[i].cpu(),
+                x_tgt[i].cpu(),
+                conf_tgt[i].cpu(),
+            )
+            tp, fp, fn = _tp_fp_fn(preds, gts)
+
+            overall_tp += tp
+            overall_fp += fp
+            overall_fn += fn
+
+            sample_snr = snr_tensor[i].item()
+            if sample_snr not in snr_tp:
+                snr_tp[sample_snr] = snr_fp[sample_snr] = snr_fn[sample_snr] = 0
+            snr_tp[sample_snr] += tp
+            snr_fp[sample_snr] += fp
+            snr_fn[sample_snr] += fn
+
     # 1) Overall
     overall_cls_acc = 100.0 * total_correct_cls / total_obj_count
     overall_freq_err = total_freq_err / total_obj_count
@@ -488,6 +646,22 @@ def test_model(model, test_loader, device):
     print(f"Classification Accuracy (overall): {overall_cls_acc:.2f}%")
     print(f"Mean Frequency Error (overall): {overall_freq_err}")
 
+    overall_prec = (
+        overall_tp / (overall_tp + overall_fp) if (overall_tp + overall_fp) else 0.0
+    )
+    overall_rec = (
+        overall_tp / (overall_tp + overall_fn) if (overall_tp + overall_fn) else 0.0
+    )
+    overall_f1 = (
+        2 * overall_prec * overall_rec / (overall_prec + overall_rec)
+        if (overall_prec + overall_rec)
+        else 0.0
+    )
+
+    print(f"Precision (overall) : {overall_prec:.3f}")
+    print(f"Recall    (overall) : {overall_rec:.3f}")
+    print(f"F1 score  (overall) : {overall_f1:.3f}\n")
+
     # 2) Per-SNR
     snr_keys_sorted = sorted(snr_obj_count.keys())
     for snr_val in snr_keys_sorted:
@@ -497,8 +671,31 @@ def test_model(model, test_loader, device):
         # Convert freq_err_snr to human readable
         freq_err_snr = convert_to_readable(freq_err_snr, 0, cfg.MODULATION_CLASSES)[0]
 
+        # If any of the snr_tp, snr_fp, snr_fn are empty at this snr, set them to 0 to avoid division by zero in the precision, recall, and f1 calculations.
+        if snr_val not in snr_tp:
+            snr_tp[snr_val] = 0
+        if snr_val not in snr_fp:
+            snr_fp[snr_val] = 0
+        if snr_val not in snr_fn:
+            snr_fn[snr_val] = 0
+
+        prec = (
+            snr_tp[snr_val] / (snr_tp[snr_val] + snr_fp[snr_val])
+            if (snr_tp[snr_val] + snr_fp[snr_val])
+            else 0.0
+        )
+        rec = (
+            snr_tp[snr_val] / (snr_tp[snr_val] + snr_fn[snr_val])
+            if (snr_tp[snr_val] + snr_fn[snr_val])
+            else 0.0
+        )
+        f1 = 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+
+        # keep the existing accuracy / freq-err print ↓ and append the new numbers
         print(
-            f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr}"
+            f"SNR {snr_val:.1f}:  "
+            f"Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr},  "
+            f"P={prec:.3f}, R={rec:.3f}, F1={f1:.3f}"
         )
 
     # 3) Confusion matrix
