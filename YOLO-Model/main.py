@@ -170,16 +170,24 @@ def main():
             model, val_loader, device, criterion, epoch
         )
 
+        # Convert frequency errors to human readable format
+        val_mean_freq_err = convert_to_readable(
+            val_mean_freq_err, 0, cfg.MODULATION_CLASSES
+        )[0]
+        train_mean_freq_err = convert_to_readable(
+            train_mean_freq_err, 0, cfg.MODULATION_CLASSES
+        )[0]
+
         # Print metrics for this epoch
         print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")
         print(
             f"  Train: Loss={avg_train_loss:.4f},"
-            f"  MeanFreqErr={train_mean_freq_err:.4f},"
+            f"  MeanFreqErr={train_mean_freq_err},"
             f"  ClsAcc={train_cls_accuracy:.2f}%"
         )
         print(
             f"  Valid: Loss={avg_val_loss:.4f},"
-            f"  MeanFreqErr={val_mean_freq_err:.4f},"
+            f"  MeanFreqErr={val_mean_freq_err},"
             f"  ClsAcc={val_cls_accuracy:.2f}%"
         )
 
@@ -253,6 +261,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         obj_mask = conf_tgt > 0
         freq_err = (x_pred - x_tgt).abs()
 
+        # Convert freq_err to Hz
+        freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
         pred_class_idx = class_pred.argmax(dim=-1)
         true_class_idx = class_tgt.argmax(dim=-1)
 
@@ -309,6 +319,8 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
+            # Convert freq_err to Hz
+            freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
 
             pred_class_idx = class_pred.argmax(dim=-1)
             true_class_idx = class_tgt.argmax(dim=-1)
@@ -409,6 +421,8 @@ def test_model(model, test_loader, device):
             # object mask
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
+            # Convert freq_err to Hz
+            freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
 
             # predicted vs. true class => argmax
             pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
@@ -464,10 +478,15 @@ def test_model(model, test_loader, device):
     overall_cls_acc = 100.0 * total_correct_cls / total_obj_count
     overall_freq_err = total_freq_err / total_obj_count
 
+    # Convert overall_freq_err to human readable
+    overall_freq_err = convert_to_readable(overall_freq_err, 0, cfg.MODULATION_CLASSES)[
+        0
+    ]
+
     print("\n=== TEST SET RESULTS ===")
     print(f"Overall bounding boxes: {total_obj_count}")
     print(f"Classification Accuracy (overall): {overall_cls_acc:.2f}%")
-    print(f"Mean Frequency Error (overall): {overall_freq_err:.4f}")
+    print(f"Mean Frequency Error (overall): {overall_freq_err}")
 
     # 2) Per-SNR
     snr_keys_sorted = sorted(snr_obj_count.keys())
@@ -475,8 +494,11 @@ def test_model(model, test_loader, device):
         cls_acc_snr = 100.0 * snr_correct_cls[snr_val] / snr_obj_count[snr_val]
         freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
 
+        # Convert freq_err_snr to human readable
+        freq_err_snr = convert_to_readable(freq_err_snr, 0, cfg.MODULATION_CLASSES)[0]
+
         print(
-            f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr:.4f}"
+            f"SNR {snr_val:.1f}:  Accuracy={cls_acc_snr:.2f}%,  FreqErr={freq_err_snr}"
         )
 
     # 3) Confusion matrix
