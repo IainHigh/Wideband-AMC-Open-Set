@@ -1,5 +1,5 @@
 {
-  "n_captures": 2000,
+  "n_captures": 10000,
   "n_samps": 4096,
   "modulation": [
     "qpsk",
@@ -10,10 +10,7 @@
     "16apsk",
     "64apsk",
     "2dpsk",
-    "8dpsk",
-    "128psk",
-    "256qam",
-    "2ask"
+    "8dpsk"
   ],
   "symbol_rate": [
     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
@@ -34,7 +31,7 @@
   ],
   "channel": {
     "type": "awgn",
-    "snr": 10,
+    "snr": [-20, 20, 2],
     "fo": 0.0,
     "po": 0.0
   },

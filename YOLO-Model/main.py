@@ -4,7 +4,6 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 
 import json
 import numpy as np
@@ -22,7 +21,6 @@ from tqdm import tqdm
 from dataset_wideband_yolo import WidebandYoloDataset
 from model_and_loss_wideband_yolo import WidebandYoloModel, WidebandYoloLoss
 
-UNKNOWN_IDX = cfg.NUM_CLASSES  # numeric index for “unknown”
 
 # Ignore warning messages that we'd expect to see
 # 1) NumPy’s “Casting complex values to real …” This is to be expected as we're converting the IQ data to real values.
@@ -55,7 +53,7 @@ random.seed(rng_seed)
 CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
 
 
-def convert_to_readable(frequency, modclass, class_list):
+def convert_to_readable(frequency, modclass):
     # Convert frequency to MHz and modclass to string
 
     if frequency > 1000:
@@ -75,8 +73,8 @@ def convert_to_readable(frequency, modclass, class_list):
     else:
         frequency_string = f"{frequency} Hz"
 
-    if modclass < len(class_list):
-        modclass_str = class_list[modclass]
+    if modclass < len(cfg.MODULATION_CLASSES):
+        modclass_str = cfg.MODULATION_CLASSES[modclass]
     else:
         modclass_str = cfg.UNKNOWN_CLASS_NAME
 
@@ -144,24 +142,14 @@ def main():
     train_dataset = WidebandYoloDataset(
         os.path.join(data_dir, "training"), transform=None
     )
-
-    cfg.MODULATION_CLASSES = train_dataset.class_list
-
     val_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "validation"), class_list=train_dataset.class_list
+        os.path.join(data_dir, "validation"), transform=None
     )
     test_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "testing"), class_list=train_dataset.class_list
+        os.path.join(data_dir, "testing"), transform=None
     )
 
-    print(train_dataset.class_list)
-
-    assert train_dataset.class_list == val_dataset.class_list == test_dataset.class_list
-    assert (
-        train_dataset.class_to_idx
-        == val_dataset.class_to_idx
-        == test_dataset.class_to_idx
-    )
+    cfg.MODULATION_CLASSES = train_dataset.class_list
 
     train_loader = DataLoader(
         train_dataset,
@@ -236,6 +224,17 @@ def main():
             train_f1,
         ) = train_model(model, train_loader, device, optimizer, criterion, epoch)
 
+        train_mean_freq_err = convert_to_readable(
+            train_mean_freq_err, 0, cfg.MODULATION_CLASSES
+        )[0]
+
+        print(
+            f"  Train: Loss={avg_train_loss:.4f}, "
+            f"MeanFreqErr={train_mean_freq_err}, "
+            f"ClsAcc={train_cls_accuracy:.2f}%, "
+            f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
+        )
+
         # Validation
         (
             avg_val_loss,
@@ -251,17 +250,6 @@ def main():
         val_mean_freq_err = convert_to_readable(
             val_mean_freq_err, 0, cfg.MODULATION_CLASSES
         )[0]
-        train_mean_freq_err = convert_to_readable(
-            train_mean_freq_err, 0, cfg.MODULATION_CLASSES
-        )[0]
-
-        # Print metrics for this epoch
-        print(
-            f"  Train: Loss={avg_train_loss:.4f}, "
-            f"MeanFreqErr={train_mean_freq_err}, "
-            f"ClsAcc={train_cls_accuracy:.2f}%, "
-            f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
-        )
 
         print(
             f"  Valid: Loss={avg_val_loss:.4f}, "
@@ -313,9 +301,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
     train_tp = train_fp = train_fn = 0
 
-    per_class_maxps = (
-        [[] for _ in range(cfg.NUM_CLASSES)] if cfg.OPENSET_ENABLE else None
-    )
     for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
@@ -364,21 +349,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         obj_mask = conf_tgt > 0
         freq_err = (x_pred - x_tgt).abs()
 
-        if cfg.OPENSET_ENABLE:
-            #   GT-boxes whose label is NOT “unknown”
-            known_mask = (label_tensor[..., 3:].sum(dim=-1) > 0) & obj_mask
-            if known_mask.any():
-                logits = pred_reshape[..., 3:]
-                probs = F.softmax(logits / cfg.OPENSET_TEMPERATURE, dim=-1)
-                maxprob, _ = probs.max(dim=-1)
-                true_idx = class_tgt.argmax(dim=-1)
-                for cls in range(cfg.NUM_CLASSES):
-                    cls_mask = known_mask & (true_idx == cls)
-                    if cls_mask.any():
-                        per_class_maxps[cls].append(
-                            maxprob[cls_mask].cpu().detach().numpy()
-                        )
-
         # Convert freq_err to Hz
         freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
         pred_class_idx = class_pred.argmax(dim=-1)
@@ -400,18 +370,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     recall = train_tp / (train_tp + train_fn) if (train_tp + train_fn) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
 
-    # ─── update τ (per class) after this epoch ──────────────────
-    if cfg.OPENSET_ENABLE:
-        tau_epoch = np.zeros(cfg.NUM_CLASSES, dtype=np.float32)
-        for cls in range(cfg.NUM_CLASSES):
-            if len(per_class_maxps[cls]):
-                tau_epoch[cls] = np.percentile(
-                    np.concatenate(per_class_maxps[cls]),
-                    (1.0 - cfg.OPENSET_COVERAGE) * 100.0,
-                )
-        cfg.OPENSET_THRESHOLD = tau_epoch
-        print("   →   calibrated τ (per-class):", np.round(cfg.OPENSET_THRESHOLD, 3))
-
     return (
         model,
         avg_train_loss,
@@ -432,10 +390,6 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_sum_freq_err = 0.0
 
     val_frames = []
-    class_list = cfg.MODULATION_CLASSES
-    if cfg.OPENSET_ENABLE and cfg.UNKNOWN_CLASS_NAME not in class_list:
-        class_list = class_list + [cfg.UNKNOWN_CLASS_NAME]
-
     val_tp = val_fp = val_fn = 0
 
     with torch.no_grad():
@@ -488,24 +442,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
 
             pred_class_idx = class_pred.argmax(dim=-1)
-
-            # ─── unknown-prediction masking (per-class τ) ───────
-            logits = pred_reshape[..., 3:]
-            probs = F.softmax(logits / cfg.OPENSET_TEMPERATURE, dim=-1)
-            maxprob = probs.max(dim=-1)[0]
-            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
-                tau_vec = torch.as_tensor(
-                    cfg.OPENSET_THRESHOLD, device=probs.device, dtype=probs.dtype
-                )
-                tau_box = tau_vec[pred_class_idx]  # pick τ for each box
-                unknown_mask_pred = maxprob < tau_box
-                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
-            # ────────────────────────────────────────────────────
-
             true_class_idx = class_tgt.argmax(dim=-1)
-            if cfg.OPENSET_ENABLE:
-                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
-                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # For metric sums
             batch_obj_count = obj_mask.sum()
@@ -533,7 +470,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
                         conf = conf_pred[i, s_idx, b_idx].item()
                         cls_p = pred_class_idx[i, s_idx, b_idx].item()
-                        x_p, cls_p = convert_to_readable(x_p, cls_p, class_list)
+                        x_p, cls_p = convert_to_readable(x_p, cls_p)
                         if conf > cfg.CONFIDENCE_THRESHOLD:
                             pred_list.append((x_p, cls_p, conf))
 
@@ -544,7 +481,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                             )  # raw frequency value.
 
                             cls_g = true_class_idx[i, s_idx, b_idx].item()
-                            x_g, cls_g = convert_to_readable(x_g, cls_g, class_list)
+                            x_g, cls_g = convert_to_readable(x_g, cls_g)
                             gt_list.append((x_g, cls_g))
 
                 frame_dict = {"pred_list": pred_list, "gt_list": gt_list}
@@ -595,10 +532,6 @@ def test_model(model, test_loader, device):
     snr_fp = {}
     snr_fn = {}
 
-    class_list = cfg.MODULATION_CLASSES
-    if cfg.OPENSET_ENABLE and cfg.UNKNOWN_CLASS_NAME not in class_list:
-        class_list = class_list + [cfg.UNKNOWN_CLASS_NAME]
-
     with torch.no_grad():
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc=f"Testing on test set"
@@ -629,24 +562,7 @@ def test_model(model, test_loader, device):
 
             # predicted vs. true class => argmax
             pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
-
-            # ─── unknown-prediction masking (per-class τ) ───────
-            logits = pred_reshape[..., 3:]
-            probs = F.softmax(logits / cfg.OPENSET_TEMPERATURE, dim=-1)
-            maxprob = probs.max(dim=-1)[0]
-            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
-                tau_vec = torch.as_tensor(
-                    cfg.OPENSET_THRESHOLD, device=probs.device, dtype=probs.dtype
-                )
-                tau_box = tau_vec[pred_class_idx]  # pick τ for each box
-                unknown_mask_pred = maxprob < tau_box
-                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
-            # ────────────────────────────────────────────────────
-
             true_class_idx = class_tgt.argmax(dim=-1)
-            if cfg.OPENSET_ENABLE:
-                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
-                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # Now we accumulate stats for each bounding box with obj_mask=1
             batch_obj_count = obj_mask.sum()
@@ -674,7 +590,6 @@ def test_model(model, test_loader, device):
             # but we have multiple bounding boxes => we can count them all with that same SNR
             snrs = snr_tensor.numpy()  # shape [bsize]
             for i in range(bsize):
-
                 preds, gts = _collect_lists(
                     x_pred[i].cpu(),
                     bw_pred[i].cpu(),
@@ -694,7 +609,6 @@ def test_model(model, test_loader, device):
                 snr_tp[sample_snr] += tp
                 snr_fp[sample_snr] += fp
                 snr_fn[sample_snr] += fn
-
                 sample_snr = snrs[i]
                 # bounding boxes belonging to sample i => obj_mask[i]
                 # gather # of obj_mask=1 in that sample
@@ -720,7 +634,9 @@ def test_model(model, test_loader, device):
     overall_freq_err = total_freq_err / total_obj_count
 
     # Convert overall_freq_err to human readable
-    overall_freq_err = convert_to_readable(overall_freq_err, 0, class_list)[0]
+    overall_freq_err = convert_to_readable(overall_freq_err, 0, cfg.MODULATION_CLASSES)[
+        0
+    ]
 
     print("\n=== TEST SET RESULTS ===")
     print(f"Overall bounding boxes: {total_obj_count}")
@@ -750,7 +666,7 @@ def test_model(model, test_loader, device):
         freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
 
         # Convert freq_err_snr to human readable
-        freq_err_snr = convert_to_readable(freq_err_snr, 0, class_list)[0]
+        freq_err_snr = convert_to_readable(freq_err_snr, 0, cfg.MODULATION_CLASSES)[0]
 
         # If any of the snr_tp, snr_fp, snr_fn are empty at this snr, set them to 0 to avoid division by zero in the precision, recall, and f1 calculations.
         if snr_val not in snr_tp:
@@ -781,7 +697,7 @@ def test_model(model, test_loader, device):
 
     # 3) Confusion matrix
     if cfg.GENERATE_CONFUSION_MATRIX:
-        plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes)
+        plot_confusion_matrix(overall_true_classes, overall_pred_classes)
 
     out_dir = os.path.join(data_dir, "../test_result_plots")
     # clear or create directory
@@ -791,16 +707,18 @@ def test_model(model, test_loader, device):
 
     # 4) Plot frequency domain diagram of test set samples and predictions
     if cfg.PLOT_TEST_SAMPLES:
-        plot_test_samples(model, test_loader, device, out_dir, class_list)
+        plot_test_samples(model, test_loader, device, out_dir)
 
     # 5) Write the test results to a file.
     if cfg.WRITE_TEST_RESULTS:
-        write_test_results(model, test_loader, device, out_dir, class_list)
+        write_test_results(model, test_loader, device, out_dir)
 
 
-def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes):
+def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
     cm = confusion_matrix(
-        overall_true_classes, overall_pred_classes, labels=range(len(class_list))
+        overall_true_classes,
+        overall_pred_classes,
+        labels=range(len(cfg.MODULATION_CLASSES)),
     )
     cm_percent = cm.astype(float)
     for i in range(cm.shape[0]):
@@ -814,8 +732,8 @@ def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes
         annot=True,
         fmt=".2f",
         cmap="Blues",
-        xticklabels=class_list,
-        yticklabels=class_list,
+        xticklabels=cfg.MODULATION_CLASSES,
+        yticklabels=cfg.MODULATION_CLASSES,
     )
     plt.title("Test Set Confusion Matrix (%)")
     plt.xlabel("Predicted Class")
@@ -825,7 +743,7 @@ def plot_confusion_matrix(class_list, overall_true_classes, overall_pred_classes
     plt.close()
 
 
-def plot_test_samples(model, test_loader, device, out_dir, class_list):
+def plot_test_samples(model, test_loader, device, out_dir):
     """
     For each sample in the test set: compute and plot its PSD,
     then draw vertical lines for each true center frequency (black dashed)
@@ -887,7 +805,7 @@ def plot_test_samples(model, test_loader, device, out_dir, class_list):
                         xg = gt[si, bi, 0]
                         fg = (si + xg) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                         cls_g = np.argmax(gt[si, bi, 3:])
-                        gt_lines.append((fg, class_list[cls_g]))
+                        gt_lines.append((fg, cfg.MODULATION_CLASSES[cls_g]))
 
             # extract preds above a threshold
             pred_lines = []
@@ -900,7 +818,9 @@ def plot_test_samples(model, test_loader, device, out_dir, class_list):
                         cls_p = np.argmax(pred[si, bi, 3:])
                         bandwidth = pred[si, bi, 2]
                         bandwidth = bandwidth * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
-                        pred_lines.append((fp, class_list[cls_p], bandwidth))
+                        pred_lines.append(
+                            (fp, cfg.MODULATION_CLASSES[cls_p], bandwidth)
+                        )
 
             # plotting
             plt.figure()
@@ -962,7 +882,7 @@ def plot_test_samples(model, test_loader, device, out_dir, class_list):
             sample_idx += 1
 
 
-def write_test_results(model, test_loader, device, out_dir, class_list):
+def write_test_results(model, test_loader, device, out_dir):
     """
     Run the model over every test sample, build readable pred/gt lists
     and write them sorted by descending SNR to
@@ -998,7 +918,7 @@ def write_test_results(model, test_loader, device, out_dir, class_list):
                             fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                             cls_idx = np.argmax(labels[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(
-                                fg, cls_idx, class_list
+                                fg, cls_idx, cfg.MODULATION_CLASSES
                             )
                             gt_list.append((freq_str, cls_str))
 
@@ -1011,7 +931,7 @@ def write_test_results(model, test_loader, device, out_dir, class_list):
                             fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                             cls_idx = np.argmax(preds[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(
-                                fp, cls_idx, class_list
+                                fp, cls_idx, cfg.MODULATION_CLASSES
                             )
                             pred_list.append((freq_str, cls_str, conf_p))
 

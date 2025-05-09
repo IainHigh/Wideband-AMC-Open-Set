@@ -18,25 +18,17 @@ def get_anchors():
     return linspace(1 / (B + 1), B / (B + 1), B)
 
 
-# Open-set recognition (max‐softmax) parameters
-OPENSET_ENABLE = True  # master switch
-OPENSET_COVERAGE = 0.80
-OPENSET_THRESHOLD = None  # will be filled in after calibration
-OPENSET_TEMPERATURE = 2.0
-UNKNOWN_CLASS_NAME = "UNKNOWN"
-TAU_ALPHA = 0.20  # EMA smoothing factor (0‥1, smaller ⇒ smoother)
-
 #####################
 # Miscellaneous Parameters
 #####################
 
 VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
-WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
+WRITE_TEST_RESULTS = True  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = (
     True  # If True, will generate a confusion matrix after training.
 )
-PLOT_TEST_SAMPLES = False  # If True, will plot the test samples and predictions.
+PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
 MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = (
     []
@@ -48,7 +40,7 @@ MODULATION_CLASSES = (
 
 SAMPLING_FREQUENCY = 1e9
 MERGE_SIMILAR_PREDICTIONS = (
-    False  # If true, will merge similar predictions into one prediction.
+    True  # If true, will merge similar predictions into one prediction.
 )
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
@@ -66,7 +58,7 @@ NUM_CLASSES = 9  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 30
 LEARNING_RATE = 0.001  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 

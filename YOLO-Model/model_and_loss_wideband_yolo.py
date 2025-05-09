@@ -339,7 +339,9 @@ class WidebandYoloModel(nn.Module):
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
                 out[i, cell, aidx, 2] = bw
-                out[i, cell, aidx, 3 + cls] = 1.0
+                out[i, cell, aidx, 3 + cls] = (
+                    1.0  # TODO: Keep an eye on this for open-set recognition.
+                )
 
         return out
 
