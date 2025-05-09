@@ -339,9 +339,7 @@ class WidebandYoloModel(nn.Module):
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
                 out[i, cell, aidx, 2] = bw
-                out[i, cell, aidx, 3 + cls] = (
-                    1.0  # TODO: COULD THIS BE THE REASON WHY THRESHOLD OPEN-SET RECOGNITION WAS FAILING?
-                )
+                out[i, cell, aidx, 3 + cls] = 1.0
 
         return out
 
@@ -464,7 +462,7 @@ class WidebandYoloLoss(nn.Module):
         bw_tgt = target[..., 2]
         cls_tgt = target[..., 3:]
 
-        obj_mask = (conf_tgt > CONFIDENCE_THRESHOLD).float()
+        obj_mask = (conf_tgt > 0).float()
         noobj_mask = 1.0 - obj_mask
 
         coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
