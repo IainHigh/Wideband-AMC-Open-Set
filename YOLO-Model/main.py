@@ -224,9 +224,7 @@ def main():
             train_f1,
         ) = train_model(model, train_loader, device, optimizer, criterion, epoch)
 
-        train_mean_freq_err = convert_to_readable(
-            train_mean_freq_err, 0, cfg.MODULATION_CLASSES
-        )[0]
+        train_mean_freq_err = convert_to_readable(train_mean_freq_err, 0)[0]
 
         print(
             f"  Train: Loss={avg_train_loss:.4f}, "
@@ -247,9 +245,7 @@ def main():
         ) = validate_model(model, val_loader, device, criterion, epoch)
 
         # Convert frequency errors to human readable format
-        val_mean_freq_err = convert_to_readable(
-            val_mean_freq_err, 0, cfg.MODULATION_CLASSES
-        )[0]
+        val_mean_freq_err = convert_to_readable(val_mean_freq_err, 0)[0]
 
         print(
             f"  Valid: Loss={avg_val_loss:.4f}, "
@@ -634,9 +630,7 @@ def test_model(model, test_loader, device):
     overall_freq_err = total_freq_err / total_obj_count
 
     # Convert overall_freq_err to human readable
-    overall_freq_err = convert_to_readable(overall_freq_err, 0, cfg.MODULATION_CLASSES)[
-        0
-    ]
+    overall_freq_err = convert_to_readable(overall_freq_err, 0)[0]
 
     print("\n=== TEST SET RESULTS ===")
     print(f"Overall bounding boxes: {total_obj_count}")
@@ -666,7 +660,7 @@ def test_model(model, test_loader, device):
         freq_err_snr = snr_freq_err[snr_val] / snr_obj_count[snr_val]
 
         # Convert freq_err_snr to human readable
-        freq_err_snr = convert_to_readable(freq_err_snr, 0, cfg.MODULATION_CLASSES)[0]
+        freq_err_snr = convert_to_readable(freq_err_snr, 0)[0]
 
         # If any of the snr_tp, snr_fp, snr_fn are empty at this snr, set them to 0 to avoid division by zero in the precision, recall, and f1 calculations.
         if snr_val not in snr_tp:
@@ -917,9 +911,7 @@ def write_test_results(model, test_loader, device, out_dir):
                             xg_norm = labels[i, si, bi, 0]
                             fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                             cls_idx = np.argmax(labels[i, si, bi, 3:])
-                            freq_str, cls_str = convert_to_readable(
-                                fg, cls_idx, cfg.MODULATION_CLASSES
-                            )
+                            freq_str, cls_str = convert_to_readable(fg, cls_idx)
                             gt_list.append((freq_str, cls_str))
 
                 # build Pred list
@@ -930,9 +922,7 @@ def write_test_results(model, test_loader, device, out_dir):
                             xp_norm = preds[i, si, bi, 0]
                             fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
                             cls_idx = np.argmax(preds[i, si, bi, 3:])
-                            freq_str, cls_str = convert_to_readable(
-                                fp, cls_idx, cfg.MODULATION_CLASSES
-                            )
+                            freq_str, cls_str = convert_to_readable(fp, cls_idx)
                             pred_list.append((freq_str, cls_str, conf_p))
 
                 entries.append((snr, len(gt_list), pred_list, gt_list))

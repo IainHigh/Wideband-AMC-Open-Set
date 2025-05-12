@@ -24,11 +24,11 @@ def get_anchors():
 
 VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
-WRITE_TEST_RESULTS = True  # If True, will write the test results to a file.
+WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = (
-    True  # If True, will generate a confusion matrix after training.
+    False  # If True, will generate a confusion matrix after training.
 )
-PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
+PLOT_TEST_SAMPLES = False  # If True, will plot the test samples and predictions.
 MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = (
     []
@@ -58,7 +58,7 @@ NUM_CLASSES = 9  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 30
+EPOCHS = 10
 LEARNING_RATE = 0.001  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
@@ -69,7 +69,7 @@ LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_BW = 5.0
-CONFIDENCE_THRESHOLD = 0.13  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold fdddddddddddddor filtering predictions
 
 
 def print_config_file():
