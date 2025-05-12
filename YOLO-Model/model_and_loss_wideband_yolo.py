@@ -91,7 +91,7 @@ class WidebandClassifier(nn.Module):
         )
         # Global Average Pooling
         self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
-        # Fully Connected Layer producing (1 + NUM_CLASSES) outputs.
+        # 96-D embedding  →  (1+NUM_CLASSES) logits
         self.fc = nn.Linear(96, num_out)
 
         # Randomly initialize the weights and biases of the fully connected layer.
@@ -122,7 +122,7 @@ class WidebandClassifier(nn.Module):
             }
         )
 
-    def forward(self, x):
+    def forward(self, x, *, return_embedding: bool = False):
         # x: [N, 2, T] where T is the length of the downconverted signal.
         x = self.conv_block1(x)
         for block in self.block2_layers:
@@ -133,8 +133,9 @@ class WidebandClassifier(nn.Module):
             concatenated = torch.cat([branch1, branch2, branch3], dim=1)
             x = F.relu(concatenated + residual)
         x = self.global_avg_pool(x)
-        x = self.global_avg_pool(x).view(x.size(0), -1)
-        return self.fc(x)
+        feat = self.global_avg_pool(x).view(x.size(0), -1)  # (B,96)
+        logits = self.fc(feat)
+        return (logits, feat) if return_embedding else logits
 
 
 ###############################################################################
@@ -264,7 +265,9 @@ class WidebandYoloModel(nn.Module):
         x_filt = self._filter_raw(x_rep, freq_pred_flat, bw_pred_flat)
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
 
-        out_conf_class = self.classifier(x_base)  # [bsz*S*B, 1+NUM_CLASSES]
+        logits, embed = self.classifier(x_base, return_embedding=True)
+        out_conf_class = logits  # shape unchanged
+        embed = embed.view(bsz, S, B, -1)  # (bsz,S,B,96)
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
 
         final_out = torch.zeros(
@@ -289,7 +292,7 @@ class WidebandYoloModel(nn.Module):
             final_out = self._pack_merged_to_tensor(
                 merged, final_out.device, final_out.dtype
             )
-        return final_out
+        return final_out, embed
 
     def _collect_raw_predictions(self, final_out):
         """

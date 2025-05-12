@@ -4,6 +4,9 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import torch.linalg as linalg  # <-- new
+
+from scipy.stats import chi2
 
 import json
 import numpy as np
@@ -51,6 +54,19 @@ torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 
 CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
+
+
+def maha_dist(x, mean, inv_cov):
+    """x:(...,D) – class-cond. squared Mahalanobis distance."""
+    diff = x - mean
+    m = torch.einsum("...d,dc,...c->...", diff, inv_cov, diff)
+    return m
+
+
+class_means = None  # tensor [NUM_CLASSES, EMBED_DIM]
+inv_cov = None  # shared inverse covariance  [D,D]
+
+UNKNOWN_IDX = cfg.NUM_CLASSES
 
 
 def convert_to_readable(frequency, modclass):
@@ -142,14 +158,19 @@ def main():
     train_dataset = WidebandYoloDataset(
         os.path.join(data_dir, "training"), transform=None
     )
-    val_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "validation"), transform=None
-    )
-    test_dataset = WidebandYoloDataset(
-        os.path.join(data_dir, "testing"), transform=None
-    )
 
     cfg.MODULATION_CLASSES = train_dataset.class_list
+
+    val_dataset = WidebandYoloDataset(
+        os.path.join(data_dir, "validation"),
+        transform=None,
+        class_list=cfg.MODULATION_CLASSES,
+    )
+    test_dataset = WidebandYoloDataset(
+        os.path.join(data_dir, "testing"),
+        transform=None,
+        class_list=cfg.MODULATION_CLASSES,
+    )
 
     train_loader = DataLoader(
         train_dataset,
@@ -297,6 +318,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
     train_tp = train_fp = train_fn = 0
 
+    emb_acc = [[] for _ in range(cfg.NUM_CLASSES)]
+
     for time_data, freq_data, label_tensor, _ in tqdm(
         train_loader, desc=f"Training epoch {epoch+1}/{cfg.EPOCHS}"
     ):
@@ -305,7 +328,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         label_tensor = label_tensor.to(device, non_blocking=True)
 
         optimizer.zero_grad()
-        pred = model(time_data, freq_data)
+        pred, emb = model(time_data, freq_data)
         bsize = pred.shape[0]
         loss = criterion(pred, label_tensor)
         loss.backward()
@@ -343,12 +366,24 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         class_tgt = label_tensor[..., 3:]
 
         obj_mask = conf_tgt > 0
+
         freq_err = (x_pred - x_tgt).abs()
 
         # Convert freq_err to Hz
         freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
         pred_class_idx = class_pred.argmax(dim=-1)
         true_class_idx = class_tgt.argmax(dim=-1)
+
+        # ---- accumulate embeddings for class Gaussians ----
+        if cfg.OPENSET_ENABLE and cfg.OPENSET_METHOD == "mahalanobis":
+            with torch.no_grad():
+                # only GT boxes
+                embs_this = emb[obj_mask].cpu()
+                labels_this = true_class_idx[obj_mask].cpu()
+                for c in range(cfg.NUM_CLASSES):
+                    idx = labels_this == c
+                    if idx.any():
+                        emb_acc[c].append(embs_this[idx])
 
         batch_obj_count = obj_mask.sum()
         batch_sum_freq_err = freq_err[obj_mask].sum()
@@ -365,6 +400,34 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     precision = train_tp / (train_tp + train_fp) if (train_tp + train_fp) else 0.0
     recall = train_tp / (train_tp + train_fn) if (train_tp + train_fn) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+    if cfg.OPENSET_ENABLE and cfg.OPENSET_METHOD == "mahalanobis":
+        with torch.no_grad():
+            vecs = []
+            labels = []
+
+            global class_means, inv_cov
+            class_means = torch.zeros(cfg.NUM_CLASSES, cfg.EMBED_DIM)
+
+            for c, lst in enumerate(emb_acc):  # c = 0 … NUM_CLASSES-1
+                if lst:  # (ignore empty classes)
+                    m = torch.cat(lst, 0)  # [n_c, 96] on **CPU**
+                    class_means[c] = m.mean(0)  # per-class mean
+                    vecs.append(m)
+                    labels.append(torch.full((m.size(0),), c, dtype=torch.long))
+
+            all_vecs = torch.cat(vecs, 0)  # [N_tot, 96]  (CPU)
+            lbl_vec = torch.cat(labels, 0)  # [N_tot]      (CPU)
+
+            # --- shared (pooled) covariance ---------------------------
+            diff = all_vecs - class_means[lbl_vec]  # devices now match
+            cov = (diff.T @ diff) / (all_vecs.size(0) - 1)
+            inv_cov = linalg.inv(cov + 1e-6 * torch.eye(cov.size(0)))
+            # thresholds: χ² quantile with D d.o.f.
+            q = chi2.ppf(cfg.OPENSET_COVERAGE, cfg.EMBED_DIM)
+            cfg.OPENSET_THRESHOLD = torch.full((cfg.NUM_CLASSES,), q)
+            class_means = class_means.to(device)
+            inv_cov = inv_cov.to(device)
 
     return (
         model,
@@ -388,6 +451,12 @@ def validate_model(model, val_loader, device, criterion, epoch):
     val_frames = []
     val_tp = val_fp = val_fn = 0
 
+    use_maha = (
+        cfg.OPENSET_ENABLE
+        and cfg.OPENSET_METHOD == "mahalanobis"
+        and cfg.OPENSET_THRESHOLD is not None
+    )
+
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
             val_loader, desc=f"Validation epoch {epoch+1}/{cfg.EPOCHS}"
@@ -396,7 +465,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_data = freq_data.to(device, non_blocking=True)
             label_tensor = label_tensor.to(device, non_blocking=True)
 
-            pred = model(time_data, freq_data)
+            pred, emb = model(time_data, freq_data)
             bsize = pred.shape[0]
             loss = criterion(pred, label_tensor)
             total_val_loss += loss.item()
@@ -438,7 +507,23 @@ def validate_model(model, val_loader, device, criterion, epoch):
             freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
 
             pred_class_idx = class_pred.argmax(dim=-1)
+
+            if use_maha:
+                # Mahalanobis distances for *every* predicted box
+                means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
+                d2 = maha_dist(
+                    emb.reshape(-1, cfg.EMBED_DIM), means_sel, inv_cov.to(device)
+                )
+                d2 = d2.view_as(pred_class_idx)
+                tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]
+                unknown_mask_pred = d2 > tau
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
             true_class_idx = class_tgt.argmax(dim=-1)
+            # GT boxes whose one-hot vector is all-zeros → “UNKNOWN”
+            if cfg.OPENSET_ENABLE:
+                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # For metric sums
             batch_obj_count = obj_mask.sum()
@@ -528,6 +613,12 @@ def test_model(model, test_loader, device):
     snr_fp = {}
     snr_fn = {}
 
+    use_maha = (
+        cfg.OPENSET_ENABLE
+        and cfg.OPENSET_METHOD == "mahalanobis"
+        and cfg.OPENSET_THRESHOLD is not None
+    )
+
     with torch.no_grad():
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc=f"Testing on test set"
@@ -535,7 +626,7 @@ def test_model(model, test_loader, device):
             time_data = time_data.to(device)
             freq_data = freq_data.to(device)
             label_tensor = label_tensor.to(device)
-            pred = model(time_data, freq_data)  # shape [batch, S, B*(1+1+NUM_CLASSES)]
+            pred, emb = model(time_data, freq_data)
             bsize = pred.shape[0]
             Sdim = pred.shape[1]  # should be S
             # interpret bounding boxes
@@ -558,7 +649,23 @@ def test_model(model, test_loader, device):
 
             # predicted vs. true class => argmax
             pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
+
+            if use_maha:
+                # Mahalanobis distances for *every* predicted box
+                means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
+                d2 = maha_dist(
+                    emb.reshape(-1, cfg.EMBED_DIM), means_sel, inv_cov.to(device)
+                )
+                d2 = d2.view_as(pred_class_idx)
+                tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]
+                unknown_mask_pred = d2 > tau
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
             true_class_idx = class_tgt.argmax(dim=-1)
+            # GT boxes whose one-hot vector is all-zeros → “UNKNOWN”
+            if cfg.OPENSET_ENABLE:
+                gt_unknown_mask = class_tgt.sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # Now we accumulate stats for each bounding box with obj_mask=1
             batch_obj_count = obj_mask.sum()
@@ -709,10 +816,16 @@ def test_model(model, test_loader, device):
 
 
 def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
+
+    if cfg.OPENSET_ENABLE:
+        class_list = cfg.MODULATION_CLASSES + [cfg.UNKNOWN_CLASS_NAME]
+    else:
+        class_list = cfg.MODULATION_CLASSES
+
     cm = confusion_matrix(
         overall_true_classes,
         overall_pred_classes,
-        labels=range(len(cfg.MODULATION_CLASSES)),
+        labels=range(len(class_list)),
     )
     cm_percent = cm.astype(float)
     for i in range(cm.shape[0]):
@@ -726,8 +839,8 @@ def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
         annot=True,
         fmt=".2f",
         cmap="Blues",
-        xticklabels=cfg.MODULATION_CLASSES,
-        yticklabels=cfg.MODULATION_CLASSES,
+        xticklabels=class_list,
+        yticklabels=class_list,
     )
     plt.title("Test Set Confusion Matrix (%)")
     plt.xlabel("Predicted Class")

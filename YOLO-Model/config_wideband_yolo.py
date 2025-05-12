@@ -18,6 +18,15 @@ def get_anchors():
     return linspace(1 / (B + 1), B / (B + 1), B)
 
 
+# ────────────────────  Mahalanobis open-set  ────────────────────
+OPENSET_ENABLE = True  # master switch
+OPENSET_METHOD = "mahalanobis"  # ("mahalanobis" | "none")
+OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
+OPENSET_THRESHOLD = None  # will hold per-class χ² quantile after calib
+UNKNOWN_CLASS_NAME = "UNKNOWN"
+# (96 = dim after global-avg-pool in WidebandClassifier)
+EMBED_DIM = 96
+
 #####################
 # Miscellaneous Parameters
 #####################
@@ -25,23 +34,17 @@ def get_anchors():
 VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
-GENERATE_CONFUSION_MATRIX = (
-    False  # If True, will generate a confusion matrix after training.
-)
+GENERATE_CONFUSION_MATRIX = True  # Generate a confusion matrix after training.
 PLOT_TEST_SAMPLES = False  # If True, will plot the test samples and predictions.
 MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
-MODULATION_CLASSES = (
-    []
-)  # The modulation classes will be determined by the dataset discovery process.
+MODULATION_CLASSES = []
 
 #####################
 # Dataset Filtering Parameters
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = (
-    True  # If true, will merge similar predictions into one prediction.
-)
+MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -52,15 +55,15 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
-NUM_CLASSES = 9  # Number of classes
+NUM_CLASSES = 3  # Number of classes
 
 #####################
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 10
+EPOCHS = 15
 LEARNING_RATE = 0.001  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.01  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
@@ -69,7 +72,7 @@ LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_BW = 5.0
-CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold fdddddddddddddor filtering predictions
+CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold for filtering predictions
 
 
 def print_config_file():

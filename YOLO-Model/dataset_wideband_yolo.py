@@ -27,7 +27,7 @@ class WidebandYoloDataset(Dataset):
     of the IQ data so that a frequency–domain representation is available for the model.
     """
 
-    def __init__(self, directory, transform=None):
+    def __init__(self, directory, transform=None, class_list=None):
         super().__init__()
         self.directory = directory
         self.transform = transform
@@ -43,7 +43,7 @@ class WidebandYoloDataset(Dataset):
             raise RuntimeError(f"No .sigmf-data files found in {directory}!")
 
         # Build a label -> index mapping for classes.
-        self.class_list = self._discover_mod_classes()
+        self.class_list = class_list or self._discover_mod_classes()
         self.class_to_idx = {c: i for i, c in enumerate(self.class_list)}
 
         # Determine num_samples from the first file.
