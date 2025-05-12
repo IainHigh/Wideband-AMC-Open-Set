@@ -18,13 +18,14 @@ def get_anchors():
     return linspace(1 / (B + 1), B / (B + 1), B)
 
 
-# ────────────────────  Mahalanobis open-set  ────────────────────
+#####################
+# Mahalanobis Open-Set Recognition Parameters
+#####################
+
 OPENSET_ENABLE = True  # master switch
-OPENSET_METHOD = "mahalanobis"  # ("mahalanobis" | "none")
 OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
 OPENSET_THRESHOLD = None  # will hold per-class χ² quantile after calib
 UNKNOWN_CLASS_NAME = "UNKNOWN"
-# (96 = dim after global-avg-pool in WidebandClassifier)
 EMBED_DIM = 96
 
 #####################
@@ -44,14 +45,14 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction.
+MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
 NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means better filtering but slower processing.
 
 #####################
-# Model Parameters[]
+# Model Parameters
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
@@ -105,4 +106,10 @@ def print_config_file():
     print("\tLAMBDA_CLASS:", LAMBDA_CLASS)
     print("\tLAMBDA_BW:", LAMBDA_BW)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
+    if OPENSET_ENABLE:
+        print("\tOPENSET RECOGNITION PARAMETERS:")
+        print("\t\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
+        print("\t\tOPENSET_THRESHOLD:", OPENSET_THRESHOLD)
+        print("\t\tUNKNOWN_CLASS_NAME:", UNKNOWN_CLASS_NAME)
+        print("\t\tEMBED_DIM:", EMBED_DIM)
     print("")

@@ -4,9 +4,7 @@
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
-import torch.linalg as linalg  # <-- new
-
-from scipy.stats import chi2
+import torch.linalg as linalg
 
 import json
 import numpy as np
@@ -15,6 +13,7 @@ import os
 import random
 import matplotlib.pyplot as plt
 import config_wideband_yolo as cfg
+from scipy.stats import chi2
 from shutil import rmtree
 from warnings import filterwarnings
 from seaborn import heatmap
@@ -375,7 +374,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         true_class_idx = class_tgt.argmax(dim=-1)
 
         # ---- accumulate embeddings for class Gaussians ----
-        if cfg.OPENSET_ENABLE and cfg.OPENSET_METHOD == "mahalanobis":
+        if cfg.OPENSET_ENABLE:
             with torch.no_grad():
                 # only GT boxes
                 embs_this = emb[obj_mask].cpu()
@@ -401,7 +400,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     recall = train_tp / (train_tp + train_fn) if (train_tp + train_fn) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
 
-    if cfg.OPENSET_ENABLE and cfg.OPENSET_METHOD == "mahalanobis":
+    if cfg.OPENSET_ENABLE:
         with torch.no_grad():
             vecs = []
             labels = []
@@ -450,12 +449,6 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
     val_frames = []
     val_tp = val_fp = val_fn = 0
-
-    use_maha = (
-        cfg.OPENSET_ENABLE
-        and cfg.OPENSET_METHOD == "mahalanobis"
-        and cfg.OPENSET_THRESHOLD is not None
-    )
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, _ in tqdm(
@@ -508,7 +501,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             pred_class_idx = class_pred.argmax(dim=-1)
 
-            if use_maha:
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
                 # Mahalanobis distances for *every* predicted box
                 means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
                 d2 = maha_dist(
@@ -613,12 +606,6 @@ def test_model(model, test_loader, device):
     snr_fp = {}
     snr_fn = {}
 
-    use_maha = (
-        cfg.OPENSET_ENABLE
-        and cfg.OPENSET_METHOD == "mahalanobis"
-        and cfg.OPENSET_THRESHOLD is not None
-    )
-
     with torch.no_grad():
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
             test_loader, desc=f"Testing on test set"
@@ -650,7 +637,7 @@ def test_model(model, test_loader, device):
             # predicted vs. true class => argmax
             pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
 
-            if use_maha:
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
                 # Mahalanobis distances for *every* predicted box
                 means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
                 d2 = maha_dist(

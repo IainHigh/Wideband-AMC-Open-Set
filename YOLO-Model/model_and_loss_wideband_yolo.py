@@ -31,10 +31,6 @@ def conv1d_batch(x, weight, pad_left, pad_right):
     y = (x_unf * weight).sum(dim=-1)
     return y
 
-
-###############################################################################
-# Residual block (used in Stage-1)
-###############################################################################
 class ResidualBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
@@ -69,9 +65,6 @@ class ResidualBlock(nn.Module):
         return out
 
 
-###############################################################################
-# New WidebandClassifier (Stage-2: Confidence and Classification)
-###############################################################################
 class WidebandClassifier(nn.Module):
     def __init__(self, num_out):
         """
@@ -137,10 +130,6 @@ class WidebandClassifier(nn.Module):
         logits = self.fc(feat)
         return (logits, feat) if return_embedding else logits
 
-
-###############################################################################
-# WidebandYoloModel (Complete YOLO with dynamic anchors and new classifier)
-###############################################################################
 class WidebandYoloModel(nn.Module):
     def __init__(self, num_samples):
         super().__init__()
@@ -266,7 +255,7 @@ class WidebandYoloModel(nn.Module):
         x_base = self._downconvert_multiple(x_filt, freq_pred_flat)
 
         logits, embed = self.classifier(x_base, return_embedding=True)
-        out_conf_class = logits  # shape unchanged
+        out_conf_class = logits
         embed = embed.view(bsz, S, B, -1)  # (bsz,S,B,96)
         out_conf_class = out_conf_class.view(bsz, S, B, 1 + NUM_CLASSES)
 
@@ -439,9 +428,6 @@ class WidebandYoloModel(nn.Module):
         return x_base
 
 
-###############################################################################
-# WidebandYoloLoss remains unchanged.
-###############################################################################
 class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
