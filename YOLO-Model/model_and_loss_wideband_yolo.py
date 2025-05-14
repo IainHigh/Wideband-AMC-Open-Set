@@ -335,9 +335,7 @@ class WidebandYoloModel(nn.Module):
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
                 out[i, cell, aidx, 2] = bw
-                out[i, cell, aidx, 3 + cls] = (
-                    1.0  # TODO: Keep an eye on this for open-set recognition.
-                )
+                out[i, cell, aidx, 3 + cls] = 1.0
 
         return out
 
@@ -358,6 +356,8 @@ class WidebandYoloModel(nn.Module):
             classes = {t[1] for t in cluster}
             if len(classes) == 1:
                 tot_conf = sum(conf for *_, conf, _ in cluster)
+                if tot_conf == 0:
+                    merged.append(max(cluster, key=lambda x: x[2]))
                 f_avg = sum(f * conf for f, _, conf, _ in cluster) / tot_conf
                 bw_avg = sum(bw * conf for _, _, conf, bw in cluster) / tot_conf
                 max_conf = max(conf for *_, conf, _ in cluster)
@@ -435,11 +435,6 @@ class WidebandYoloModel(nn.Module):
 class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
-
-
-class WidebandYoloLoss(nn.Module):
-    def __init__(self):
-        super().__init__()
         # learnable class centres:  C × D
         self.centers = nn.Parameter(torch.randn(NUM_CLASSES, EMBED_DIM) * 0.01)
 
@@ -487,4 +482,4 @@ class WidebandYoloLoss(nn.Module):
         total_loss = (
             coord_loss + bw_loss + conf_loss_o + conf_loss_n + cls_loss + center_loss
         )  # keep same scale
-        return total_loss / batch_size, center_loss.detach() / batch_size
+        return total_loss / batch_size

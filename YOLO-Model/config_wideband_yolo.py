@@ -25,7 +25,7 @@ def get_anchors():
 OPENSET_ENABLE = True  # master switch
 OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
 UNKNOWN_CLASS_NAME = "UNKNOWN"
-EMBED_DIM = 96
+EMBED_DIM = 96  # TODO: Don't have this as a configurable parameter, but rather a constant in the model.
 
 #####################
 # Miscellaneous Parameters

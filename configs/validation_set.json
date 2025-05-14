@@ -17,7 +17,7 @@
     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
   ],
   "sampling_rate": 1e9,
-  "randomly_generated_center_frequencies": [40e6, 400e6, 3, 1],
+  "randomly_generated_center_frequencies": [40e6, 400e6, 1, 0],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
