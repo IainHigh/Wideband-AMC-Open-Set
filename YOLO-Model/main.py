@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torch.linalg as linalg
 
 import json
-import uuid
+from uuid import uuid4
 import numpy as np
 import sys
 import os
@@ -255,6 +255,9 @@ def main():
             f"ClsAcc={train_cls_accuracy:.2f}%, "
             f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
         )
+
+        if not cfg.VALIDATE_MODEL:
+            continue
 
         # Validation
         (
@@ -845,7 +848,7 @@ def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
 
     # IF the file already exists, save it with a uuid suffix
     if os.path.exists("confusion_matrix.png"):
-        uuid = str(uuid.uuid4())
+        uuid = str(uuid4())
         plt.savefig(f"confusion_matrix_{uuid}.png")
         print(f"Saved confusion matrix as confusion_matrix_{uuid}.png")
     else:

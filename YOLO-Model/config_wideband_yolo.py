@@ -32,6 +32,7 @@ EMBED_DIM = 96
 #####################
 
 VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
+VALIDATE_MODEL = False
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
 WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = True  # Generate a confusion matrix after training.
