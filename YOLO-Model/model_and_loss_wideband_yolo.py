@@ -15,12 +15,14 @@ from config_wideband_yolo import (
     LAMBDA_NOOBJ,
     LAMBDA_CLASS,
     LAMBDA_BW,
+    LAMBDA_CENTER,
     CONFIDENCE_THRESHOLD,
     NUMTAPS,
     SAMPLING_FREQUENCY,
     MERGE_SIMILAR_PREDICTIONS,
     MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
     get_anchors,
+    EMBED_DIM,
 )
 
 
@@ -30,6 +32,7 @@ def conv1d_batch(x, weight, pad_left, pad_right):
     weight = weight.unsqueeze(2)
     y = (x_unf * weight).sum(dim=-1)
     return y
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -129,6 +132,7 @@ class WidebandClassifier(nn.Module):
         feat = self.global_avg_pool(x).view(x.size(0), -1)  # (B,96)
         logits = self.fc(feat)
         return (logits, feat) if return_embedding else logits
+
 
 class WidebandYoloModel(nn.Module):
     def __init__(self, num_samples):
@@ -436,8 +440,10 @@ class WidebandYoloLoss(nn.Module):
 class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
+        # learnable class centres:  C × D
+        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, EMBED_DIM) * 0.01)
 
-    def forward(self, pred, target):
+    def forward(self, pred, target, embed):
         # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
         batch_size = pred.shape[0]
         pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + 1 + NUM_CLASSES)
@@ -467,5 +473,18 @@ class WidebandYoloLoss(nn.Module):
             obj_mask.unsqueeze(-1) * (cls_pred - cls_tgt) ** 2
         )
 
-        total_loss = coord_loss + bw_loss + conf_loss_o + conf_loss_n + cls_loss
-        return total_loss / batch_size
+        # ---------- centre-loss on *GT* boxes --------------------------
+        with torch.no_grad():
+            gt_idx = cls_tgt.argmax(dim=-1)  # [B,S,B]
+        obj_mask_flat = obj_mask.bool().view(-1)
+        emb_flat = embed.view(embed.size(0), embed.size(1), B, EMBED_DIM)
+        emb_flat = emb_flat.view(-1, EMBED_DIM)[obj_mask_flat]  # [N_pos,D]
+        label_flat = gt_idx.view(-1)[obj_mask_flat]  # [N_pos]
+
+        center_sel = self.centers[label_flat]  # [N_pos,D]
+        center_loss = ((emb_flat - center_sel) ** 2).sum(1).mean() * LAMBDA_CENTER
+
+        total_loss = (
+            coord_loss + bw_loss + conf_loss_o + conf_loss_n + cls_loss + center_loss
+        )  # keep same scale
+        return total_loss / batch_size, center_loss.detach() / batch_size

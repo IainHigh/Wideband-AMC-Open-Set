@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import torch.linalg as linalg
 
 import json
+import uuid
 import numpy as np
 import sys
 import os
@@ -199,7 +200,7 @@ def main():
     # 2) Create model & loss
     num_samples = train_dataset.get_num_samples()
     model = WidebandYoloModel(num_samples).to(device)
-    criterion = WidebandYoloLoss()
+    criterion = WidebandYoloLoss().to(device)
 
     start_epoch = 0
     # If the model is already partially trained, load the model and get the epoch from which to continue training.
@@ -237,6 +238,7 @@ def main():
         (
             model,
             avg_train_loss,
+            avg_centre_loss,
             train_mean_freq_err,
             train_cls_accuracy,
             train_prec,
@@ -248,6 +250,7 @@ def main():
 
         print(
             f"  Train: Loss={avg_train_loss:.4f}, "
+            f"CenterLoss={avg_centre_loss:.4f}, "
             f"MeanFreqErr={train_mean_freq_err}, "
             f"ClsAcc={train_cls_accuracy:.2f}%, "
             f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
@@ -309,6 +312,7 @@ def main():
 def train_model(model, train_loader, device, optimizer, criterion, epoch):
     model.train()
     total_train_loss = 0.0
+    total_center_loss = 0.0
 
     # For metrics:
     train_obj_count = 0
@@ -329,10 +333,11 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         optimizer.zero_grad()
         pred, emb = model(time_data, freq_data)
         bsize = pred.shape[0]
-        loss = criterion(pred, label_tensor)
+        loss, c_loss = criterion(pred, label_tensor, emb)
         loss.backward()
         optimizer.step()
         total_train_loss += loss.item()
+        total_center_loss += c_loss.item()
 
         pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
         tgt_r = label_tensor.view_as(pred_r)
@@ -393,6 +398,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         train_correct_cls += batch_correct_cls.item()
 
     avg_train_loss = total_train_loss / len(train_loader)
+    avg_center_loss = total_center_loss / len(train_loader)
+
     train_mean_freq_err = train_sum_freq_err / train_obj_count
     train_cls_accuracy = 100.0 * (train_correct_cls / train_obj_count)
 
@@ -431,6 +438,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     return (
         model,
         avg_train_loss,
+        avg_center_loss,
         train_mean_freq_err,
         train_cls_accuracy,
         precision,
@@ -460,7 +468,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             pred, emb = model(time_data, freq_data)
             bsize = pred.shape[0]
-            loss = criterion(pred, label_tensor)
+            loss, _ = criterion(pred, label_tensor, emb)
             total_val_loss += loss.item()
 
             pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
@@ -513,6 +521,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                 pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
 
             true_class_idx = class_tgt.argmax(dim=-1)
+
             # GT boxes whose one-hot vector is all-zeros → “UNKNOWN”
             if cfg.OPENSET_ENABLE:
                 gt_unknown_mask = class_tgt.sum(dim=-1) == 0
@@ -833,7 +842,15 @@ def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
     plt.xlabel("Predicted Class")
     plt.ylabel("True Class")
     plt.tight_layout()
-    plt.savefig("test_confusion_matrix.png")
+
+    # IF the file already exists, save it with a uuid suffix
+    if os.path.exists("confusion_matrix.png"):
+        uuid = str(uuid.uuid4())
+        plt.savefig(f"confusion_matrix_{uuid}.png")
+        print(f"Saved confusion matrix as confusion_matrix_{uuid}.png")
+    else:
+        plt.savefig("confusion_matrix.png")
+        print(f"Saved confusion matrix as confusion_matrix.png")
     plt.close()
 
 

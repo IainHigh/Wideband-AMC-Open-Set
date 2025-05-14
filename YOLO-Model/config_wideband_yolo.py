@@ -24,7 +24,6 @@ def get_anchors():
 
 OPENSET_ENABLE = True  # master switch
 OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
-OPENSET_THRESHOLD = None  # will hold per-class χ² quantile after calib
 UNKNOWN_CLASS_NAME = "UNKNOWN"
 EMBED_DIM = 96
 
@@ -56,7 +55,7 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
-NUM_CLASSES = 3  # Number of classes
+NUM_CLASSES = 7  # Number of classes
 
 #####################
 # Training Parameters
@@ -73,6 +72,7 @@ LAMBDA_COORD = 5.0  # Weight for coordinate (x offset) loss
 LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_BW = 5.0
+LAMBDA_CENTER = 5.0
 CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold for filtering predictions
 
 
@@ -109,7 +109,6 @@ def print_config_file():
     if OPENSET_ENABLE:
         print("\tOPENSET RECOGNITION PARAMETERS:")
         print("\t\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
-        print("\t\tOPENSET_THRESHOLD:", OPENSET_THRESHOLD)
         print("\t\tUNKNOWN_CLASS_NAME:", UNKNOWN_CLASS_NAME)
         print("\t\tEMBED_DIM:", EMBED_DIM)
     print("")
