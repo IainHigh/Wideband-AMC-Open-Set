@@ -1,12 +1,12 @@
 {
-  "n_captures": 20000,
+  "n_captures": 100000,
   "n_samps": 4096,
   "modulation": ["qpsk", "16qam", "32qam", "4ask", "16ask", "16apsk", "64apsk"],
   "symbol_rate": [
     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
   ],
   "sampling_rate": 1e9,
-  "randomly_generated_center_frequencies": [40e6, 400e6, 1, 0],
+  "randomly_generated_center_frequencies": [40e6, 400e6, 4, 1],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
@@ -21,7 +21,7 @@
   ],
   "channel": {
     "type": "awgn",
-    "snr": 10,
+    "snr": [-5, 10, 1],
     "fo": 0.0,
     "po": 0.0
   },

@@ -45,7 +45,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction.
+MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -62,9 +62,9 @@ NUM_CLASSES = 7  # Number of classes
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 15
+EPOCHS = 80
 LEARNING_RATE = 0.001  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.1  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.005  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
