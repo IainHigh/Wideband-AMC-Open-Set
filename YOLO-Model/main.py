@@ -217,7 +217,7 @@ def main():
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
 
-    if start_epoch == cfg.EPOCHS:
+    if start_epoch >= cfg.EPOCHS:
         print("Model training complete. No more epochs to train.")
         return
 
@@ -225,13 +225,9 @@ def main():
     for epoch in range(start_epoch, cfg.EPOCHS):
         print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")
 
-        # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of 10 by the last epoch.
-        if cfg.EPOCHS > 1:
-            prog = epoch / (cfg.EPOCHS - 1)
-        else:
-            prog = 0.0
+        # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of FINAL_LR_MULTIPLE by the last epoch.
+        prog = epoch / (cfg.EPOCHS - 1) if cfg.EPOCHS > 1 else 0.0
         learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
-
         optimizer = optim.Adam(model.parameters(), lr=learn_rate)
 
         # Training
@@ -254,49 +250,47 @@ def main():
             f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
         )
 
-        if not cfg.VALIDATE_MODEL:
-            continue
+        if cfg.VALIDATE_MODEL:
+            # Validation
+            (
+                avg_val_loss,
+                val_mean_freq_err,
+                val_cls_accuracy,
+                val_prec,
+                val_rec,
+                val_f1,
+                val_frames,
+            ) = validate_model(model, val_loader, device, criterion, epoch)
 
-        # Validation
-        (
-            avg_val_loss,
-            val_mean_freq_err,
-            val_cls_accuracy,
-            val_prec,
-            val_rec,
-            val_f1,
-            val_frames,
-        ) = validate_model(model, val_loader, device, criterion, epoch)
+            # Convert frequency errors to human readable format
+            val_mean_freq_err = convert_to_readable(val_mean_freq_err, 0)[0]
 
-        # Convert frequency errors to human readable format
-        val_mean_freq_err = convert_to_readable(val_mean_freq_err, 0)[0]
-
-        print(
-            f"  Valid: Loss={avg_val_loss:.4f}, "
-            f"MeanFreqErr={val_mean_freq_err}, "
-            f"ClsAcc={val_cls_accuracy:.2f}%, "
-            f"P={val_prec:.3f}, R={val_rec:.3f}, F1={val_f1:.3f}"
-        )
-
-        # Print a random subset of "frames"
-        if cfg.VAL_PRINT_SAMPLES > 0:
-            random.shuffle(val_frames)
-            to_print = val_frames[
-                : cfg.VAL_PRINT_SAMPLES
-            ]  # up to VAL_PRINT_SAMPLES frames
             print(
-                f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
+                f"  Valid: Loss={avg_val_loss:.4f}, "
+                f"MeanFreqErr={val_mean_freq_err}, "
+                f"ClsAcc={val_cls_accuracy:.2f}%, "
+                f"P={val_prec:.3f}, R={val_rec:.3f}, F1={val_f1:.3f}"
             )
-            print(f"  Prediction format: (frequency, class, confidence)")
-            print(f"  GroundTruth format: (frequency, class)")
-            for idx, frame_dict in enumerate(to_print, 1):
-                pred_list = frame_dict["pred_list"]
-                gt_list = frame_dict["gt_list"]
 
-                print(f"    Frame {idx}:")
-                print(f"      Predicted => {pred_list}")
-                print(f"      GroundTruth=> {gt_list}")
-            print("")
+            # Print a random subset of "frames"
+            if cfg.VAL_PRINT_SAMPLES > 0:
+                random.shuffle(val_frames)
+                to_print = val_frames[
+                    : cfg.VAL_PRINT_SAMPLES
+                ]  # up to VAL_PRINT_SAMPLES frames
+                print(
+                    f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
+                )
+                print(f"  Prediction format: (frequency, class, confidence)")
+                print(f"  GroundTruth format: (frequency, class)")
+                for idx, frame_dict in enumerate(to_print, 1):
+                    pred_list = frame_dict["pred_list"]
+                    gt_list = frame_dict["gt_list"]
+
+                    print(f"    Frame {idx}:")
+                    print(f"      Predicted => {pred_list}")
+                    print(f"      GroundTruth=> {gt_list}")
+                print("")
 
         if cfg.MULTIPLE_JOBS_PER_TRAINING:
             # Save model every epoch
