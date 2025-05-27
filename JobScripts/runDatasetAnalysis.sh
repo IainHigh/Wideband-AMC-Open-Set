@@ -28,7 +28,12 @@ source activate mypython
 # python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py ./configs/testing_set.json
 
 # Run the dataset analysis program
-python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/DatasetPlotter/plot_dataset.py
+# python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/DatasetPlotter/plot_dataset.py
 
 # Remove the default dataset generated
-# rm -rf "/exports/eddie/scratch/s2062378/data"
+# rm -rf /exports/eddie/scratch/s2062378/data
+
+# Plot all of the modulation schemes
+rm -rf /exports/eddie/scratch/s2062378/data/all_mod_schemes
+python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py ./configs/all_modulation_schemes.json 2025
+python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/DatasetPlotter/plot_all_constellations.py
