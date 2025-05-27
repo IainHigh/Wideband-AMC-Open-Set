@@ -37,7 +37,7 @@ PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the co
 WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = True  # Generate a confusion matrix after training.
 PLOT_TEST_SAMPLES = False  # If True, will plot the test samples and predictions.
-MULTIPLE_JOBS_PER_TRAINING = True  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
+MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = []
 
 #####################
@@ -45,7 +45,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
+MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -56,15 +56,15 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
-NUM_CLASSES = 6  # Number of classes
+NUM_CLASSES = 7  # Number of classes
 
 #####################
 # Training Parameters
 #####################
 BATCH_SIZE = 64
-EPOCHS = 150
+EPOCHS = 75
 LEARNING_RATE = 0.001  # Initial learning rate
-FINAL_LR_MULTIPLE = 0.001  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
+FINAL_LR_MULTIPLE = 0.005  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
 ########################
 # Loss Function Weights
@@ -75,7 +75,7 @@ LAMBDA_COORD = 1.0  # Weight for coordinate (x offset) loss
 LAMBDA_BW = 1.0
 
 LAMBDA_CLASS = 2.0  # Weight for classification loss
-LAMBDA_CENTER = 2.0  # Weight for the embedding distance loss
+LAMBDA_CENTER = 5.0  # Weight for the embedding distance loss
 
 CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold for filtering predictions
 

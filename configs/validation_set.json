@@ -1,15 +1,17 @@
 {
-  "n_captures": 20000,
+  "n_captures": 10000,
   "n_samps": 4096,
   "modulation": [
-    "16qam",
-    "64qam",
-    "32qam",
-    "bpsk",
     "qpsk",
-    "8psk",
+    "16qam",
+    "32qam",
+    "4ask",
+    "16ask",
     "16apsk",
-    "16psk"
+    "64apsk",
+    "128psk",
+    "256qam",
+    "2ask"
   ],
   "symbol_rate": 32,
   "sampling_rate": 1e9,
