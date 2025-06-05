@@ -106,6 +106,9 @@ def delete_existing_plots():
         constellation_diagram_output_path,
         spectrogram_output_path,
     ]:
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+            continue
         for file in os.listdir(path):
             os.remove(f"{path}/{file}")
 
@@ -164,7 +167,7 @@ def plot_time_domain_diagram(f_data, sampling_rate):
     plt.plot(time_axis, I, label="I", alpha=0.8)
     plt.plot(time_axis, Q, label="Q", alpha=0.8)
     plt.grid()
-    plt.title(f"Time Domain")
+    plt.title("Time Domain")
     plt.xlabel("Time [s]")
     plt.ylabel("Amplitude")
     plt.legend()
@@ -202,7 +205,7 @@ def plot_frequency_domain_diagram(f_data, center_frequencies, sampling_rate):
         )
 
     plt.grid()
-    plt.title(f"Frequency Domain")
+    plt.title("Frequency Domain")
     plt.xlabel("Frequency [Hz]")
     plt.ylabel("PSD [dB]")
     plt.legend()
@@ -266,7 +269,7 @@ def plot_constellation_diagram(
         plt.axvline(0, color="gray", linewidth=0.5, linestyle="--")
         plt.xlabel("I (In-phase)")
         plt.ylabel("Q (Quadrature)")
-        plt.title(f"Constellation Diagram ({modscheme}) at {f_c/1e6:.2f} MHz")
+        plt.title("Constellation Diagram ({modscheme}) at {f_c/1e6:.2f} MHz")
         cbar = plt.colorbar()
         cbar.set_label("Density")
         plt.grid(True, linestyle="--", alpha=0.5)
@@ -296,10 +299,10 @@ def plot_spectrogram(f_data, sampling_rate):
         cmap="inferno",
     )
     plt.colorbar(label="Power [dB]")
-    plt.title(f"Spectrogram")
+    plt.title("Spectrogram")
     plt.xlabel("Frequency [Hz]")
     plt.ylabel("Time [s]")
-    plt.savefig(f"{spectrogram_output_path}/Spectrogram.png")
+    plt.savefig("{spectrogram_output_path}/Spectrogram.png")
     plt.close()
 
 

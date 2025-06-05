@@ -3,8 +3,7 @@
 plot_unique_constellations.py
 ─────────────────────────────
 Iterate through all SigMF captures in <Dataset_Directory>/<DATASET_NAME>,
-create one constellation diagram per *new* modulation scheme, and save it to
-./figures/all_mod_schemes/{MOD_SCHEME}.png
+create one constellation diagram per *new* modulation scheme, and save it.
 """
 
 import os, sys, json, numpy as np, matplotlib.pyplot as plt
@@ -12,11 +11,11 @@ from scipy.signal import filtfilt, firwin
 from scipy.stats import gaussian_kde
 from tqdm import tqdm
 
-np.Inf = np.inf  # numpy-pickle workaround
+np.Inf = np.inf
 
 DATASET_NAME = "all_mod_schemes"  # dataset name in Dataset_Directory
-OUTPUT_DIR = "./figures/all_mod_schemes"
-MAX_POINTS = 65536
+OUTPUT_DIR = "./DatasetPlotter/figures/all_mod_schemes"
+MAX_POINTS = 8192
 
 
 def prepare_output_dir(path: str):
@@ -104,7 +103,7 @@ def main():
             print(f"[WARN] skipping '{base}': {e}")
             continue
         sps = sps[0] if isinstance(sps, list) else sps  # handle single value or list
-        bw = (fs / sps) * (1 + beta) if sps and beta else 0.2 * fs  # fallback: 20 %-BW
+        bw = (fs / sps) * (1 + beta)
 
         for i, m in enumerate(mods):
             if m in seen:  # already have this modulation plotted
@@ -113,6 +112,10 @@ def main():
             chan = bandpass_complex(iq, fs, fc - bw / 2, fc + bw / 2)
             t = np.arange(len(chan)) / fs
             bb = chan * np.exp(-1j * 2 * np.pi * fc * t)  # down-convert
+
+            if sps:
+                bb = bb[int(sps) // 2 :: int(sps)]  # sample once per symbol
+
             outfile = os.path.join(OUTPUT_DIR, f"{m}.png")
             plot_constellation(bb, outfile, f"{m}  (first capture)")
             seen.add(m)

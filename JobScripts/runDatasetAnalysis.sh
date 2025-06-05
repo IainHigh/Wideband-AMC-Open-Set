@@ -1,8 +1,8 @@
 #!/bin/sh
 #$ -N DatasetAnalysis
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
-#$ -l h_rt=00:59:00 
-#$ -l h_vmem=10G
+#$ -l h_rt=00:30:00 
+#$ -l h_vmem=1G
 
 #$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
