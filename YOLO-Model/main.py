@@ -52,6 +52,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 torch.manual_seed(rng_seed)
 random.seed(rng_seed)
+np.random.seed(rng_seed)
 
 CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
 
@@ -787,11 +788,12 @@ def test_model(model, test_loader, device):
     if cfg.GENERATE_CONFUSION_MATRIX:
         plot_confusion_matrix(overall_true_classes, overall_pred_classes)
 
-    out_dir = os.path.join(data_dir, "../test_result_plots")
-    # clear or create directory
-    if os.path.exists(out_dir):
-        rmtree(out_dir)
-    os.makedirs(out_dir, exist_ok=True)
+    if cfg.PLOT_TEST_SAMPLES or cfg.WRITE_TEST_RESULTS:
+        out_dir = os.path.join(data_dir, "../test_result_plots")
+        # clear or create directory
+        if os.path.exists(out_dir):
+            rmtree(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
     # 4) Plot frequency domain diagram of test set samples and predictions
     if cfg.PLOT_TEST_SAMPLES:

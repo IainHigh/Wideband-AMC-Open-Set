@@ -45,7 +45,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
+MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -56,7 +56,7 @@ NUMTAPS = 101  # Number of taps for the filter - Higher number of taps means bet
 #####################
 S = 8  # Number of grid cells
 B = 4  # Anchors / Boxes per cell
-NUM_CLASSES = 6  # Number of classes
+NUM_CLASSES = 7  # Number of classes
 
 #####################
 # Training Parameters

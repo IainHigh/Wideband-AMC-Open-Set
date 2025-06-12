@@ -90,9 +90,6 @@ class WidebandClassifier(nn.Module):
         # 96-D embedding  →  (1+NUM_CLASSES) logits
         self.fc = nn.Linear(96, num_out)
 
-        # Randomly initialize the weights and biases of the fully connected layer.
-        nn.init.normal_(self.fc.weight, mean=0.0, std=0.5)
-
     def _create_block2(self, in_channels, out_channels):
         return nn.ModuleDict(
             {
