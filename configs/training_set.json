@@ -1,5 +1,5 @@
 {
-  "n_captures": 100000,
+  "n_captures": 10000,
   "n_samps": 4096,
   "modulation": ["qpsk", "16qam", "32qam", "4ask", "16ask", "16apsk", "64apsk"],
   "symbol_rate": 32,

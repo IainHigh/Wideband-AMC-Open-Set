@@ -122,3 +122,78 @@ void linear_modulate(int modtype, int order, int n_sym, unsigned int s[], float 
     // clean up
     modem_destroy(mod);
 }
+
+void linear_constellation(int modtype, int order, float rI[], float rQ[])
+{
+    // determine modulation scheme
+    modulation_scheme ms = LIQUID_MODEM_QAM16;
+    switch(modtype){
+        case 1:
+            switch(order){
+                case 2:   ms = LIQUID_MODEM_BPSK;   break;
+                case 4:   ms = LIQUID_MODEM_QPSK;   break;
+                case 8:   ms = LIQUID_MODEM_PSK8;   break;
+                case 16:  ms = LIQUID_MODEM_PSK16;  break;
+                case 32:  ms = LIQUID_MODEM_PSK32;  break;
+                case 64:  ms = LIQUID_MODEM_PSK64;  break;
+                case 128: ms = LIQUID_MODEM_PSK128; break;
+                case 256: ms = LIQUID_MODEM_PSK256; break;
+            }
+            break;
+        case 2:
+            switch(order){
+                case 4:   ms = LIQUID_MODEM_QAM4;   break;
+                case 8:   ms = LIQUID_MODEM_QAM8;   break;
+                case 16:  ms = LIQUID_MODEM_QAM16;  break;
+                case 32:  ms = LIQUID_MODEM_QAM32;  break;
+                case 64:  ms = LIQUID_MODEM_QAM64;  break;
+                case 128: ms = LIQUID_MODEM_QAM128; break;
+                case 256: ms = LIQUID_MODEM_QAM256; break;
+            }
+            break;
+        case 3:
+            switch(order){
+                case 2:   ms = LIQUID_MODEM_ASK2;   break;
+                case 4:   ms = LIQUID_MODEM_ASK4;   break;
+                case 8:   ms = LIQUID_MODEM_ASK8;   break;
+                case 16:  ms = LIQUID_MODEM_ASK16;  break;
+                case 32:  ms = LIQUID_MODEM_ASK32;  break;
+                case 64:  ms = LIQUID_MODEM_ASK64;  break;
+                case 128: ms = LIQUID_MODEM_ASK128; break;
+                case 256: ms = LIQUID_MODEM_ASK256; break;
+            }
+            break;
+        case 4:
+            switch(order){
+                case 4:   ms = LIQUID_MODEM_APSK4;   break;
+                case 8:   ms = LIQUID_MODEM_APSK8;   break;
+                case 16:  ms = LIQUID_MODEM_APSK16;  break;
+                case 32:  ms = LIQUID_MODEM_APSK32;  break;
+                case 64:  ms = LIQUID_MODEM_APSK64;  break;
+                case 128: ms = LIQUID_MODEM_APSK128; break;
+                case 256: ms = LIQUID_MODEM_APSK256; break;
+            }
+            break;
+        case 5:
+            switch(order){
+                case 2:   ms = LIQUID_MODEM_DPSK2;   break;
+                case 4:   ms = LIQUID_MODEM_DPSK4;   break;
+                case 8:   ms = LIQUID_MODEM_DPSK8;   break;
+                case 16:  ms = LIQUID_MODEM_DPSK16;  break;
+                case 32:  ms = LIQUID_MODEM_DPSK32;  break;
+                case 64:  ms = LIQUID_MODEM_DPSK64;  break;
+                case 128: ms = LIQUID_MODEM_DPSK128; break;
+                case 256: ms = LIQUID_MODEM_DPSK256; break;
+            }
+            break;
+    }
+
+    modem mod = modem_create(ms);
+    float complex s_m;
+    for (int i=0; i<order; i++) {
+        modem_modulate(mod, i, &s_m);
+        rI[i] = crealf(s_m);
+        rQ[i] = cimagf(s_m);
+    }
+    modem_destroy(mod);
+}

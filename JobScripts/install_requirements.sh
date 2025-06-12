@@ -1,13 +1,13 @@
 #!/bin/sh
 #$ -N Install-Requirements
 #$ -wd /home/s2062378
-#$ -l h_rt=00:59:00 
+#$ -l h_rt=23:59:00 
 #$ -l h_vmem=10G
 
 #$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
-#$ -m beas
-#$ -M "s2062378@ed.ac.uk"
+# -m beas
+# -M "s2062378@ed.ac.uk"
 
 export LD_LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LD_LIBRARY_PATH
 export PATH=$HOME/liquid-dsp-install/bin:$PATH

@@ -1,7 +1,7 @@
 #!/bin/sh
 #$ -N YOLO
 #$ -wd /home/s2062378/Synthetic-Radio-Frequency-Data-Generator
-#$ -l h_rt=23:59:00
+#$ -l h_rt=03:59:00
 #$ -l h_vmem=80G
 
 #$ -q gpu

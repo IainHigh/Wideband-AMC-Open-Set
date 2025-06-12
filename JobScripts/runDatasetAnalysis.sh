@@ -6,8 +6,8 @@
 
 #$ -o /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
 #$ -e /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/OutputFiles
-#$ -m beas
-#$ -M "s2062378@ed.ac.uk"
+# -m beas
+# -M "s2062378@ed.ac.uk"
 
 export LD_LIBRARY_PATH=$HOME/liquid-dsp-install/lib:$LD_LIBRARY_PATH
 export PATH=$HOME/liquid-dsp-install/bin:$PATH
@@ -35,5 +35,4 @@ source activate mypython
 
 # Plot all of the modulation schemes
 rm -rf /exports/eddie/scratch/s2062378/data/all_mod_schemes
-python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/generator.py ./configs/all_modulation_schemes.json 2025
 python3 /home/s2062378/Synthetic-Radio-Frequency-Data-Generator/DatasetPlotter/plot_all_constellations.py

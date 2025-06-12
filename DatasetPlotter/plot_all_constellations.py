@@ -1,127 +1,116 @@
 #!/usr/bin/python3
-"""
-plot_unique_constellations.py
-─────────────────────────────
-Iterate through all SigMF captures in <Dataset_Directory>/<DATASET_NAME>,
-create one constellation diagram per *new* modulation scheme, and save it.
-"""
+import ctypes
+import importlib.util
+import os
+import numpy as np
+import matplotlib.pyplot as plt
 
-import os, sys, json, numpy as np, matplotlib.pyplot as plt
-from scipy.signal import filtfilt, firwin
-from scipy.stats import gaussian_kde
-from tqdm import tqdm
+spec = importlib.util.spec_from_file_location("maps", os.path.join("utils", "maps.py"))
+maps = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(maps)
+mod_str2int = maps.mod_str2int
 
-np.Inf = np.inf
+# load shared library
+clinear = ctypes.CDLL(os.path.abspath("./cmodules/linear_modulate"))
 
-DATASET_NAME = "all_mod_schemes"  # dataset name in Dataset_Directory
-OUTPUT_DIR = "./DatasetPlotter/figures/all_mod_schemes"
-MAX_POINTS = 8192
-
-
-def prepare_output_dir(path: str):
-    os.makedirs(path, exist_ok=True)
-    for f in os.listdir(path):
-        os.remove(os.path.join(path, f))
+# set argument types for the new function
+clinear.linear_constellation.argtypes = [
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+]
 
 
-def bandpass_complex(x, fs, low, high, numtaps=101, beta=8.6):
-    nyq = 0.5 * fs
-    taps = firwin(
-        numtaps,
-        [max(low, 1.0) / nyq, min(high, nyq - 1.0) / nyq],
-        pass_zero=False,
-        window=("kaiser", beta),
-    )
-    return filtfilt(taps, [1.0], x.real) + 1j * filtfilt(taps, [1.0], x.imag)
+def plot_constellation(mod_scheme, output):
+    if mod_scheme not in mod_str2int:
+        raise ValueError(f"Unknown modulation scheme '{mod_scheme}'")
 
+    modinfo = mod_str2int[mod_scheme]
+    modtype = ctypes.c_int(modinfo[0])
+    order = ctypes.c_int(modinfo[1])
 
-def plot_constellation(iq, outfile, title):
-    iq = iq[:MAX_POINTS] if len(iq) > MAX_POINTS else iq
-    I, Q = iq.real, iq.imag
-    z = gaussian_kde(np.vstack((I, Q)))(np.vstack((I, Q)))
-    order = z.argsort()
-    I, Q, z = I[order], Q[order], z[order]
+    i_arr = (ctypes.c_float * order.value)()
+    q_arr = (ctypes.c_float * order.value)()
+
+    clinear.linear_constellation(modtype, order, i_arr, q_arr)
+
+    I = np.frombuffer(i_arr, dtype=np.float32)
+    Q = np.frombuffer(q_arr, dtype=np.float32)
+
+    # Normalise to [-1, 1] range
+    if np.max(np.abs(I)) != 0:
+        I = I / np.max(np.abs(I))
+    if np.max(np.abs(Q)) != 0:
+        Q = Q / np.max(np.abs(Q))
+
+    # Plot the constellation diagram
     plt.figure()
-    plt.scatter(I, Q, c=z, s=1, cmap="viridis")
+    plt.scatter(I, Q)
     plt.axhline(0, color="gray", ls="--", lw=0.5)
     plt.axvline(0, color="gray", ls="--", lw=0.5)
-    plt.title(title)
-    plt.xlabel("I (In-phase)")
-    plt.ylabel("Q (Quadrature)")
-    plt.colorbar(label="Density")
+    plt.gca().set_aspect("equal", "box")
+    plt.title(mod_scheme)
+    plt.xlabel("I")
+    plt.ylabel("Q")
     plt.grid(True, ls="--", alpha=0.4)
     plt.tight_layout()
-    plt.savefig(outfile, dpi=300)
+    plt.savefig(output, dpi=900)
     plt.close()
 
 
-def get_data(base):
-    with open(base + ".sigmf-meta") as f:
-        meta = json.load(f)
-    with open(base + ".sigmf-data", "rb") as f:
-        raw = np.load(f)
-
-    ann0 = meta["annotations"][0]
-    mods = ann0["rfml_labels"]["modclass"]
-    fs = ann0["sampling_rate"]
-    fcs = ann0["center_frequencies"]
-
-    try:  # pull pulse-shaping info if present
-        filt = meta["annotations"][1]["filter"]
-        sps, beta = filt["sps"], filt["rolloff"]
-    except (KeyError, IndexError):
-        sps = beta = None
-
-    iq = raw[0::2] + 1j * raw[1::2]  # interleaved I,Q → complex
-    return iq, mods, fcs, fs, sps, beta
-
-
 def main():
-    # load system parameters (paths, rng seed, etc.)
-    with open("./configs/system_parameters.json") as f:
-        sp = json.load(f)
-    sys.path.append(sp["Working_Directory"])
-    np.random.seed(sp["Random_Seed"])
+    mod_schemes = [
+        "bpsk",
+        "qpsk",
+        "8psk",
+        "16psk",
+        "32psk",
+        "64psk",
+        "128psk",
+        "256psk",
+        "4qam",
+        "8qam",
+        "16qam",
+        "32qam",
+        "64qam",
+        "128qam",
+        "256qam",
+        "2ask",
+        "4ask",
+        "8ask",
+        "16ask",
+        "32ask",
+        "64ask",
+        "128ask",
+        "256ask",
+        "2apsk",
+        "4apsk",
+        "8apsk",
+        "16apsk",
+        "32apsk",
+        "64apsk",
+        "128apsk",
+        "256apsk",
+        "2dpsk",
+        "4dpsk",
+        "8dpsk",
+        "16dpsk",
+        "32dpsk",
+        "64dpsk",
+        "128dpsk",
+        "256dpsk",
+    ]
+    output_dir = "./DatasetPlotter/figures/all_mod_schemes"
+    os.makedirs(output_dir, exist_ok=True)
 
-    dataset_path = os.path.join(sp["Dataset_Directory"], DATASET_NAME)
-    if not os.path.isdir(dataset_path):
-        sys.exit(f"Dataset path '{dataset_path}' not found.")
+    # Empty the output directory
+    for file in os.listdir(output_dir):
+        os.remove(f"{output_dir}/{file}")
 
-    prepare_output_dir(OUTPUT_DIR)
-    seen = set()
-
-    bases = {
-        os.path.join(dataset_path, f.split(".")[0])
-        for f in os.listdir(dataset_path)
-        if f.endswith(".sigmf-data")
-    }
-
-    for base in tqdm(sorted(bases), desc="Processing captures"):
-        try:
-            iq, mods, fcs, fs, sps, beta = get_data(base)
-        except Exception as e:
-            print(f"[WARN] skipping '{base}': {e}")
-            continue
-        sps = sps[0] if isinstance(sps, list) else sps  # handle single value or list
-        bw = (fs / sps) * (1 + beta)
-
-        for i, m in enumerate(mods):
-            if m in seen:  # already have this modulation plotted
-                continue
-            fc = fcs[i] if i < len(fcs) else 0.0
-            chan = bandpass_complex(iq, fs, fc - bw / 2, fc + bw / 2)
-            t = np.arange(len(chan)) / fs
-            bb = chan * np.exp(-1j * 2 * np.pi * fc * t)  # down-convert
-
-            if sps:
-                bb = bb[int(sps) // 2 :: int(sps)]  # sample once per symbol
-
-            outfile = os.path.join(OUTPUT_DIR, f"{m}.png")
-            plot_constellation(bb, outfile, f"{m}  (first capture)")
-            seen.add(m)
-            print(f"[INFO] wrote {outfile}")
-
-    print(f"\nDone — generated {len(seen)} unique constellation diagrams.")
+    for scheme in mod_schemes:
+        output_name = os.path.join(output_dir, f"{scheme.lower()}_constellation.png")
+        plot_constellation(scheme.lower(), output_name)
 
 
 if __name__ == "__main__":
