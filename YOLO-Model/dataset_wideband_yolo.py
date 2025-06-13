@@ -48,6 +48,8 @@ class WidebandYoloDataset(Dataset):
 
         # Determine num_samples from the first file.
         self.num_samples = self._find_num_samples(self.files[0])
+        # cache of memory-mapped arrays for faster access
+        self._memmaps = {}
 
     def _discover_mod_classes(self):
         all_mods = set()
@@ -68,8 +70,7 @@ class WidebandYoloDataset(Dataset):
     def _find_num_samples(self, base):
         # Check the first file to see how many samples (2*N interleaved)
         data_path = os.path.join(self.directory, base + ".sigmf-data")
-        with open(data_path, "rb") as f:
-            iq_data = np.load(f)
+        iq_data = np.fromfile(data_path, dtype=np.float32)
         return len(iq_data) // 2
 
     def get_num_samples(self):
@@ -83,9 +84,15 @@ class WidebandYoloDataset(Dataset):
         data_path = os.path.join(self.directory, base + ".sigmf-data")
         meta_path = os.path.join(self.directory, base + ".sigmf-meta")
 
-        # Load IQ data (time domain)
-        with open(data_path, "rb") as f:
-            iq_data = np.load(f)
+        # Load IQ data (time domain) using a memory map for efficiency
+        if base not in self._memmaps:
+            self._memmaps[base] = np.memmap(
+                data_path,
+                dtype=np.float32,
+                mode="r",
+                shape=(2 * self.num_samples,),
+            )
+        iq_data = self._memmaps[base]
         I = iq_data[0::2]
         Q = iq_data[1::2]
         x_complex = I + 1j * Q
@@ -147,7 +154,14 @@ class WidebandYoloDataset(Dataset):
             # Find the anchor index that is closest to the computed offset.
             anchor_idx = int(np.argmin(np.abs(anchor_values - x_offset)))
 
-            # Assign the label for the best matching anchor.
+            # If this anchor is already used, try to find a free one
+            if label_tensor[cell_idx, anchor_idx, 1] == 1.0:
+                free = np.where(label_tensor[cell_idx, :, 1] == 0)[0]
+                if len(free) == 0:
+                    # No space left in this cell; skip to avoid overwrite
+                    continue
+                anchor_idx = free[0]
+
             label_tensor[cell_idx, anchor_idx, 0] = x_offset
             label_tensor[cell_idx, anchor_idx, 1] = 1.0
             label_tensor[cell_idx, anchor_idx, 2] = bw_n  # bandwidth

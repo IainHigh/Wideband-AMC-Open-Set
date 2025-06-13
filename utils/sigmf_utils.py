@@ -34,8 +34,9 @@ def save_sigmf(i, q, config, idx):
     iq = np.zeros(2 * len(i), dtype=i.dtype)
     iq[0::2] = i
     iq[1::2] = q
+    # Write raw interleaved IQ samples to comply with the SigMF spec
     with open(data_name, "wb") as f:
-        np.save(f, iq)
+        iq.tofile(f)
 
     _global = {
         "core:datatype": "cf32_le",

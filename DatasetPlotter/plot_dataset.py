@@ -119,8 +119,7 @@ def get_data(file):
         f_meta = json.load(_f)
 
     ## get data
-    with open(file + ".sigmf-data", "rb") as _f:
-        f_data = np.load(_f)
+    f_data = np.fromfile(file + ".sigmf-data", dtype=np.float32)
 
     # Extract metadata
     annotation = f_meta["annotations"][0]
@@ -269,7 +268,7 @@ def plot_constellation_diagram(
         plt.axvline(0, color="gray", linewidth=0.5, linestyle="--")
         plt.xlabel("I (In-phase)")
         plt.ylabel("Q (Quadrature)")
-        plt.title("Constellation Diagram ({modscheme}) at {f_c/1e6:.2f} MHz")
+        plt.title(f"Constellation Diagram ({modscheme}) at {f_c/1e6:.2f} MHz")
         cbar = plt.colorbar()
         cbar.set_label("Density")
         plt.grid(True, linestyle="--", alpha=0.5)
@@ -302,7 +301,7 @@ def plot_spectrogram(f_data, sampling_rate):
     plt.title("Spectrogram")
     plt.xlabel("Frequency [Hz]")
     plt.ylabel("Time [s]")
-    plt.savefig("{spectrogram_output_path}/Spectrogram.png")
+    plt.savefig(f"{spectrogram_output_path}/Spectrogram.png")
     plt.close()
 
 

@@ -129,7 +129,7 @@ class WidebandClassifier(nn.Module):
             concatenated = torch.cat([branch1, branch2, branch3], dim=1)
             x = F.relu(concatenated + residual)
         x = self.global_avg_pool(x)
-        feat = self.global_avg_pool(x).view(x.size(0), -1)  # (B,96)
+        feat = x.view(x.size(0), -1)  # (B,96)
         logits = self.fc(feat)
         return (logits, feat) if return_embedding else logits
 
@@ -436,7 +436,59 @@ class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # learnable class centres:  C × D
-        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, 96) * 0.01)
+        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, 96) * 0.1)
+        self.reset_epoch_stats()
+
+    def reset_epoch_stats(self):
+        """Reset accumulators used for detailed loss printing."""
+        self._epoch_stats = {
+            "coord": 0.0,
+            "bw": 0.0,
+            "conf_obj": 0.0,
+            "conf_noobj": 0.0,
+            "cls": 0.0,
+            "center": 0.0,
+            "trip": 0.0,
+            "center_sep": 0.0,
+        }
+        self._samples = 0
+
+    def _update_epoch_stats(
+        self,
+        batch_size,
+        coord_loss,
+        bw_loss,
+        conf_loss_o,
+        conf_loss_n,
+        cls_loss,
+        center_loss,
+        trip_loss,
+        center_sep_loss,
+    ):
+        self._epoch_stats["coord"] += coord_loss.item()
+        self._epoch_stats["bw"] += bw_loss.item()
+        self._epoch_stats["conf_obj"] += conf_loss_o.item()
+        self._epoch_stats["conf_noobj"] += conf_loss_n.item()
+        self._epoch_stats["cls"] += cls_loss.item()
+        self._epoch_stats["center"] += center_loss.item()
+        self._epoch_stats["trip"] += trip_loss.item()
+        self._epoch_stats["center_sep"] += center_sep_loss.item()
+        self._samples += batch_size
+
+    def print_epoch_stats(self):
+        """Print the averaged loss components for the epoch."""
+        if self._samples == 0:
+            return
+        stats = {k: v / self._samples for k, v in self._epoch_stats.items()}
+        print("\tDetailed Loss (avg per sample):")
+        print(f"\t\tCoordLoss: {stats['coord']:.4f}")
+        print(f"\t\tBwLoss: {stats['bw']:.4f}")
+        print(f"\t\tConfLossObj: {stats['conf_obj']:.4f}")
+        print(f"\t\tConfLossNoObj: {stats['conf_noobj']:.4f}")
+        print(f"\t\tClsLoss: {stats['cls']:.4f}")
+        print(f"\t\tCenterLoss: {stats['center']:.4f}")
+        print(f"\t\tTripletLoss: {stats['trip']:.4f}")
+        print(f"\t\tCenterSepLoss: {stats['center_sep']:.4f}")
 
     def _pairwise_dist(self, x):
         prod = x @ x.t()
@@ -528,13 +580,16 @@ class WidebandYoloLoss(nn.Module):
         )  # keep same scale
 
         if DETAILED_LOSS_PRINT:
-            print(f"\t\t\tCoordLoss: {coord_loss.item() / batch_size :.4f} ")
-            print(f"\t\t\tBwLoss: {bw_loss.item() / batch_size :.4f}")
-            print(f"\t\t\tConfLossObj: {conf_loss_o.item() / batch_size :.4f}")
-            print(f"\t\t\tConfLossNoObj: {conf_loss_n.item() / batch_size :.4f}")
-            print(f"\t\t\tClsLoss: {cls_loss.item() / batch_size :.4f}")
-            print(f"\t\t\tCenterLoss: {center_loss.item() / batch_size :.4f}")
-            print(f"\t\t\tTripletLoss: {trip_loss.item() / batch_size :.4f}")
-            print(f"\t\t\tCenterSepLoss: {center_sep_loss.item() / batch_size :.4f}")
+            self._update_epoch_stats(
+                batch_size,
+                coord_loss,
+                bw_loss,
+                conf_loss_o,
+                conf_loss_n,
+                cls_loss,
+                center_loss,
+                trip_loss,
+                center_sep_loss,
+            )
 
         return total_loss / batch_size

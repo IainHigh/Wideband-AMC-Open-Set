@@ -23,7 +23,7 @@ def get_anchors():
 #####################
 
 OPENSET_ENABLE = True  # master switch
-OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
+OPENSET_COVERAGE = 0.97  # tail kept inside each class Gaussian
 UNKNOWN_CLASS_NAME = "UNKNOWN"
 
 #####################
@@ -82,8 +82,8 @@ LAMBDA_CLASS = 2.0  # Weight for classification loss
 
 # Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
 LAMBDA_CENTER = 2.0  # Weight for the embedding distance loss
-LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
-TRIPLET_MARGIN = 0.2  # Margin for triplet loss
+LAMBDA_TRIPLET = 5.0  # Weight for triplet loss
+TRIPLET_MARGIN = 1.0  # Margin for triplet loss
 LAMBDA_CENTER_SEP = 2.0  # Weight for maximising distance between class centres
 
 

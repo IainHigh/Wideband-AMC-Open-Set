@@ -256,7 +256,7 @@ def main():
         train_mean_freq_err = convert_to_readable(train_mean_freq_err, 0)[0]
 
         print(
-            f"  Train: Loss={avg_train_loss:.4f}, "
+            f"\tTrain: Loss={avg_train_loss:.4f}, "
             f"MeanFreqErr={train_mean_freq_err}, "
             f"ClsAcc={train_cls_accuracy:.2f}%, "
             f"P={train_prec:.3f}, R={train_rec:.3f}, F1={train_f1:.3f}"
@@ -278,7 +278,7 @@ def main():
             val_mean_freq_err = convert_to_readable(val_mean_freq_err, 0)[0]
 
             print(
-                f"  Valid: Loss={avg_val_loss:.4f}, "
+                f"\tValid: Loss={avg_val_loss:.4f}, "
                 f"MeanFreqErr={val_mean_freq_err}, "
                 f"ClsAcc={val_cls_accuracy:.2f}%, "
                 f"P={val_prec:.3f}, R={val_rec:.3f}, F1={val_f1:.3f}"
@@ -291,17 +291,17 @@ def main():
                     : cfg.VAL_PRINT_SAMPLES
                 ]  # up to VAL_PRINT_SAMPLES frames
                 print(
-                    f"\n  Some random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
+                    f"\n\tSome random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
                 )
-                print(f"  Prediction format: (frequency, class, confidence)")
-                print(f"  GroundTruth format: (frequency, class)")
+                print(f"\tPrediction format: (frequency, class, confidence)")
+                print(f"\tGroundTruth format: (frequency, class)")
                 for idx, frame_dict in enumerate(to_print, 1):
                     pred_list = frame_dict["pred_list"]
                     gt_list = frame_dict["gt_list"]
 
-                    print(f"    Frame {idx}:")
-                    print(f"      Predicted => {pred_list}")
-                    print(f"      GroundTruth=> {gt_list}")
+                    print(f"\t\tFrame {idx}:")
+                    print(f"\t\t\tPredicted => {pred_list}")
+                    print(f"\t\t\tGroundTruth=> {gt_list}")
                 print("")
 
         if cfg.MULTIPLE_JOBS_PER_TRAINING:
@@ -320,6 +320,9 @@ def main():
 
 def train_model(model, train_loader, device, optimizer, criterion, epoch):
     model.train()
+    if cfg.DETAILED_LOSS_PRINT:
+        criterion.reset_epoch_stats()
+
     total_train_loss = 0.0
 
     # For metrics:
@@ -441,6 +444,10 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
             class_means = class_means.to(device)
             inv_cov = inv_cov.to(device)
 
+    if cfg.DETAILED_LOSS_PRINT:
+        criterion.print_epoch_stats()
+        criterion.reset_epoch_stats()
+
     return (
         model,
         avg_train_loss,
@@ -454,6 +461,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
 def validate_model(model, val_loader, device, criterion, epoch):
     model.eval()
+    if cfg.DETAILED_LOSS_PRINT:
+        criterion.reset_epoch_stats()
     total_val_loss = 0.0
 
     val_obj_count = 0
@@ -582,6 +591,10 @@ def validate_model(model, val_loader, device, criterion, epoch):
     precision = val_tp / (val_tp + val_fp) if (val_tp + val_fp) else 0.0
     recall = val_tp / (val_tp + val_fn) if (val_tp + val_fn) else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+
+    if cfg.DETAILED_LOSS_PRINT:
+        criterion.print_epoch_stats()
+        criterion.reset_epoch_stats()
 
     return (
         avg_val_loss,
