@@ -215,7 +215,12 @@ def main():
                 checkpoint = torch.load(
                     f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth", map_location="cpu"
                 )
-                model.load_state_dict(checkpoint)
+                if "model" in checkpoint:
+                    model.load_state_dict(checkpoint["model"])
+                    criterion.load_state_dict(checkpoint["criterion"])
+                else:
+                    # Backwards compatibility with checkpoints that only saved the model
+                    model.load_state_dict(checkpoint)
                 model.to(device)
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
@@ -231,7 +236,11 @@ def main():
         # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of FINAL_LR_MULTIPLE by the last epoch.
         prog = epoch / (cfg.EPOCHS - 1) if cfg.EPOCHS > 1 else 0.0
         learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
-        optimizer = optim.Adam(model.parameters(), lr=learn_rate)
+        # Optimizer must update both the model and the loss centres so the class prototypes are learned along with the network weights.
+        optimizer = optim.Adam(
+            list(model.parameters()) + list(criterion.parameters()),
+            lr=learn_rate,
+        )
 
         # Training
         (
@@ -296,12 +305,14 @@ def main():
                 print("")
 
         if cfg.MULTIPLE_JOBS_PER_TRAINING:
-            # Save model every epoch
-            torch.save(model.state_dict(), f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth")
-
-            # Delete the previous model epoch to save space
-            if epoch > 0:
-                os.remove(f"{SAVE_MODEL_NAME}_epoch_{epoch}.pth")
+            # Save model (and loss centres) every epoch for multi-job training
+            torch.save(
+                {
+                    "model": model.state_dict(),
+                    "criterion": criterion.state_dict(),
+                },
+                f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth",
+            )
 
     # 4) Test the model
     test_model(model, test_loader, device)
