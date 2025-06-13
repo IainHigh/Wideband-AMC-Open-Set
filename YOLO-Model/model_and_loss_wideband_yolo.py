@@ -543,9 +543,17 @@ class WidebandYoloLoss(nn.Module):
         conf_loss_o = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
         conf_loss_n = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
 
-        cls_loss = LAMBDA_CLASS * torch.sum(
-            obj_mask.unsqueeze(-1) * (cls_pred - cls_tgt) ** 2
-        )
+        with torch.no_grad():
+            tgt_idx = cls_tgt.argmax(dim=-1)
+        if obj_mask.sum() > 0:
+            ce = F.cross_entropy(
+                cls_pred[obj_mask.bool()],
+                tgt_idx[obj_mask.bool()],
+                reduction="sum",
+            )
+        else:
+            ce = torch.tensor(0.0, device=cls_pred.device)
+        cls_loss = LAMBDA_CLASS * ce
 
         # ---------- centre-loss on *GT* boxes --------------------------
         with torch.no_grad():

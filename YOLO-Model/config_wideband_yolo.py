@@ -75,7 +75,7 @@ DETAILED_LOSS_PRINT = (
 
 CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
 
-LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
+LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
 LAMBDA_COORD = 1.0  # Weight for coordinate (x offset) loss
 LAMBDA_BW = 1.0
 LAMBDA_CLASS = 2.0  # Weight for classification loss
@@ -83,8 +83,8 @@ LAMBDA_CLASS = 2.0  # Weight for classification loss
 # Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
 LAMBDA_CENTER = 2.0  # Weight for the embedding distance loss
 LAMBDA_TRIPLET = 5.0  # Weight for triplet loss
-TRIPLET_MARGIN = 1.0  # Margin for triplet loss
-LAMBDA_CENTER_SEP = 2.0  # Weight for maximising distance between class centres
+TRIPLET_MARGIN = 3.0  # Margin for triplet loss
+LAMBDA_CENTER_SEP = 1.0  # Weight for maximising distance between class centres
 
 
 def print_config_file():

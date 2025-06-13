@@ -62,12 +62,15 @@ EMBED_DIM = 96
 def maha_dist(x, mean, inv_cov):
     """x:(...,D) – class-cond. squared Mahalanobis distance."""
     diff = x - mean
-    m = torch.einsum("...d,dc,...c->...", diff, inv_cov, diff)
+    if inv_cov.dim() == 2:
+        m = torch.einsum("...d,dc,...c->...", diff, inv_cov, diff)
+    else:
+        m = torch.einsum("...d,...dc,...c->...", diff, inv_cov, diff)
     return m
 
 
 class_means = None  # tensor [NUM_CLASSES, EMBED_DIM]
-inv_cov = None  # shared inverse covariance  [D,D]
+inv_cov = None  # per-class inverse covariance  [NUM_CLASSES,D,D]
 
 UNKNOWN_IDX = cfg.NUM_CLASSES
 
@@ -347,6 +350,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         loss = criterion(pred, label_tensor, emb)
         loss.backward()
         optimizer.step()
+        with torch.no_grad():
+            model.anchors.data.clamp_(0.0, 1.0)
         total_train_loss += loss.item()
 
         pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
@@ -418,27 +423,20 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
     if cfg.OPENSET_ENABLE:
         with torch.no_grad():
-            vecs = []
-            labels = []
-
             global class_means, inv_cov
             class_means = torch.zeros(cfg.NUM_CLASSES, EMBED_DIM)
+            inv_cov = torch.zeros(cfg.NUM_CLASSES, EMBED_DIM, EMBED_DIM)
 
-            for c, lst in enumerate(emb_acc):  # c = 0 … NUM_CLASSES-1
-                if lst:  # (ignore empty classes)
-                    m = torch.cat(lst, 0)  # [n_c, 96] on **CPU**
-                    class_means[c] = m.mean(0)  # per-class mean
-                    vecs.append(m)
-                    labels.append(torch.full((m.size(0),), c, dtype=torch.long))
+            for c, lst in enumerate(emb_acc):
+                if not lst:
+                    continue
+                m = torch.cat(lst, 0)
+                mean_c = m.mean(0)
+                class_means[c] = mean_c
+                diff = m - mean_c
+                cov_c = (diff.T @ diff) / (m.size(0) - 1)
+                inv_cov[c] = linalg.inv(cov_c + 1e-6 * torch.eye(cov_c.size(0)))
 
-            all_vecs = torch.cat(vecs, 0)  # [N_tot, 96]  (CPU)
-            lbl_vec = torch.cat(labels, 0)  # [N_tot]      (CPU)
-
-            # --- shared (pooled) covariance ---------------------------
-            diff = all_vecs - class_means[lbl_vec]  # devices now match
-            cov = (diff.T @ diff) / (all_vecs.size(0) - 1)
-            inv_cov = linalg.inv(cov + 1e-6 * torch.eye(cov.size(0)))
-            # thresholds: χ² quantile with D d.o.f.
             q = chi2.ppf(cfg.OPENSET_COVERAGE, EMBED_DIM)
             cfg.OPENSET_THRESHOLD = torch.full((cfg.NUM_CLASSES,), q)
             class_means = class_means.to(device)
@@ -525,10 +523,10 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
                 # Mahalanobis distances for *every* predicted box
-                means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
-                d2 = maha_dist(
-                    emb.reshape(-1, EMBED_DIM), means_sel, inv_cov.to(device)
-                )
+                flat_idx = pred_class_idx.reshape(-1)
+                means_sel = class_means[flat_idx].to(device)
+                cov_sel = inv_cov[flat_idx].to(device)
+                d2 = maha_dist(emb.reshape(-1, EMBED_DIM), means_sel, cov_sel)
                 d2 = d2.view_as(pred_class_idx)
                 tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]
                 unknown_mask_pred = d2 > tau
@@ -666,10 +664,10 @@ def test_model(model, test_loader, device):
 
             if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
                 # Mahalanobis distances for *every* predicted box
-                means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
-                d2 = maha_dist(
-                    emb.reshape(-1, EMBED_DIM), means_sel, inv_cov.to(device)
-                )
+                flat_idx = pred_class_idx.reshape(-1)
+                means_sel = class_means[flat_idx].to(device)
+                cov_sel = inv_cov[flat_idx].to(device)
+                d2 = maha_dist(emb.reshape(-1, EMBED_DIM), means_sel, cov_sel)
                 d2 = d2.view_as(pred_class_idx)
                 tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]
                 unknown_mask_pred = d2 > tau

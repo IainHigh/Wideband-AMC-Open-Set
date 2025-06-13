@@ -175,8 +175,8 @@ class WidebandYoloDataset(Dataset):
 
         # Return time-domain IQ, frequency-domain representation, label, and SNR.
         return (
-            torch.tensor(x_wide),
-            torch.tensor(x_freq),
-            torch.tensor(label_tensor),
+            torch.from_numpy(x_wide),
+            torch.from_numpy(x_freq),
+            torch.from_numpy(label_tensor),
             torch.tensor(snr_value, dtype=torch.float32),
         )
