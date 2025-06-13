@@ -56,6 +56,8 @@ np.random.seed(rng_seed)
 
 CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
 
+EMBED_DIM = 96
+
 
 def maha_dist(x, mean, inv_cov):
     """x:(...,D) – class-cond. squared Mahalanobis distance."""
@@ -406,7 +408,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
             labels = []
 
             global class_means, inv_cov
-            class_means = torch.zeros(cfg.NUM_CLASSES, cfg.EMBED_DIM)
+            class_means = torch.zeros(cfg.NUM_CLASSES, EMBED_DIM)
 
             for c, lst in enumerate(emb_acc):  # c = 0 … NUM_CLASSES-1
                 if lst:  # (ignore empty classes)
@@ -423,7 +425,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
             cov = (diff.T @ diff) / (all_vecs.size(0) - 1)
             inv_cov = linalg.inv(cov + 1e-6 * torch.eye(cov.size(0)))
             # thresholds: χ² quantile with D d.o.f.
-            q = chi2.ppf(cfg.OPENSET_COVERAGE, cfg.EMBED_DIM)
+            q = chi2.ppf(cfg.OPENSET_COVERAGE, EMBED_DIM)
             cfg.OPENSET_THRESHOLD = torch.full((cfg.NUM_CLASSES,), q)
             class_means = class_means.to(device)
             inv_cov = inv_cov.to(device)
@@ -505,7 +507,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
                 # Mahalanobis distances for *every* predicted box
                 means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
                 d2 = maha_dist(
-                    emb.reshape(-1, cfg.EMBED_DIM), means_sel, inv_cov.to(device)
+                    emb.reshape(-1, EMBED_DIM), means_sel, inv_cov.to(device)
                 )
                 d2 = d2.view_as(pred_class_idx)
                 tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]
@@ -642,7 +644,7 @@ def test_model(model, test_loader, device):
                 # Mahalanobis distances for *every* predicted box
                 means_sel = class_means[pred_class_idx.reshape(-1)].to(device)
                 d2 = maha_dist(
-                    emb.reshape(-1, cfg.EMBED_DIM), means_sel, inv_cov.to(device)
+                    emb.reshape(-1, EMBED_DIM), means_sel, inv_cov.to(device)
                 )
                 d2 = d2.view_as(pred_class_idx)
                 tau = cfg.OPENSET_THRESHOLD.to(device)[pred_class_idx]

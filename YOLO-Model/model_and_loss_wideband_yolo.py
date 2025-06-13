@@ -22,7 +22,6 @@ from config_wideband_yolo import (
     MERGE_SIMILAR_PREDICTIONS,
     MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
     get_anchors,
-    EMBED_DIM,
 )
 
 
@@ -433,7 +432,7 @@ class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # learnable class centres:  C × D
-        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, EMBED_DIM) * 0.01)
+        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, 96) * 0.01)
 
     def forward(self, pred, target, embed):
         # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
@@ -469,8 +468,8 @@ class WidebandYoloLoss(nn.Module):
         with torch.no_grad():
             gt_idx = cls_tgt.argmax(dim=-1)  # [B,S,B]
         obj_mask_flat = obj_mask.bool().view(-1)
-        emb_flat = embed.view(embed.size(0), embed.size(1), B, EMBED_DIM)
-        emb_flat = emb_flat.view(-1, EMBED_DIM)[obj_mask_flat]  # [N_pos,D]
+        emb_flat = embed.view(embed.size(0), embed.size(1), B, 96)
+        emb_flat = emb_flat.view(-1, 96)[obj_mask_flat]  # [N_pos,D]
         label_flat = gt_idx.view(-1)[obj_mask_flat]  # [N_pos]
 
         center_sel = self.centers[label_flat]  # [N_pos,D]

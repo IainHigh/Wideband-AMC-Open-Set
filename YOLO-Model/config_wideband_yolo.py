@@ -25,7 +25,6 @@ def get_anchors():
 OPENSET_ENABLE = True  # master switch
 OPENSET_COVERAGE = 0.95  # tail kept inside each class Gaussian
 UNKNOWN_CLASS_NAME = "UNKNOWN"
-EMBED_DIM = 96  # TODO: Don't have this as a configurable parameter, but rather a constant in the model.
 
 #####################
 # Miscellaneous Parameters
@@ -45,7 +44,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction. TODO: Investigate why when this is True, the model crashes with NaN error with one transmitter.
+MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -77,7 +76,7 @@ LAMBDA_BW = 1.0
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_CENTER = 5.0  # Weight for the embedding distance loss
 
-CONFIDENCE_THRESHOLD = 0.16  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
 
 
 def print_config_file():
@@ -117,5 +116,4 @@ def print_config_file():
         print("\tOPENSET RECOGNITION PARAMETERS:")
         print("\t\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
         print("\t\tUNKNOWN_CLASS_NAME:", UNKNOWN_CLASS_NAME)
-        print("\t\tEMBED_DIM:", EMBED_DIM)
     print("")

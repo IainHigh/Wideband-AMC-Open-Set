@@ -4,7 +4,7 @@
   "modulation": [
     "qpsk",
     "16qam",
-    "32qam",
+    "64qam",
     "4ask",
     "16ask",
     "16apsk",
@@ -30,7 +30,7 @@
   ],
   "channel": {
     "type": "awgn",
-    "snr": [-5, 10, 1],
+    "snr": 10,
     "fo": 0.0,
     "po": 0.0
   },
