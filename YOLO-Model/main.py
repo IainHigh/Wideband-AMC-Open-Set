@@ -232,18 +232,23 @@ def main():
         print("Model training complete. No more epochs to train.")
         return
 
-    # 3) Training loop
+    # 3) Optimiser
+    prog = start_epoch / (cfg.EPOCHS - 1) if cfg.EPOCHS > 1 else 0.0
+    learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
+    optimizer = optim.Adam(
+        list(model.parameters()) + list(criterion.parameters()),
+        lr=learn_rate,
+    )
+
+    # 4) Training loop
     for epoch in range(start_epoch, cfg.EPOCHS):
         print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")
 
-        # Set the learning rate depending on the epoch. Starts at LEARNING_RATE and decreases by a factor of FINAL_LR_MULTIPLE by the last epoch.
+        # Adjust learning rate for this epoch without resetting optimiser state
         prog = epoch / (cfg.EPOCHS - 1) if cfg.EPOCHS > 1 else 0.0
         learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
-        # Optimizer must update both the model and the loss centres so the class prototypes are learned along with the network weights.
-        optimizer = optim.Adam(
-            list(model.parameters()) + list(criterion.parameters()),
-            lr=learn_rate,
-        )
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = learn_rate
 
         # Training
         (
