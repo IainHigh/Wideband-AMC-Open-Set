@@ -229,18 +229,6 @@ def main():
         print("Model training complete. No more epochs to train.")
         return
 
-    print("Criterion parameters:")
-    print(list(criterion.parameters()))
-    print(
-        f"Criterion has {sum(p.numel() for p in criterion.parameters() if p.requires_grad)} trainable parameters."
-    )
-
-    print("Model parameters:")
-    print(list(model.parameters()))
-    print(
-        f"Model has {sum(p.numel() for p in model.parameters() if p.requires_grad)} trainable parameters."
-    )
-
     # 3) Training loop
     for epoch in range(start_epoch, cfg.EPOCHS):
         print(f"Epoch [{epoch+1}/{cfg.EPOCHS}]")

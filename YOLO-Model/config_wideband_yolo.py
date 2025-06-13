@@ -68,17 +68,23 @@ FINAL_LR_MULTIPLE = 0.005  # Final learning rate multiple - the final learning r
 ########################
 # Loss Function Weights
 ########################
-LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
 
-LAMBDA_COORD = 1.0  # Weight for coordinate (x offset) loss
-LAMBDA_BW = 1.0
-
-LAMBDA_CLASS = 2.0  # Weight for classification loss
-LAMBDA_CENTER = 5.0  # Weight for the embedding distance loss
-LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
-TRIPLET_MARGIN = 0.2  # Margin for triplet loss
+DETAILED_LOSS_PRINT = (
+    True  # If True, will print detailed loss information during training.
+)
 
 CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
+
+LAMBDA_NOOBJ = 0.5  # Weight for confidence loss in no-object cells
+LAMBDA_COORD = 1.0  # Weight for coordinate (x offset) loss
+LAMBDA_BW = 1.0
+LAMBDA_CLASS = 2.0  # Weight for classification loss
+
+# Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
+LAMBDA_CENTER = 2.0  # Weight for the embedding distance loss
+LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
+TRIPLET_MARGIN = 0.2  # Margin for triplet loss
+LAMBDA_CENTER_SEP = 2.0  # Weight for maximising distance between class centres
 
 
 def print_config_file():
@@ -92,12 +98,13 @@ def print_config_file():
     print("\tGENERATE_CONFUSION_MATRIX:", GENERATE_CONFUSION_MATRIX)
     print("\tMULTIPLE_JOBS_PER_TRAINING:", MULTIPLE_JOBS_PER_TRAINING)
     print("\tSAMPLING_FREQUENCY:", SAMPLING_FREQUENCY)
-    print("\tMERGE_SIMILAR_PREDICTIONS:", MERGE_SIMILAR_PREDICTIONS)
     if MERGE_SIMILAR_PREDICTIONS:
         print(
             "\tMERGE_SIMILAR_PREDICTIONS_THRESHOLD:",
             MERGE_SIMILAR_PREDICTIONS_THRESHOLD,
         )
+    else:
+        print("\tNOT MERGING SIMILAR PREDICTIONS")
     print("\tNUMTAPS:", NUMTAPS)
     print("\tS:", S)
     print("\tB:", B)
@@ -106,17 +113,23 @@ def print_config_file():
     print("\tEPOCHS:", EPOCHS)
     print("\tLEARNING_RATE:", LEARNING_RATE)
     print("\tFINAL_LR_MULTIPLE:", FINAL_LR_MULTIPLE)
+    print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
+    print("")
     print("\tLOSS WEIGHT LAMBDAS:")
     print("\t\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
     print("\t\tLAMBDA_COORD:", LAMBDA_COORD)
     print("\t\tLAMBDA_BW:", LAMBDA_BW)
     print("\t\tLAMBDA_CLASS:", LAMBDA_CLASS)
-    print("\t\tLAMBDA_CENTER:", LAMBDA_CENTER)
-    print("\t\tLAMBDA_TRIPLET:", LAMBDA_TRIPLET)
-    print("\t\tTRIPLET_MARGIN:", TRIPLET_MARGIN)
-    print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
+
     if OPENSET_ENABLE:
+        print("")
         print("\tOPENSET RECOGNITION PARAMETERS:")
         print("\t\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
         print("\t\tUNKNOWN_CLASS_NAME:", UNKNOWN_CLASS_NAME)
+
+        print("\t\tLAMBDA_CENTER:", LAMBDA_CENTER)
+        print("\t\tLAMBDA_TRIPLET:", LAMBDA_TRIPLET)
+        print("\t\tLAMBDA_CENTER_SEP:", LAMBDA_CENTER_SEP)
+        print("\t\tTRIPLET_MARGIN:", TRIPLET_MARGIN)
+
     print("")

@@ -17,8 +17,10 @@ from config_wideband_yolo import (
     LAMBDA_BW,
     LAMBDA_CENTER,
     LAMBDA_TRIPLET,
+    LAMBDA_CENTER_SEP,
     TRIPLET_MARGIN,
     CONFIDENCE_THRESHOLD,
+    DETAILED_LOSS_PRINT,
     NUMTAPS,
     SAMPLING_FREQUENCY,
     MERGE_SIMILAR_PREDICTIONS,
@@ -506,6 +508,14 @@ class WidebandYoloLoss(nn.Module):
 
         trip_loss = self._triplet_loss(emb_flat, label_flat) * LAMBDA_TRIPLET
 
+        # ---------- maximise separation between class centres -------------
+        with torch.no_grad():
+            num_c = self.centers.size(0)
+        dists_cent = self._pairwise_dist(self.centers)
+        mask = torch.ones_like(dists_cent) - torch.eye(num_c, device=dists_cent.device)
+        sep_mean = (dists_cent * mask).sum() / (num_c * (num_c - 1))
+        center_sep_loss = -LAMBDA_CENTER_SEP * sep_mean
+
         total_loss = (
             coord_loss
             + bw_loss
@@ -514,5 +524,17 @@ class WidebandYoloLoss(nn.Module):
             + cls_loss
             + center_loss
             + trip_loss
+            + center_sep_loss
         )  # keep same scale
+
+        if DETAILED_LOSS_PRINT:
+            print(f"\t\t\tCoordLoss: {coord_loss.item() / batch_size :.4f} ")
+            print(f"\t\t\tBwLoss: {bw_loss.item() / batch_size :.4f}")
+            print(f"\t\t\tConfLossObj: {conf_loss_o.item() / batch_size :.4f}")
+            print(f"\t\t\tConfLossNoObj: {conf_loss_n.item() / batch_size :.4f}")
+            print(f"\t\t\tClsLoss: {cls_loss.item() / batch_size :.4f}")
+            print(f"\t\t\tCenterLoss: {center_loss.item() / batch_size :.4f}")
+            print(f"\t\t\tTripletLoss: {trip_loss.item() / batch_size :.4f}")
+            print(f"\t\t\tCenterSepLoss: {center_sep_loss.item() / batch_size :.4f}")
+
         return total_loss / batch_size
