@@ -75,6 +75,8 @@ LAMBDA_BW = 1.0
 
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 LAMBDA_CENTER = 5.0  # Weight for the embedding distance loss
+LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
+TRIPLET_MARGIN = 0.2  # Margin for triplet loss
 
 CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
 
@@ -110,7 +112,8 @@ def print_config_file():
     print("\t\tLAMBDA_BW:", LAMBDA_BW)
     print("\t\tLAMBDA_CLASS:", LAMBDA_CLASS)
     print("\t\tLAMBDA_CENTER:", LAMBDA_CENTER)
-
+    print("\t\tLAMBDA_TRIPLET:", LAMBDA_TRIPLET)
+    print("\t\tTRIPLET_MARGIN:", TRIPLET_MARGIN)
     print("\tCONFIDENCE_THRESHOLD:", CONFIDENCE_THRESHOLD)
     if OPENSET_ENABLE:
         print("\tOPENSET RECOGNITION PARAMETERS:")

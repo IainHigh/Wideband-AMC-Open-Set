@@ -16,6 +16,8 @@ from config_wideband_yolo import (
     LAMBDA_CLASS,
     LAMBDA_BW,
     LAMBDA_CENTER,
+    LAMBDA_TRIPLET,
+    TRIPLET_MARGIN,
     CONFIDENCE_THRESHOLD,
     NUMTAPS,
     SAMPLING_FREQUENCY,
@@ -434,6 +436,33 @@ class WidebandYoloLoss(nn.Module):
         # learnable class centres:  C × D
         self.centers = nn.Parameter(torch.randn(NUM_CLASSES, 96) * 0.01)
 
+    def _pairwise_dist(self, x):
+        prod = x @ x.t()
+        sq = torch.diagonal(prod)
+        dist = sq.unsqueeze(1) - 2 * prod + sq.unsqueeze(0)
+        dist = torch.clamp(dist, min=0.0)
+        return dist
+
+    def _triplet_loss(self, embeds, labels):
+        if embeds.size(0) < 2:
+            return torch.tensor(0.0, device=embeds.device, dtype=embeds.dtype)
+        dists = self._pairwise_dist(embeds)
+        N = embeds.size(0)
+        losses = []
+        for i in range(N):
+            mask_pos = (labels == labels[i]) & (
+                torch.arange(N, device=labels.device) != i
+            )
+            mask_neg = labels != labels[i]
+            if not mask_pos.any() or not mask_neg.any():
+                continue
+            pos_dist = dists[i][mask_pos].max()
+            neg_dist = dists[i][mask_neg].min()
+            losses.append(F.softplus(pos_dist - neg_dist + TRIPLET_MARGIN))
+        if not losses:
+            return torch.tensor(0.0, device=embeds.device, dtype=embeds.dtype)
+        return torch.stack(losses).mean()
+
     def forward(self, pred, target, embed):
         # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
         batch_size = pred.shape[0]
@@ -475,7 +504,15 @@ class WidebandYoloLoss(nn.Module):
         center_sel = self.centers[label_flat]  # [N_pos,D]
         center_loss = ((emb_flat - center_sel) ** 2).sum(1).mean() * LAMBDA_CENTER
 
+        trip_loss = self._triplet_loss(emb_flat, label_flat) * LAMBDA_TRIPLET
+
         total_loss = (
-            coord_loss + bw_loss + conf_loss_o + conf_loss_n + cls_loss + center_loss
+            coord_loss
+            + bw_loss
+            + conf_loss_o
+            + conf_loss_n
+            + cls_loss
+            + center_loss
+            + trip_loss
         )  # keep same scale
         return total_loss / batch_size
