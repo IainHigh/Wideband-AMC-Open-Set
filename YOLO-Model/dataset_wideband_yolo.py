@@ -48,8 +48,6 @@ class WidebandYoloDataset(Dataset):
 
         # Determine num_samples from the first file.
         self.num_samples = self._find_num_samples(self.files[0])
-        # cache of memory-mapped arrays for faster access
-        self._memmaps = {}
 
     def _discover_mod_classes(self):
         all_mods = set()
@@ -84,15 +82,15 @@ class WidebandYoloDataset(Dataset):
         data_path = os.path.join(self.directory, base + ".sigmf-data")
         meta_path = os.path.join(self.directory, base + ".sigmf-meta")
 
-        # Load IQ data (time domain) using a memory map for efficiency
-        if base not in self._memmaps:
-            self._memmaps[base] = np.memmap(
-                data_path,
-                dtype=np.float32,
-                mode="r",
-                shape=(2 * self.num_samples,),
-            )
-        iq_data = self._memmaps[base]
+        # Load IQ data (time domain). Avoid keeping many files open at once by creating a temporary memory map for this sample only.
+        iq_map = np.memmap(
+            data_path,
+            dtype=np.float32,
+            mode="r",
+            shape=(2 * self.num_samples,),
+        )
+        iq_data = np.array(iq_map)
+        del iq_map
         I = iq_data[0::2]
         Q = iq_data[1::2]
         x_complex = I + 1j * Q

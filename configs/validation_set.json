@@ -1,5 +1,5 @@
 {
-  "n_captures": 1000,
+  "n_captures": 30000,
   "n_samps": 4096,
   "modulation": [
     "qpsk",
@@ -30,7 +30,7 @@
   ],
   "channel": {
     "type": "awgn",
-    "snr": 10,
+    "snr": [-5, 10, 1],
     "fo": 0.0,
     "po": 0.0
   },
