@@ -1,5 +1,5 @@
 {
-  "n_captures": 30000,
+  "n_captures": 1000,
   "n_samps": 4096,
   "modulation": [
     "qpsk",
@@ -15,7 +15,7 @@
   ],
   "symbol_rate": 32,
   "sampling_rate": 1e9,
-  "randomly_generated_center_frequencies": [40e6, 400e6, 4, 1],
+  "randomly_generated_center_frequencies": [40e6, 400e6, 1, 1],
 
   "am_defaults": { "modulation_index": [0.5, 0.7, 0.05] },
   "fmnb_defaults": { "modulation_factor": [0.03, 0.08, 0.01] },
@@ -30,7 +30,7 @@
   ],
   "channel": {
     "type": "awgn",
-    "snr": [-5, 10, 1],
+    "snr": 10,
     "fo": 0.0,
     "po": 0.0
   },

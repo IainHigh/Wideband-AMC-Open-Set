@@ -11,6 +11,7 @@ from uuid import uuid4
 import numpy as np
 import sys
 import os
+import gc
 import random
 import matplotlib.pyplot as plt
 import config_wideband_yolo as cfg
@@ -322,6 +323,10 @@ def main():
                 f"{SAVE_MODEL_NAME}_epoch_{epoch+1}.pth",
             )
 
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
     # 4) Test the model
     test_model(model, test_loader, device)
 
@@ -450,6 +455,10 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
     if cfg.DETAILED_LOSS_PRINT:
         criterion.print_epoch_stats()
         criterion.reset_epoch_stats()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
 
     return (
         model,

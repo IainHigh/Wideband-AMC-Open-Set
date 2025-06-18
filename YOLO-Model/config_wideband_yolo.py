@@ -60,8 +60,8 @@ NUM_CLASSES = 7  # Number of classes
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 100
-EPOCHS = 50
+BATCH_SIZE = 75
+EPOCHS = 15
 LEARNING_RATE = 0.001  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.005  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
 
@@ -81,10 +81,10 @@ LAMBDA_BW = 1.0
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 
 # Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
-LAMBDA_CENTER = 2.0  # Weight for the embedding distance loss
-LAMBDA_TRIPLET = 5.0  # Weight for triplet loss
-TRIPLET_MARGIN = 3.0  # Margin for triplet loss
-LAMBDA_CENTER_SEP = 1.0  # Weight for maximising distance between class centres
+LAMBDA_CENTER = 0.001  # Weight for the embedding distance loss
+LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
+TRIPLET_MARGIN = 1.0  # Margin for triplet loss
+LAMBDA_CENTER_SEP = 0.00025  # Weight for maximising distance between class centres
 
 
 def print_config_file():
