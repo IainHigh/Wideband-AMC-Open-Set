@@ -274,26 +274,39 @@ class WidebandYoloModel(nn.Module):
         final_out[..., 3:] = out_conf_class[..., 1:]  # classes
         final_out = final_out.view(bsz, S, B * (1 + 1 + 1 + NUM_CLASSES))
         if (not self.training) and MERGE_SIMILAR_PREDICTIONS:
-            all_preds = self._collect_raw_predictions(final_out)
-            merged = [
-                self._merge_similar_predictions(l, MERGE_SIMILAR_PREDICTIONS_THRESHOLD)
-                for l in all_preds
-            ]
-            final_out = self._pack_merged_to_tensor(
-                merged, final_out.device, final_out.dtype
+            all_preds, all_embs = self._collect_raw_predictions(final_out, embed)
+            merged = []
+            merged_embs = []
+            for p_list, e_list in zip(all_preds, all_embs):
+                mp, me = self._merge_similar_predictions(
+                    p_list, e_list, MERGE_SIMILAR_PREDICTIONS_THRESHOLD
+                )
+                merged.append(mp)
+                merged_embs.append(me)
+            emb_dim = embed.size(-1)
+            final_out, embed = self._pack_merged_to_tensor(
+                merged,
+                merged_embs,
+                final_out.device,
+                final_out.dtype,
+                embed.dtype,
+                emb_dim,
             )
         return final_out, embed
 
-    def _collect_raw_predictions(self, final_out):
+    def _collect_raw_predictions(self, final_out, embed):
         """
         Turn raw model output (bsz×S×(B*(1+1+NUM_CLASSES))) into per-sample
-        lists of (freq_Hz:float, class_idx:int, conf:float).
+        lists of (freq_Hz, class_idx, conf, bw) **and corresponding embeddings**.
         """
         bsz = final_out.size(0)
         raw = final_out.view(bsz, S, B, 1 + 1 + 1 + NUM_CLASSES)
-        lists = []
+        embed = embed.view(bsz, S, B, -1)
+        pred_lists = []
+        emb_lists = []
         for i in range(bsz):
             preds = []
+            embs = []
             for si in range(S):
                 for bi in range(B):
                     conf = raw[i, si, bi, 1].item()
@@ -304,64 +317,58 @@ class WidebandYoloModel(nn.Module):
                     cls = int(raw[i, si, bi, 3:].argmax())
                     bw = raw[i, si, bi, 2].item()
                     preds.append((freq, cls, conf, bw))
-            lists.append(preds)
-        return lists
+                    embs.append(embed[i, si, bi].detach())
+            pred_lists.append(preds)
+            emb_lists.append(embs)
+        return pred_lists, emb_lists
 
-    def _pack_merged_to_tensor(self, merged_lists, device, dtype):
+    def _pack_merged_to_tensor(
+        self, merged_lists, emb_lists, device, dtype, emb_dtype, emb_dim
+    ):
         """
-        merged_lists: List of length bsz of [(freq_Hz, class_idx, conf), …]
-        returns: tensor of shape (bsz, S, B, 1+1+NUM_CLASSES)
+        merged_lists: List of length bsz of predictions
+        emb_lists   : matching embeddings
+        returns: (pred_tensor, emb_tensor)
         """
         bsz = len(merged_lists)
         out = torch.zeros(
             bsz, S, B, 1 + 1 + 1 + NUM_CLASSES, device=device, dtype=dtype
         )
+        out_emb = torch.zeros(bsz, S, B, emb_dim, device=device, dtype=emb_dtype)
 
         anchors = get_anchors()  # numpy array of length B
-        for i, preds in enumerate(merged_lists):
-            for freq, cls, conf, bw in preds:
-                # normalized freq in [0,1]
+        for i, (preds, embs) in enumerate(zip(merged_lists, emb_lists)):
+            for (freq, cls, conf, bw), emb in zip(preds, embs):
                 freq_norm = freq / (SAMPLING_FREQUENCY / 2)
                 cell = int(freq_norm * S)
                 cell = min(cell, S - 1)
                 off = freq_norm * S - cell
                 off = float(np.clip(off, 0.0, 1.0))
-                # pick closest anchor index
                 aidx = int(np.argmin(np.abs(anchors - off)))
 
                 out[i, cell, aidx, 0] = off
                 out[i, cell, aidx, 1] = conf
                 out[i, cell, aidx, 2] = bw
                 out[i, cell, aidx, 3 + cls] = 1.0
+                out_emb[i, cell, aidx] = emb.to(device)
 
-        return out
+        return out, out_emb
 
-    def _merge_similar_predictions(self, pred_list, margin):
-        preds = sorted(pred_list, key=lambda x: x[0])
-        merged = []
-        while preds:
-            seed_f, seed_c, seed_conf, seed_bw = preds.pop(0)
-            cluster = [(seed_f, seed_c, seed_conf, seed_bw)]
-            i = 0
-            while i < len(preds):
-                f, c, conf, bw = preds[i]
-                if abs(f - seed_f) <= margin:
-                    cluster.append((f, c, conf, bw))
-                    preds.pop(i)
-                else:
-                    i += 1
-            classes = {t[1] for t in cluster}
-            if len(classes) == 1:
-                tot_conf = sum(conf for *_, conf, _ in cluster)
-                if tot_conf == 0:
-                    merged.append(max(cluster, key=lambda x: x[2]))
-                f_avg = sum(f * conf for f, _, conf, _ in cluster) / tot_conf
-                bw_avg = sum(bw * conf for _, _, conf, bw in cluster) / tot_conf
-                max_conf = max(conf for *_, conf, _ in cluster)
-                merged.append((f_avg, cluster[0][1], max_conf, bw_avg))
-            else:
-                merged.append(max(cluster, key=lambda x: x[2]))
-        return merged
+    def _merge_similar_predictions(self, pred_list, emb_list, margin):
+        """Return only the highest confidence prediction within ``margin``."""
+        pairs = list(zip(pred_list, emb_list))
+        # Sort by descending confidence so the first item in a cluster is kept
+        pairs.sort(key=lambda x: x[0][2], reverse=True)
+
+        kept_preds = []
+        kept_embs = []
+        for (freq, cls, conf, bw), emb in pairs:
+            if all(abs(freq - kp[0]) > margin for kp in kept_preds):
+                kept_preds.append((freq, cls, conf, bw))
+                kept_embs.append(emb)
+            # else: discard lower‑confidence prediction
+
+        return kept_preds, kept_embs
 
     def _filter_raw(self, x_flat, freq_flat, bandwidth_flat):
         """
@@ -503,10 +510,10 @@ class WidebandYoloLoss(nn.Module):
         noobj_mask = 1.0 - obj_mask
 
         # ----- IoU between predicted and target frequency regions -----
-        pred_low = x_pred - bw_pred
-        pred_high = x_pred + bw_pred
-        tgt_low = x_tgt - bw_tgt
-        tgt_high = x_tgt + bw_tgt
+        pred_low = x_pred - (bw_pred / 2.0)
+        pred_high = x_pred + (bw_pred / 2.0)
+        tgt_low = x_tgt - (bw_tgt / 2.0)
+        tgt_high = x_tgt + (bw_tgt / 2.0)
 
         inter_low = torch.maximum(pred_low, tgt_low)
         inter_high = torch.minimum(pred_high, tgt_high)

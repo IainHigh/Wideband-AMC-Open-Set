@@ -30,12 +30,13 @@ UNKNOWN_CLASS_NAME = "UNKNOWN"
 # Miscellaneous Parameters
 #####################
 
-VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
 VALIDATE_MODEL = False
+VAL_PRINT_SAMPLES = 0  # The number of samples to print during validation. Helps to see how the model is doing.
+
 PRINT_CONFIG_FILE = True  # If True, will print the configuration file to the console.
-WRITE_TEST_RESULTS = False  # If True, will write the test results to a file.
+WRITE_TEST_RESULTS = True  # If True, will write the test results to a file.
 GENERATE_CONFUSION_MATRIX = True  # Generate a confusion matrix after training.
-PLOT_TEST_SAMPLES = False  # If True, will plot the test samples and predictions.
+PLOT_TEST_SAMPLES = True  # If True, will plot the test samples and predictions.
 MULTIPLE_JOBS_PER_TRAINING = False  # If true, will save the model after each validation step. When the current job script is finished, it will start the next job script and resume training from the last saved model.
 MODULATION_CLASSES = []
 
@@ -44,7 +45,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction.
+MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -60,7 +61,7 @@ NUM_CLASSES = 7  # Number of classes
 #####################
 # Training Parameters
 #####################
-BATCH_SIZE = 75
+BATCH_SIZE = 64
 EPOCHS = 15
 LEARNING_RATE = 0.001  # Initial learning rate
 FINAL_LR_MULTIPLE = 0.005  # Final learning rate multiple - the final learning rate will be this multiple of the initial learning rate.
@@ -76,7 +77,7 @@ DETAILED_LOSS_PRINT = (
 CONFIDENCE_THRESHOLD = 0.15  # Confidence threshold for filtering predictions
 
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
-IOU_LOSS = 1.0  # Weight for IoU loss (centre offset and bandwidths)
+IOU_LOSS = 2.0  # Weight for IoU loss (centre offset and bandwidths)
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 
 # Open-set recognition loss weights:

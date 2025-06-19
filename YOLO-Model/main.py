@@ -953,40 +953,67 @@ def plot_test_samples(model, test_loader, device, out_dir):
 
             # run model for this one sample
             with torch.no_grad():
-                pred = model(
+                pred, emb = model(
                     time_data[b : b + 1].to(device),
                     freq_data[b : b + 1].to(device),
                 )
-            # reshape to [1, S, B, 1+1+NUM_CLASSES]
-            pred = (
-                pred.view(1, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()[0]
-            )
-            gt = label_tensor[b].view(cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).numpy()
+
+            # reshape to [S, B, 1+1+NUM_CLASSES]
+            pred = pred.view(cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+            emb = emb.view(cfg.S, cfg.B, -1)
+            gt = label_tensor[b].view(cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+
+            pred = pred.cpu()
+            emb = emb.cpu()
+            gt = gt.cpu()
+
+            # determine predicted and true classes with open-set support
+            pred_class_idx = pred[..., 3:].argmax(dim=-1)
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
+                flat_idx = pred_class_idx.reshape(-1)
+                means_sel = class_means[flat_idx].to(emb.device)
+                cov_sel = inv_cov[flat_idx].to(emb.device)
+                d2 = maha_dist(emb.reshape(-1, EMBED_DIM), means_sel, cov_sel)
+                d2 = d2.view_as(pred_class_idx)
+                tau = cfg.OPENSET_THRESHOLD[pred_class_idx]
+                unknown_mask_pred = d2 > tau
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
+            true_class_idx = gt[..., 3:].argmax(dim=-1)
+            if cfg.OPENSET_ENABLE:
+                gt_unknown_mask = gt[..., 3:].sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
 
             # extract GT freqs & classes
             gt_lines = []
             for si in range(cfg.S):
                 for bi in range(cfg.B):
                     if gt[si, bi, 1] > 0:  # confidence>0
-                        xg = gt[si, bi, 0]
+                        xg = gt[si, bi, 0].item()
                         fg = (si + xg) * CELL_WIDTH
-                        cls_g = np.argmax(gt[si, bi, 3:])
-                        gt_lines.append((fg, cfg.MODULATION_CLASSES[cls_g]))
+                        cls_g_idx = int(true_class_idx[si, bi].item())
+                        if cls_g_idx < len(cfg.MODULATION_CLASSES):
+                            cls_g = cfg.MODULATION_CLASSES[cls_g_idx]
+                        else:
+                            cls_g = cfg.UNKNOWN_CLASS_NAME
+                        gt_lines.append((fg, cls_g))
 
             # extract preds above a threshold
             pred_lines = []
             for si in range(cfg.S):
                 for bi in range(cfg.B):
-                    conf_p = pred[si, bi, 1]
+                    conf_p = pred[si, bi, 1].item()
                     if conf_p > cfg.CONFIDENCE_THRESHOLD:
-                        xp = pred[si, bi, 0]
+                        xp = pred[si, bi, 0].item()
                         fp = (si + xp) * CELL_WIDTH
-                        cls_p = np.argmax(pred[si, bi, 3:])
-                        bandwidth = pred[si, bi, 2]
+                        cls_p_idx = int(pred_class_idx[si, bi].item())
+                        if cls_p_idx < len(cfg.MODULATION_CLASSES):
+                            cls_p = cfg.MODULATION_CLASSES[cls_p_idx]
+                        else:
+                            cls_p = cfg.UNKNOWN_CLASS_NAME
+                        bandwidth = pred[si, bi, 2].item()
                         bandwidth = bandwidth * CELL_WIDTH
-                        pred_lines.append(
-                            (fp, cfg.MODULATION_CLASSES[cls_p], bandwidth)
-                        )
+                        pred_lines.append((fp, cls_p, bandwidth))
 
             # plotting
             plt.figure()
@@ -1063,14 +1090,31 @@ def write_test_results(model, test_loader, device, out_dir):
         ):
             bsz = time_data.size(0)
             # run model once per batch
-            preds = model(time_data.to(device), freq_data.to(device))
-            # reshape to [batch, S, B, 1+1+NUM_CLASSES]
-            preds = (
-                preds.view(bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES).cpu().numpy()
-            )
-            labels = label_tensor.view(
-                bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES
-            ).numpy()
+            preds, emb = model(time_data.to(device), freq_data.to(device))
+            preds = preds.view(bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+            emb = emb.view(bsz, cfg.S, cfg.B, -1)
+            labels = label_tensor.view(bsz, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
+
+            preds = preds.cpu()
+            emb = emb.cpu()
+            labels = labels.cpu()
+
+            pred_class_idx = preds[..., 3:].argmax(dim=-1)
+            if cfg.OPENSET_ENABLE and cfg.OPENSET_THRESHOLD is not None:
+                flat_idx = pred_class_idx.reshape(-1)
+                means_sel = class_means[flat_idx].to(emb.device)
+                cov_sel = inv_cov[flat_idx].to(emb.device)
+                d2 = maha_dist(emb.reshape(-1, EMBED_DIM), means_sel, cov_sel)
+                d2 = d2.view_as(pred_class_idx)
+                tau = cfg.OPENSET_THRESHOLD[pred_class_idx]
+                unknown_mask_pred = d2 > tau
+                pred_class_idx[unknown_mask_pred] = UNKNOWN_IDX
+
+            true_class_idx = labels[..., 3:].argmax(dim=-1)
+            if cfg.OPENSET_ENABLE:
+                gt_unknown_mask = labels[..., 3:].sum(dim=-1) == 0
+                true_class_idx[gt_unknown_mask] = UNKNOWN_IDX
+
             for i in range(bsz):
                 snr = snr_tensor[i].item()
                 pred_list = []
@@ -1080,23 +1124,22 @@ def write_test_results(model, test_loader, device, out_dir):
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
                         if labels[i, si, bi, 1] > 0:
-                            xg_norm = labels[i, si, bi, 0]
+                            xg_norm = labels[i, si, bi, 0].item()
                             fg = (si + xg_norm) * CELL_WIDTH
-                            cls_idx = np.argmax(labels[i, si, bi, 3:])
+                            cls_idx = int(true_class_idx[i, si, bi].item())
                             freq_str, cls_str = convert_to_readable(fg, cls_idx)
                             gt_list.append((freq_str, cls_str))
 
-                # build Pred list
+                # build Pred list␊
                 for si in range(cfg.S):
                     for bi in range(cfg.B):
-                        conf_p = preds[i, si, bi, 1]
+                        conf_p = preds[i, si, bi, 1].item()
                         if conf_p > cfg.CONFIDENCE_THRESHOLD:
-                            xp_norm = preds[i, si, bi, 0]
+                            xp_norm = preds[i, si, bi, 0].item()
                             fp = (si + xp_norm) * CELL_WIDTH
-                            cls_idx = np.argmax(preds[i, si, bi, 3:])
+                            cls_idx = int(pred_class_idx[i, si, bi].item())
                             freq_str, cls_str = convert_to_readable(fp, cls_idx)
                             pred_list.append((freq_str, cls_str, conf_p))
-
                 entries.append((snr, len(gt_list), pred_list, gt_list))
 
     # sort by SNR descending

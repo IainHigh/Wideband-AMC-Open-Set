@@ -1,3 +1,3 @@
-1) Modify the YOLO-Model/main.py script so that plot_test_samples() and write_test_results() work with open-set recognition enabled. Make sure these accurately display UNKNOWN predictions.
-2) Fix the model such that Open-Set recognition works when merging multiple predictions for the same transmission.
-3) Make sure the model still works with open-set recognition disabled.
+1) Fix the model such that Open-Set recognition works when merging multiple predictions for the same transmission.
+2) Make sure the model still works with open-set recognition disabled.
+3) The current issue with the models open-set recognition performance is only when there's multiple transmitters. Look into why this is and resolve it. Could it be due to overlapping signals / noise? How is the accuracy of closed-set with multiple transmitters? When there's no overlapping signals it should be identical to multiple.
