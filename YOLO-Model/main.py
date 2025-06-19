@@ -219,12 +219,7 @@ def main():
                 checkpoint = torch.load(
                     f"{SAVE_MODEL_NAME}_epoch_{i+1}.pth", map_location="cpu"
                 )
-                if "model" in checkpoint:
-                    model.load_state_dict(checkpoint["model"])
-                    criterion.load_state_dict(checkpoint["criterion"])
-                else:
-                    # Backwards compatibility with checkpoints that only saved the model
-                    model.load_state_dict(checkpoint)
+                model.load_state_dict(checkpoint)
                 model.to(device)
                 start_epoch = i + 1
                 print(f"Loaded model from epoch {i+1}")
@@ -237,7 +232,7 @@ def main():
     prog = start_epoch / (cfg.EPOCHS - 1) if cfg.EPOCHS > 1 else 0.0
     learn_rate = cfg.LEARNING_RATE * (cfg.FINAL_LR_MULTIPLE**prog)
     optimizer = optim.Adam(
-        list(model.parameters()) + list(criterion.parameters()),
+        list(model.parameters()),
         lr=learn_rate,
     )
 
@@ -451,6 +446,8 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
             cfg.OPENSET_THRESHOLD = torch.full((cfg.NUM_CLASSES,), q)
             class_means = class_means.to(device)
             inv_cov = inv_cov.to(device)
+
+            criterion.centers = class_means
 
     if cfg.DETAILED_LOSS_PRINT:
         criterion.print_epoch_stats()

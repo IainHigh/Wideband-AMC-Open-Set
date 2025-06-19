@@ -436,7 +436,7 @@ class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
         # learnable class centres:  C × D
-        self.centers = nn.Parameter(torch.randn(NUM_CLASSES, 96) * 0.1)
+        self.centers = torch.randn(NUM_CLASSES, 96) * 0.1
         self.reset_epoch_stats()
 
     def reset_epoch_stats(self):
