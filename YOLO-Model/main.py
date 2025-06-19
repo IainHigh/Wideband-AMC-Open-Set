@@ -70,6 +70,7 @@ def maha_dist(x, mean, inv_cov):
     return m
 
 
+# Global variables for class means and inverse covariance
 class_means = None  # tensor [NUM_CLASSES, EMBED_DIM]
 inv_cov = None  # per-class inverse covariance  [NUM_CLASSES,D,D]
 
@@ -297,8 +298,8 @@ def main():
                 print(
                     f"\n\tSome random frames from validation (only {cfg.VAL_PRINT_SAMPLES} shown):"
                 )
-                print(f"\tPrediction format: (frequency, class, confidence)")
-                print(f"\tGroundTruth format: (frequency, class)")
+                print("\tPrediction format: (frequency, class, confidence)")
+                print("\tGroundTruth format: (frequency, class)")
                 for idx, frame_dict in enumerate(to_print, 1):
                     pred_list = frame_dict["pred_list"]
                     gt_list = frame_dict["gt_list"]
@@ -327,9 +328,16 @@ def main():
 
 
 def train_model(model, train_loader, device, optimizer, criterion, epoch):
+    global class_means, inv_cov
     model.train()
     if cfg.DETAILED_LOSS_PRINT:
         criterion.reset_epoch_stats()
+
+    # Use the class centres from the previous epoch if available
+    if class_means is not None:
+        current_centers = class_means.to(device)
+    else:
+        current_centers = torch.randn(cfg.NUM_CLASSES, EMBED_DIM, device=device) * 0.1
 
     total_train_loss = 0.0
 
@@ -352,7 +360,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         optimizer.zero_grad()
         pred, emb = model(time_data, freq_data)
         bsize = pred.shape[0]
-        loss = criterion(pred, label_tensor, emb)
+        loss = criterion(pred, label_tensor, emb, current_centers)
         loss.backward()
         optimizer.step()
         with torch.no_grad():
@@ -428,7 +436,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
 
     if cfg.OPENSET_ENABLE:
         with torch.no_grad():
-            global class_means, inv_cov
             class_means = torch.zeros(cfg.NUM_CLASSES, EMBED_DIM)
             inv_cov = torch.zeros(cfg.NUM_CLASSES, EMBED_DIM, EMBED_DIM)
 
@@ -446,8 +453,6 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
             cfg.OPENSET_THRESHOLD = torch.full((cfg.NUM_CLASSES,), q)
             class_means = class_means.to(device)
             inv_cov = inv_cov.to(device)
-
-            criterion.centers = class_means
 
     if cfg.DETAILED_LOSS_PRINT:
         criterion.print_epoch_stats()
@@ -472,6 +477,11 @@ def validate_model(model, val_loader, device, criterion, epoch):
     model.eval()
     if cfg.DETAILED_LOSS_PRINT:
         criterion.reset_epoch_stats()
+    # class centres computed from training epoch
+    if class_means is not None:
+        current_centers = class_means.to(device)
+    else:
+        current_centers = torch.randn(cfg.NUM_CLASSES, EMBED_DIM, device=device) * 0.1
     total_val_loss = 0.0
 
     val_obj_count = 0
@@ -491,7 +501,7 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             pred, emb = model(time_data, freq_data)
             bsize = pred.shape[0]
-            loss = criterion(pred, label_tensor, emb)
+            loss = criterion(pred, label_tensor, emb, current_centers)
             total_val_loss += loss.item()
 
             pred_r = pred.view(bsize, cfg.S, cfg.B, 1 + 1 + 1 + cfg.NUM_CLASSES)
@@ -644,7 +654,7 @@ def test_model(model, test_loader, device):
 
     with torch.no_grad():
         for time_data, freq_data, label_tensor, snr_tensor in tqdm(
-            test_loader, desc=f"Testing on test set"
+            test_loader, desc="Testing on test set"
         ):
             time_data = time_data.to(device)
             freq_data = freq_data.to(device)
@@ -878,7 +888,7 @@ def plot_confusion_matrix(overall_true_classes, overall_pred_classes):
         print(f"Saved confusion matrix as confusion_matrix_{uuid}.png")
     else:
         plt.savefig("confusion_matrix.png")
-        print(f"Saved confusion matrix as confusion_matrix.png")
+        print("Saved confusion matrix as confusion_matrix.png")
     plt.close()
 
 

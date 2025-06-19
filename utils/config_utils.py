@@ -9,14 +9,8 @@ from .maps import mod_str2int
 def check_range(x, positive=True):
     start, stop, step = x
     if positive:
-        assert [i >= 0.0 for i in x]
-
-    if stop < start:
-        return False
-    elif step > (stop - start):
-        return False
-    else:
-        return True
+        assert all(i >= 0.0 for i in x)
+    return (stop >= start) and (step <= (stop - start))
 
 
 def map_config(config, defaults, dataset_dir):

@@ -81,10 +81,8 @@ LAMBDA_BW = 1.0
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 
 # Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
-LAMBDA_CENTER = 0.001  # Weight for the embedding distance loss
-LAMBDA_TRIPLET = 1.0  # Weight for triplet loss
-TRIPLET_MARGIN = 1.0  # Margin for triplet loss
-LAMBDA_CENTER_SEP = 0.00025  # Weight for maximising distance between class centres
+LAMBDA_CENTER = 1.0  # Weight for the embedding distance loss
+LAMBDA_CENTER_SEP = 1.0  # Weight for maximising distance between class centres
 
 
 def print_config_file():
@@ -126,10 +124,7 @@ def print_config_file():
         print("\tOPENSET RECOGNITION PARAMETERS:")
         print("\t\tOPENSET_COVERAGE:", OPENSET_COVERAGE)
         print("\t\tUNKNOWN_CLASS_NAME:", UNKNOWN_CLASS_NAME)
-
         print("\t\tLAMBDA_CENTER:", LAMBDA_CENTER)
-        print("\t\tLAMBDA_TRIPLET:", LAMBDA_TRIPLET)
         print("\t\tLAMBDA_CENTER_SEP:", LAMBDA_CENTER_SEP)
-        print("\t\tTRIPLET_MARGIN:", TRIPLET_MARGIN)
 
     print("")

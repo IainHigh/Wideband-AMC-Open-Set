@@ -81,7 +81,7 @@ def generate_linear(config, rng_seed):
     max_beta = max([_beta for _sps, _beta, _delay, _dt in sig_params])
     min_sps = min([_sps for _sps, _beta, _delay, _dt in sig_params])
 
-    for i in tqdm(range(0, config["n_captures"]), desc=f"Generating Data"):
+    for i in tqdm(range(0, config["n_captures"]), desc="Generating Data"):
         if config["center_frequencies_random"]:
             lower_bound, upper_bound, n_max, prevent_overlap = config[
                 "center_frequencies"

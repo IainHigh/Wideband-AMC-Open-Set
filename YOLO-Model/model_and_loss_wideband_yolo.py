@@ -16,9 +16,7 @@ from config_wideband_yolo import (
     LAMBDA_CLASS,
     LAMBDA_BW,
     LAMBDA_CENTER,
-    LAMBDA_TRIPLET,
     LAMBDA_CENTER_SEP,
-    TRIPLET_MARGIN,
     CONFIDENCE_THRESHOLD,
     DETAILED_LOSS_PRINT,
     NUMTAPS,
@@ -435,8 +433,6 @@ class WidebandYoloModel(nn.Module):
 class WidebandYoloLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        # learnable class centres:  C × D
-        self.centers = torch.randn(NUM_CLASSES, 96) * 0.1
         self.reset_epoch_stats()
 
     def reset_epoch_stats(self):
@@ -448,7 +444,6 @@ class WidebandYoloLoss(nn.Module):
             "conf_noobj": 0.0,
             "cls": 0.0,
             "center": 0.0,
-            "trip": 0.0,
             "center_sep": 0.0,
         }
         self._samples = 0
@@ -462,7 +457,6 @@ class WidebandYoloLoss(nn.Module):
         conf_loss_n,
         cls_loss,
         center_loss,
-        trip_loss,
         center_sep_loss,
     ):
         self._epoch_stats["coord"] += coord_loss.item()
@@ -471,7 +465,6 @@ class WidebandYoloLoss(nn.Module):
         self._epoch_stats["conf_noobj"] += conf_loss_n.item()
         self._epoch_stats["cls"] += cls_loss.item()
         self._epoch_stats["center"] += center_loss.item()
-        self._epoch_stats["trip"] += trip_loss.item()
         self._epoch_stats["center_sep"] += center_sep_loss.item()
         self._samples += batch_size
 
@@ -487,7 +480,6 @@ class WidebandYoloLoss(nn.Module):
         print(f"\t\tConfLossNoObj: {stats['conf_noobj']:.4f}")
         print(f"\t\tClsLoss: {stats['cls']:.4f}")
         print(f"\t\tCenterLoss: {stats['center']:.4f}")
-        print(f"\t\tTripletLoss: {stats['trip']:.4f}")
         print(f"\t\tCenterSepLoss: {stats['center_sep']:.4f}")
 
     def _pairwise_dist(self, x):
@@ -497,27 +489,7 @@ class WidebandYoloLoss(nn.Module):
         dist = torch.clamp(dist, min=0.0)
         return dist
 
-    def _triplet_loss(self, embeds, labels):
-        if embeds.size(0) < 2:
-            return torch.tensor(0.0, device=embeds.device, dtype=embeds.dtype)
-        dists = self._pairwise_dist(embeds)
-        N = embeds.size(0)
-        losses = []
-        for i in range(N):
-            mask_pos = (labels == labels[i]) & (
-                torch.arange(N, device=labels.device) != i
-            )
-            mask_neg = labels != labels[i]
-            if not mask_pos.any() or not mask_neg.any():
-                continue
-            pos_dist = dists[i][mask_pos].max()
-            neg_dist = dists[i][mask_neg].min()
-            losses.append(F.softplus(pos_dist - neg_dist + TRIPLET_MARGIN))
-        if not losses:
-            return torch.tensor(0.0, device=embeds.device, dtype=embeds.dtype)
-        return torch.stack(losses).mean()
-
-    def forward(self, pred, target, embed):
+    def forward(self, pred, target, embed, centers):
         # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
         batch_size = pred.shape[0]
         pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + 1 + NUM_CLASSES)
@@ -563,15 +535,13 @@ class WidebandYoloLoss(nn.Module):
         emb_flat = emb_flat.view(-1, 96)[obj_mask_flat]  # [N_pos,D]
         label_flat = gt_idx.view(-1)[obj_mask_flat]  # [N_pos]
 
-        center_sel = self.centers[label_flat]  # [N_pos,D]
+        center_sel = centers[label_flat]  # [N_pos,D]
         center_loss = ((emb_flat - center_sel) ** 2).sum(1).mean() * LAMBDA_CENTER
-
-        trip_loss = self._triplet_loss(emb_flat, label_flat) * LAMBDA_TRIPLET
 
         # ---------- maximise separation between class centres -------------
         with torch.no_grad():
-            num_c = self.centers.size(0)
-        dists_cent = self._pairwise_dist(self.centers)
+            num_c = centers.size(0)
+        dists_cent = self._pairwise_dist(centers)
         mask = torch.ones_like(dists_cent) - torch.eye(num_c, device=dists_cent.device)
         sep_mean = (dists_cent * mask).sum() / (num_c * (num_c - 1))
         center_sep_loss = -LAMBDA_CENTER_SEP * sep_mean
@@ -583,7 +553,6 @@ class WidebandYoloLoss(nn.Module):
             + conf_loss_n
             + cls_loss
             + center_loss
-            + trip_loss
             + center_sep_loss
         )  # keep same scale
 
@@ -596,7 +565,6 @@ class WidebandYoloLoss(nn.Module):
                 conf_loss_n,
                 cls_loss,
                 center_loss,
-                trip_loss,
                 center_sep_loss,
             )
 
