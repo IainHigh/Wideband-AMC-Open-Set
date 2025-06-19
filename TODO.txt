@@ -1,0 +1,3 @@
+1) Modify the YOLO-Model/main.py script so that plot_test_samples() and write_test_results() work with open-set recognition enabled. Make sure these accurately display UNKNOWN predictions.
+2) Fix the model such that Open-Set recognition works when merging multiple predictions for the same transmission.
+3) Make sure the model still works with open-set recognition disabled.

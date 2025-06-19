@@ -11,10 +11,9 @@ from config_wideband_yolo import (
     S,
     B,
     NUM_CLASSES,
-    LAMBDA_COORD,
+    IOU_LOSS,
     LAMBDA_NOOBJ,
     LAMBDA_CLASS,
-    LAMBDA_BW,
     LAMBDA_CENTER,
     LAMBDA_CENTER_SEP,
     CONFIDENCE_THRESHOLD,
@@ -438,8 +437,7 @@ class WidebandYoloLoss(nn.Module):
     def reset_epoch_stats(self):
         """Reset accumulators used for detailed loss printing."""
         self._epoch_stats = {
-            "coord": 0.0,
-            "bw": 0.0,
+            "iou": 0.0,
             "conf_obj": 0.0,
             "conf_noobj": 0.0,
             "cls": 0.0,
@@ -451,16 +449,14 @@ class WidebandYoloLoss(nn.Module):
     def _update_epoch_stats(
         self,
         batch_size,
-        coord_loss,
-        bw_loss,
+        iou_loss,
         conf_loss_o,
         conf_loss_n,
         cls_loss,
         center_loss,
         center_sep_loss,
     ):
-        self._epoch_stats["coord"] += coord_loss.item()
-        self._epoch_stats["bw"] += bw_loss.item()
+        self._epoch_stats["iou"] += iou_loss.item()
         self._epoch_stats["conf_obj"] += conf_loss_o.item()
         self._epoch_stats["conf_noobj"] += conf_loss_n.item()
         self._epoch_stats["cls"] += cls_loss.item()
@@ -474,8 +470,7 @@ class WidebandYoloLoss(nn.Module):
             return
         stats = {k: v / self._samples for k, v in self._epoch_stats.items()}
         print("\tDetailed Loss (avg per sample):")
-        print(f"\t\tCoordLoss: {stats['coord']:.4f}")
-        print(f"\t\tBwLoss: {stats['bw']:.4f}")
+        print(f"\t\tIoULoss: {stats['iou']:.4f}")
         print(f"\t\tConfLossObj: {stats['conf_obj']:.4f}")
         print(f"\t\tConfLossNoObj: {stats['conf_noobj']:.4f}")
         print(f"\t\tClsLoss: {stats['cls']:.4f}")
@@ -490,7 +485,6 @@ class WidebandYoloLoss(nn.Module):
         return dist
 
     def forward(self, pred, target, embed, centers):
-        # TODO: Currently the centre frequency and bandwidth are used seperately in the loss function. These could be compined into a single term similar to IoU.
         batch_size = pred.shape[0]
         pred = pred.view(batch_size, pred.shape[1], B, 1 + 1 + 1 + NUM_CLASSES)
         target = target.view_as(pred)
@@ -508,10 +502,23 @@ class WidebandYoloLoss(nn.Module):
         obj_mask = (conf_tgt > 0).float()
         noobj_mask = 1.0 - obj_mask
 
-        coord_loss = LAMBDA_COORD * torch.sum(obj_mask * (x_pred - x_tgt) ** 2)
-        bw_loss = LAMBDA_BW * torch.sum(obj_mask * (bw_pred - bw_tgt) ** 2)
+        # ----- IoU between predicted and target frequency regions -----
+        pred_low = x_pred - bw_pred
+        pred_high = x_pred + bw_pred
+        tgt_low = x_tgt - bw_tgt
+        tgt_high = x_tgt + bw_tgt
 
-        iou_1d = torch.clamp(1.0 - torch.abs(x_pred - x_tgt), 0.0, 1.0)
+        inter_low = torch.maximum(pred_low, tgt_low)
+        inter_high = torch.minimum(pred_high, tgt_high)
+        intersection = (inter_high - inter_low).clamp(min=0.0)
+
+        union_low = torch.minimum(pred_low, tgt_low)
+        union_high = torch.maximum(pred_high, tgt_high)
+        union = (union_high - union_low).clamp(min=1e-6)
+
+        iou_1d = intersection / union
+        iou_loss = IOU_LOSS * torch.sum(obj_mask * (1.0 - iou_1d))
+
         conf_loss_o = torch.sum(obj_mask * (conf_pred - iou_1d) ** 2)
         conf_loss_n = LAMBDA_NOOBJ * torch.sum(noobj_mask * (conf_pred**2))
 
@@ -547,8 +554,7 @@ class WidebandYoloLoss(nn.Module):
         center_sep_loss = -LAMBDA_CENTER_SEP * sep_mean
 
         total_loss = (
-            coord_loss
-            + bw_loss
+            iou_loss
             + conf_loss_o
             + conf_loss_n
             + cls_loss
@@ -559,8 +565,7 @@ class WidebandYoloLoss(nn.Module):
         if DETAILED_LOSS_PRINT:
             self._update_epoch_stats(
                 batch_size,
-                coord_loss,
-                bw_loss,
+                iou_loss,
                 conf_loss_o,
                 conf_loss_n,
                 cls_loss,

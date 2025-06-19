@@ -55,7 +55,7 @@ torch.manual_seed(rng_seed)
 random.seed(rng_seed)
 np.random.seed(rng_seed)
 
-CELL_WIDTH = cfg.SAMPLING_FREQUENCY / cfg.S  # width of a YOLO “bin” in Hz
+CELL_WIDTH = (cfg.SAMPLING_FREQUENCY / 2) / cfg.S  # width of a YOLO “bin” in Hz
 
 EMBED_DIM = 96
 
@@ -110,14 +110,13 @@ def _hz_from_offset(off, cell):
     return (cell + off) * CELL_WIDTH
 
 
-def _collect_lists(x_pred, bw_pred, conf_pred, x_tgt, conf_tgt):
-    """
-    Build (pred, gt) lists **for ONE frame**.
+def _collect_lists(x_pred, bw_pred, conf_pred, x_tgt, bw_tgt, conf_tgt):
+    """Build (pred, gt) lists **for ONE frame**.
 
     • prediction = (centre_Hz, bandwidth_Hz) for every box whose confidence
-      exceeds `CONFIDENCE_THRESHOLD`.
+      exceeds ``CONFIDENCE_THRESHOLD``.
 
-    • ground truth = centre_Hz for every GT box (conf_tgt>0)
+    • ground truth = (centre_Hz, bandwidth_Hz) for every GT box (``conf_tgt>0``)
     """
     pred, gt = [], []
     for s in range(cfg.S):
@@ -129,24 +128,27 @@ def _collect_lists(x_pred, bw_pred, conf_pred, x_tgt, conf_tgt):
 
             if conf_tgt[s, b] > 0:
                 f = _hz_from_offset(x_tgt[s, b], s)
-                gt.append(f)
+                bw = bw_tgt[s, b] * CELL_WIDTH
+                gt.append((f, bw))
     return pred, gt
 
 
 def _tp_fp_fn(pred, gt):
-    """
-    Greedy 1-to-1 matching based on the rule
+    """Greedy 1-to-1 matching using 1D IoU overlap."""
 
-        |f_gt − f_pred| ≤ bw_pred / 2     ⇒ TP
-
-    Unmatched predictions → FP, unmatched GT → FN
-    """
     tp = fp = 0
     remaining = gt.copy()
     for f_pred, bw_pred in pred:
+        p_low = f_pred - bw_pred / 2.0
+        p_high = f_pred + bw_pred / 2.0
         matched = False
-        for i, f_gt in enumerate(remaining):
-            if abs(f_gt - f_pred) <= bw_pred / 2:
+        for i, (f_gt, bw_gt) in enumerate(remaining):
+            g_low = f_gt - bw_gt / 2.0
+            g_high = f_gt + bw_gt / 2.0
+
+            inter_low = max(p_low, g_low)
+            inter_high = min(p_high, g_high)
+            if inter_high > inter_low:
                 tp += 1
                 remaining.pop(i)
                 matched = True
@@ -375,11 +377,17 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         conf_pr = pred_r[..., 1].cpu()
 
         x_tgt = tgt_r[..., 0].cpu()
+        bw_tgt = tgt_r[..., 2].cpu()
         conf_tg = tgt_r[..., 1].cpu()
 
         for i in range(bsize):
             preds, gts = _collect_lists(
-                x_pred[i], bw_pred[i], conf_pr[i], x_tgt[i], conf_tg[i]
+                x_pred[i],
+                bw_pred[i],
+                conf_pr[i],
+                x_tgt[i],
+                bw_tgt[i],
+                conf_tg[i],
             )
             tp, fp, fn = _tp_fp_fn(preds, gts)
             train_tp += tp
@@ -402,7 +410,7 @@ def train_model(model, train_loader, device, optimizer, criterion, epoch):
         freq_err = (x_pred - x_tgt).abs()
 
         # Convert freq_err to Hz
-        freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+        freq_err = freq_err * CELL_WIDTH
         pred_class_idx = class_pred.argmax(dim=-1)
         true_class_idx = class_tgt.argmax(dim=-1)
 
@@ -512,11 +520,17 @@ def validate_model(model, val_loader, device, criterion, epoch):
             conf_pr = pred_r[..., 1].cpu()
 
             x_tgt = tgt_r[..., 0].cpu()
+            bw_tgt = tgt_r[..., 2].cpu()
             conf_tg = tgt_r[..., 1].cpu()
 
             for i in range(bsize):
                 preds, gts = _collect_lists(
-                    x_pred[i], bw_pred[i], conf_pr[i], x_tgt[i], conf_tg[i]
+                    x_pred[i],
+                    bw_pred[i],
+                    conf_pr[i],
+                    x_tgt[i],
+                    bw_tgt[i],
+                    conf_tg[i],
                 )
                 tp, fp, fn = _tp_fp_fn(preds, gts)
                 val_tp += tp
@@ -533,12 +547,13 @@ def validate_model(model, val_loader, device, criterion, epoch):
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
+            bw_tgt = label_tensor[..., 2]
             class_tgt = label_tensor[..., 3:]
 
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
             # Convert freq_err to Hz
-            freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+            freq_err = freq_err * CELL_WIDTH
 
             pred_class_idx = class_pred.argmax(dim=-1)
 
@@ -672,13 +687,14 @@ def test_model(model, test_loader, device):
 
             x_tgt = label_tensor[..., 0]
             conf_tgt = label_tensor[..., 1]
+            bw_tgt = label_tensor[..., 2]
             class_tgt = label_tensor[..., 3:]
 
             # object mask
             obj_mask = conf_tgt > 0
             freq_err = (x_pred - x_tgt).abs()
             # Convert freq_err to Hz
-            freq_err = freq_err * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+            freq_err = freq_err * CELL_WIDTH
 
             # predicted vs. true class => argmax
             pred_class_idx = class_pred.argmax(dim=-1)  # [bsize, S, B]
@@ -731,6 +747,7 @@ def test_model(model, test_loader, device):
                     bw_pred[i].cpu(),
                     conf_pred[i].cpu(),
                     x_tgt[i].cpu(),
+                    bw_tgt[i].cpu(),
                     conf_tgt[i].cpu(),
                 )
                 tp, fp, fn = _tp_fp_fn(preds, gts)
@@ -952,7 +969,7 @@ def plot_test_samples(model, test_loader, device, out_dir):
                 for bi in range(cfg.B):
                     if gt[si, bi, 1] > 0:  # confidence>0
                         xg = gt[si, bi, 0]
-                        fg = (si + xg) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                        fg = (si + xg) * CELL_WIDTH
                         cls_g = np.argmax(gt[si, bi, 3:])
                         gt_lines.append((fg, cfg.MODULATION_CLASSES[cls_g]))
 
@@ -963,10 +980,10 @@ def plot_test_samples(model, test_loader, device, out_dir):
                     conf_p = pred[si, bi, 1]
                     if conf_p > cfg.CONFIDENCE_THRESHOLD:
                         xp = pred[si, bi, 0]
-                        fp = (si + xp) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                        fp = (si + xp) * CELL_WIDTH
                         cls_p = np.argmax(pred[si, bi, 3:])
                         bandwidth = pred[si, bi, 2]
-                        bandwidth = bandwidth * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                        bandwidth = bandwidth * CELL_WIDTH
                         pred_lines.append(
                             (fp, cfg.MODULATION_CLASSES[cls_p], bandwidth)
                         )
@@ -1064,7 +1081,7 @@ def write_test_results(model, test_loader, device, out_dir):
                     for bi in range(cfg.B):
                         if labels[i, si, bi, 1] > 0:
                             xg_norm = labels[i, si, bi, 0]
-                            fg = (si + xg_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            fg = (si + xg_norm) * CELL_WIDTH
                             cls_idx = np.argmax(labels[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(fg, cls_idx)
                             gt_list.append((freq_str, cls_str))
@@ -1075,7 +1092,7 @@ def write_test_results(model, test_loader, device, out_dir):
                         conf_p = preds[i, si, bi, 1]
                         if conf_p > cfg.CONFIDENCE_THRESHOLD:
                             xp_norm = preds[i, si, bi, 0]
-                            fp = (si + xp_norm) * (cfg.SAMPLING_FREQUENCY / 2) / cfg.S
+                            fp = (si + xp_norm) * CELL_WIDTH
                             cls_idx = np.argmax(preds[i, si, bi, 3:])
                             freq_str, cls_str = convert_to_readable(fp, cls_idx)
                             pred_list.append((freq_str, cls_str, conf_p))

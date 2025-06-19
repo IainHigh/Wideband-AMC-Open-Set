@@ -73,14 +73,13 @@ DETAILED_LOSS_PRINT = (
     True  # If True, will print detailed loss information during training.
 )
 
-CONFIDENCE_THRESHOLD = 0.2  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.15  # Confidence threshold for filtering predictions
 
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
-LAMBDA_COORD = 1.0  # Weight for coordinate (x offset) loss
-LAMBDA_BW = 1.0
+IOU_LOSS = 1.0  # Weight for IoU loss (centre offset and bandwidths)
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 
-# Open-set recognition loss weights: TODO: Add a condition of if OPENSET_ENABLE is True same with printing etc.
+# Open-set recognition loss weights:
 LAMBDA_CENTER = 1.0  # Weight for the embedding distance loss
 LAMBDA_CENTER_SEP = 1.0  # Weight for maximising distance between class centres
 
@@ -115,8 +114,7 @@ def print_config_file():
     print("")
     print("\tLOSS WEIGHT LAMBDAS:")
     print("\t\tLAMBDA_NOOBJ:", LAMBDA_NOOBJ)
-    print("\t\tLAMBDA_COORD:", LAMBDA_COORD)
-    print("\t\tLAMBDA_BW:", LAMBDA_BW)
+    print("\t\tIOU_LOSS:", IOU_LOSS)
     print("\t\tLAMBDA_CLASS:", LAMBDA_CLASS)
 
     if OPENSET_ENABLE:
