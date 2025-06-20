@@ -558,6 +558,8 @@ class WidebandYoloLoss(nn.Module):
         dists_cent = self._pairwise_dist(centers)
         mask = torch.ones_like(dists_cent) - torch.eye(num_c, device=dists_cent.device)
         sep_mean = (dists_cent * mask).sum() / (num_c * (num_c - 1))
+        # Take the logarithm of the mean distance to avoid getting too large values.
+        sep_mean = torch.log(sep_mean + 1e-9)  # avoid log(0)
         center_sep_loss = -LAMBDA_CENTER_SEP * sep_mean
 
         total_loss = (
