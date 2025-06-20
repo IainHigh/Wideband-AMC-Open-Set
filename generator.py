@@ -109,6 +109,62 @@ def generate_linear(config, rng_seed):
         I_total = np.zeros(n_samps - buf, dtype=np.float32)
         Q_total = np.zeros(n_samps - buf, dtype=np.float32)
 
+        add_awgn_flag = True
+
+        # Extract channel parameters based on type (same for all transmitters)
+        if channel_type == "awgn":
+            snr, fo, po = channel_params[i]
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+        elif channel_type == "rayleigh":
+            (
+                snr,
+                fo,
+                po,
+                awgn_flag,
+                path_delays,
+                path_gains,
+            ) = channel_params[i]
+
+            assert len(path_delays) == len(
+                path_gains
+            ), "Path delays and path gains must have the same length."
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+            num_taps = ctypes.c_int(len(path_delays))
+
+            # Convert path_delays and path_gains to ctypes arrays
+            path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
+            add_awgn_flag = bool(awgn_flag)
+        elif channel_type == "rician":
+            (
+                snr,
+                fo,
+                po,
+                k_factor,
+                awgn_flag,
+                path_delays,
+                path_gains,
+            ) = channel_params[i]
+            assert len(path_delays) == len(
+                path_gains
+            ), "Path delays and path gains must have the same length."
+            snr = ctypes.c_float(snr)
+            fo = ctypes.c_float(fo)
+            po = ctypes.c_float(po)
+            k_factor = ctypes.c_float(k_factor)
+            num_taps = ctypes.c_int(len(path_delays))
+
+            # Convert path_delays and path_gains to ctypes arrays
+            path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
+            add_awgn_flag = bool(awgn_flag)
+        else:
+            raise ValueError("Undefined channel type.")
+
         for center_freq in center_frequencies:
             if not CALCULATE_BER_SNR:
                 rng_seed += 1
@@ -123,61 +179,61 @@ def generate_linear(config, rng_seed):
             mod_list.append(mod[-1])
 
             # Extract channel parameters based on type
-            if channel_type == "awgn":
-                snr, fo, po = channel_params[i]
-                snr = ctypes.c_float(snr)
-                fo = ctypes.c_float(fo)
-                po = ctypes.c_float(po)
+            # if channel_type == "awgn":
+            #     snr, fo, po = channel_params[i]
+            #     snr = ctypes.c_float(snr)
+            #     fo = ctypes.c_float(fo)
+            #     po = ctypes.c_float(po)
 
-            elif channel_type == "rayleigh":
-                (
-                    snr,
-                    fo,
-                    po,
-                    awgn_flag,
-                    path_delays,
-                    path_gains,
-                ) = channel_params[i]
+            # elif channel_type == "rayleigh":
+            #     (
+            #         snr,
+            #         fo,
+            #         po,
+            #         awgn_flag,
+            #         path_delays,
+            #         path_gains,
+            #     ) = channel_params[i]
 
-                assert len(path_delays) == len(
-                    path_gains
-                ), "Path delays and path gains must have the same length."
-                snr = ctypes.c_float(snr)
-                fo = ctypes.c_float(fo)
-                po = ctypes.c_float(po)
-                num_taps = ctypes.c_int(len(path_delays))
-                awgn = ctypes.c_int(awgn_flag)
+            #     assert len(path_delays) == len(
+            #         path_gains
+            #     ), "Path delays and path gains must have the same length."
+            #     snr = ctypes.c_float(snr)
+            #     fo = ctypes.c_float(fo)
+            #     po = ctypes.c_float(po)
+            #     num_taps = ctypes.c_int(len(path_delays))
+            #     awgn = ctypes.c_int(awgn_flag)
 
-                # Convert path_delays and path_gains to ctypes arrays
-                path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
-                path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
+            #     # Convert path_delays and path_gains to ctypes arrays
+            #     path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            #     path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
 
-            elif channel_type == "rician":
-                (
-                    snr,
-                    fo,
-                    po,
-                    k_factor,
-                    awgn_flag,
-                    path_delays,
-                    path_gains,
-                ) = channel_params[i]
-                assert len(path_delays) == len(
-                    path_gains
-                ), "Path delays and path gains must have the same length."
-                snr = ctypes.c_float(snr)
-                fo = ctypes.c_float(fo)
-                po = ctypes.c_float(po)
-                k_factor = ctypes.c_float(k_factor)
-                num_taps = ctypes.c_int(len(path_delays))
-                awgn = ctypes.c_int(awgn_flag)
+            # elif channel_type == "rician":
+            #     (
+            #         snr,
+            #         fo,
+            #         po,
+            #         k_factor,
+            #         awgn_flag,
+            #         path_delays,
+            #         path_gains,
+            #     ) = channel_params[i]
+            #     assert len(path_delays) == len(
+            #         path_gains
+            #     ), "Path delays and path gains must have the same length."
+            #     snr = ctypes.c_float(snr)
+            #     fo = ctypes.c_float(fo)
+            #     po = ctypes.c_float(po)
+            #     k_factor = ctypes.c_float(k_factor)
+            #     num_taps = ctypes.c_int(len(path_delays))
+            #     awgn = ctypes.c_int(awgn_flag)
 
-                # Convert path_delays and path_gains to ctypes arrays
-                path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
-                path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
+            #     # Convert path_delays and path_gains to ctypes arrays
+            #     path_delays_ctypes = (ctypes.c_float * len(path_delays))(*path_delays)
+            #     path_gains_ctypes = (ctypes.c_float * len(path_gains))(*path_gains)
 
-            else:
-                raise ValueError("Undefined channel type.")
+            # else:
+            #     raise ValueError("Undefined channel type.")
 
             rand_index = np.random.randint(0, len(sig_params))
             sps_list.append(sig_params[rand_index][0])
@@ -217,8 +273,14 @@ def generate_linear(config, rng_seed):
             )
 
             # Channel Type
+            add_awgn = add_awgn_flag
             if channel_type == "awgn":
-                cchan.channel(snr, n_sym, sps, fo, po, xI, xQ, yI, yQ, verbose, seed)
+                # Apply frequency and phase offsets but defer noise
+                complex_signal = np.array(xI) + 1j * np.array(xQ)
+                times_ch = np.arange(n_samps) / sps.value
+                complex_signal *= np.exp(1j * (fo.value * times_ch + po.value))
+                yI = complex_signal.real.astype(np.float32)
+                yQ = complex_signal.imag.astype(np.float32)
             elif channel_type == "rayleigh":
                 cchan.rayleigh_channel(
                     snr,
@@ -227,7 +289,7 @@ def generate_linear(config, rng_seed):
                     fo,
                     po,
                     num_taps,
-                    awgn,
+                    ctypes.c_int(0),
                     xI,
                     xQ,
                     yI,
@@ -246,7 +308,7 @@ def generate_linear(config, rng_seed):
                     po,
                     k_factor,
                     num_taps,
-                    awgn,
+                    ctypes.c_int(0),
                     xI,
                     xQ,
                     yI,
@@ -276,6 +338,14 @@ def generate_linear(config, rng_seed):
             # Sum to create the wideband signal
             I_total += I_shifted
             Q_total += Q_shifted
+
+        # Add AWGN noise once after summing all transmitters
+        if add_awgn:
+            nstd = np.power(10.0, -snr.value / 20.0)
+            noise_I = np.random.normal(scale=nstd / np.sqrt(2), size=I_total.shape)
+            noise_Q = np.random.normal(scale=nstd / np.sqrt(2), size=Q_total.shape)
+            I_total += noise_I
+            Q_total += noise_Q
 
         # Metadata
         metadata = {

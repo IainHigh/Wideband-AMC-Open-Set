@@ -45,7 +45,7 @@ MODULATION_CLASSES = []
 #####################
 
 SAMPLING_FREQUENCY = 1e9
-MERGE_SIMILAR_PREDICTIONS = True  # Merge similar predictions into one prediction.
+MERGE_SIMILAR_PREDICTIONS = False  # Merge similar predictions into one prediction.
 MERGE_SIMILAR_PREDICTIONS_THRESHOLD = (
     SAMPLING_FREQUENCY / 15
 )  # The threshold for merging similar predictions. If the distance between two predictions is less than this value, they will be merged.
@@ -74,10 +74,10 @@ DETAILED_LOSS_PRINT = (
     True  # If True, will print detailed loss information during training.
 )
 
-CONFIDENCE_THRESHOLD = 0.15  # Confidence threshold for filtering predictions
+CONFIDENCE_THRESHOLD = 0.10  # Confidence threshold for filtering predictions
 
 LAMBDA_NOOBJ = 1.0  # Weight for confidence loss in no-object cells
-IOU_LOSS = 2.0  # Weight for IoU loss (centre offset and bandwidths)
+IOU_LOSS = 4.0  # Weight for IoU loss (centre offset and bandwidths)
 LAMBDA_CLASS = 2.0  # Weight for classification loss
 
 # Open-set recognition loss weights:

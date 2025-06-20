@@ -1,3 +1,4 @@
-1) Fix the model such that Open-Set recognition works when merging multiple predictions for the same transmission.
-2) Make sure the model still works with open-set recognition disabled.
-3) The current issue with the models open-set recognition performance is only when there's multiple transmitters. Look into why this is and resolve it. Could it be due to overlapping signals / noise? How is the accuracy of closed-set with multiple transmitters? When there's no overlapping signals it should be identical to multiple.
+1) Look into methods of preventing CenterSepLoss from increasing substantially too high - could simply take the logarithm of it.
+2) Fix the model such that Open-Set recognition works when merging multiple predictions for the same transmission. Merge based on embedding distance if OSR is enabled - confidence if OSR is disabled.
+3) Make sure the model still works with open-set recognition disabled.
+4) Implement Rician and Rayleigh channel models back into generator.py when required. Currently removed due to the issue faced with AWGN stacking - decreasing the SNR when multiple transmissions were present.
