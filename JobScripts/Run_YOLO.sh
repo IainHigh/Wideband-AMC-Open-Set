@@ -28,7 +28,7 @@ module load anaconda
 # Activate the anaconda environment
 source activate mypython
 
-if false ; then
+if true ; then
     echo "If you've changed the modulation scheme list, please remember to change NUM_CLASSES in the YOLO config file as well."
 
     # Remove the old dataset

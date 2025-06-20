@@ -4,7 +4,6 @@
   "modulation": [
     "qpsk",
     "16qam",
-    "64qam",
     "4ask",
     "16ask",
     "16apsk",
